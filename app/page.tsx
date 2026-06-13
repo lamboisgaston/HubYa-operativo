@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 type Cliente = {
   id: number;
@@ -457,254 +457,164 @@ export default function Home() {
     }));
   }
 
-  function nombrePrivado(cliente: Cliente, index: number) {
+  const nombrePrivado = useCallback((cliente: Cliente, index: number) => {
     return cliente.id === clienteActivo?.id ? cliente.nombre : `Cliente ${index + 1}`;
+  }, [clienteActivo?.id]);
+
+  const emailPrivado = useMemo(() => {
+    const lineasClientes = clientesDelHub.map((cliente, index) =>
+      `- ${nombrePrivado(cliente, index)}: ${formatoMoneda(numeroSeguro(cliente.importeCobrado))}`,
+    );
+    const lineasGastos = jornada.gastosJornada.map((gasto) =>
+      `- ${gasto.concepto || "Gasto sin concepto"}: ${formatoMoneda(numeroSeguro(gasto.importe))}`,
+    );
+    const lineasParticipantes = calculos.pagosParticipantes.map((participante) =>
+      `- ${participante.nombre}${participante.esCapataz ? " · capataz" : ""}: ${formatoMoneda(participante.gananciaFinal)}`,
+    );
+
+    return [
+      `Reporte diario HubYa`,
+      `Cliente seleccionado: ${clienteActivo?.nombre || "cliente"}`,
+      `Hub: ${jornada.hub}`,
+      `Fecha: ${fechaFormateada}`,
+      clienteActivo ? `Importe correspondiente a su espacio verde: ${formatoMoneda(numeroSeguro(clienteActivo.importeCobrado))}` : "",
+      "",
+      `Hola ${clienteActivo?.nombre || "cliente"},`,
+      "",
+      `Trabajo realizado: ${jornada.trabajoRealizado}`,
+      `Trabajo pendiente: ${jornada.trabajoPendiente}`,
+      "",
+      "Por privacidad, los demás clientes figuran anonimizados y no se muestran emails de otros clientes.",
+      "",
+      `Total facturado: ${formatoMoneda(calculos.totalFacturado)}`,
+      ...lineasClientes,
+      "",
+      `Gastos de la jornada: ${formatoMoneda(calculos.totalGastos)}`,
+      ...lineasGastos,
+      "",
+      `Saldo operativo: ${formatoMoneda(calculos.saldoOperativo)}`,
+      `Utilidad capataz (${calculos.porcentajeUtilidadCapataz}%): ${formatoMoneda(calculos.utilidadCapataz)}`,
+      `Capataz seleccionado: ${capatazSeleccionado?.nombre || "Sin seleccionar"}`,
+      `Saldo distribuible: ${formatoMoneda(calculos.saldoDistribuible)}`,
+      `Pago base equitativo: ${formatoMoneda(calculos.pagoBaseEquitativo)}`,
+      "",
+      "Ganancia final por actor:",
+      ...lineasParticipantes,
+      "",
+      `Estado operativo: ${jornada.estadoOperativo}`,
+      "",
+      "Saludos,",
+      "HubYa",
+    ].filter((linea) => linea !== "").join("\n");
+  }, [calculos, capatazSeleccionado?.nombre, clienteActivo, clientesDelHub, fechaFormateada, jornada, nombrePrivado]);
+
+  async function copiarEmail() {
+    await navigator.clipboard.writeText(emailPrivado);
+    setMensajeGuardado(`Email copiado: ${new Date().toLocaleTimeString("es-AR")}`);
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f6f1] text-[#182018]">
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <header className="mb-8 flex flex-col gap-5 border-b border-[#d8ddcf] pb-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#66745c]">Plataforma Operativa</p>
-            <h1 className="mt-2 text-4xl font-bold tracking-tight">HubYa Operativo</h1>
-            <p className="mt-2 text-[#66745c]">{tituloReporteDiario}</p>
-          </div>
-
-          <div className="flex flex-col gap-3 lg:items-end">
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <button onClick={guardarJornada} className="rounded-full border border-[#cfd7c6] bg-white px-4 py-2 text-sm font-bold text-[#3c4937] shadow-sm">Guardar jornada</button>
-              <button onClick={cargarJornada} className="rounded-full border border-[#cfd7c6] bg-white px-4 py-2 text-sm font-bold text-[#3c4937] shadow-sm">Cargar jornada</button>
-              <button onClick={limpiarJornada} className="rounded-full border border-[#d6b7b7] bg-[#fff7f7] px-4 py-2 text-sm font-bold text-[#743c3c] shadow-sm">Limpiar</button>
+    <main className="min-h-screen bg-[#eef2e8] text-[#182018]">
+      <section className="mx-auto max-w-[1500px] px-3 py-3 sm:px-4">
+        <header className="sticky top-0 z-20 mb-3 rounded-2xl border border-[#cfd8c6] bg-white/95 p-3 shadow-sm backdrop-blur">
+          <div className="grid gap-2 xl:grid-cols-[1.2fr_1fr_auto] xl:items-end">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HubYa Operativo · planilla diaria</p>
+              <h1 className="text-xl font-black leading-tight">{tituloReporteDiario}</h1>
             </div>
-            <p className="text-xs font-medium text-[#66745c]">{mensajeGuardado}</p>
+            <div className="grid gap-2 md:grid-cols-[1fr_145px_1.4fr]">
+              <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub
+                <select value={jornada.hub} onChange={(e) => actualizarJornada({ hub: e.target.value as HubDisponible })} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold outline-none">
+                  {HUBS_DISPONIBLES.map((hub) => <option key={hub} value={hub}>{hub}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Fecha
+                <input type="date" value={jornada.fecha} onChange={(e) => actualizarJornada({ fecha: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm outline-none" />
+              </label>
+              <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Estado operativo
+                <input value={jornada.estadoOperativo} onChange={(e) => actualizarJornada({ estadoOperativo: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm outline-none" />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-1.5 xl:justify-end">
+              <button onClick={guardarJornada} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar</button>
+              <button onClick={cargarJornada} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cargar</button>
+              <button onClick={limpiarJornada} className="h-8 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-3 text-xs font-black text-[#743c3c]">Limpiar</button>
+            </div>
           </div>
+          <p className="mt-1 text-[11px] font-semibold text-[#66745c]">{mensajeGuardado}</p>
         </header>
 
         {alertas.length > 0 && (
-          <div className="mb-6 rounded-3xl border border-[#f0c978] bg-[#fff8e9] p-5 text-sm font-semibold text-[#7a4a00]">
-            <p className="text-base font-bold">Alertas de validación</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {alertas.map((alerta) => <li key={alerta}>{alerta}</li>)}
-            </ul>
+          <div className="mb-3 rounded-xl border border-[#f0c978] bg-[#fff8e9] px-3 py-2 text-xs font-semibold text-[#7a4a00]">
+            <strong>Alertas:</strong> {alertas.join(" · ")}
           </div>
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <section className="space-y-6">
-            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-              <h2 className="text-2xl font-bold">1. Datos de la jornada</h2>
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm font-semibold">
-                  Hub
-                  <select value={jornada.hub} onChange={(e) => actualizarJornada({ hub: e.target.value as HubDisponible })} className="rounded-xl border border-[#d5ddcf] bg-white px-4 py-3 outline-none">
-                    {HUBS_DISPONIBLES.map((hub) => <option key={hub} value={hub}>{hub}</option>)}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm font-semibold">Fecha<input type="date" value={jornada.fecha} onChange={(e) => actualizarJornada({ fecha: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
-                <label className="grid gap-2 text-sm font-semibold md:col-span-2">Nombre del reporte<input value={jornada.nombreReporte} onChange={(e) => actualizarJornada({ nombreReporte: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
-                <label className="grid gap-2 text-sm font-semibold md:col-span-2">Estado operativo<input value={jornada.estadoOperativo} onChange={(e) => actualizarJornada({ estadoOperativo: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
-              </div>
+        <section className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+          {[
+            ["Total facturado", formatoMoneda(calculos.totalFacturado)],
+            ["Total gastos", formatoMoneda(calculos.totalGastos)],
+            ["Saldo operativo", formatoMoneda(calculos.saldoOperativo)],
+            ["Utilidad capataz", formatoMoneda(calculos.utilidadCapataz)],
+            ["Saldo distribuible", formatoMoneda(calculos.saldoDistribuible)],
+            ["Pago base", formatoMoneda(calculos.pagoBaseEquitativo)],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-[#d8dfd1] bg-white p-2 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-wide text-[#66745c]">{label}</p>
+              <p className="mt-1 truncate text-base font-black">{value}</p>
             </div>
+          ))}
+        </section>
 
-
-
-            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-              <h2 className="text-2xl font-bold">Hubs activos en Salta</h2>
-              <p className="mt-2 text-sm text-[#66745c]">Seleccioná el Hub operativo de esta jornada y verificá el resto de Hubs prearmados disponibles.</p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {HUBS_DISPONIBLES.map((hub) => (
-                  <span
-                    key={hub}
-                    className={`rounded-full border px-4 py-2 text-sm font-bold ${
-                      hub === jornada.hub
-                        ? "border-[#1f2a1d] bg-[#1f2a1d] text-white shadow-sm"
-                        : "border-[#d5ddcf] bg-[#f6f8f3] text-[#3c4937]"
-                    }`}
-                  >
-                    {hub}
-                  </span>
-                ))}
-              </div>
+        <section className="grid gap-3 xl:grid-cols-[1.25fr_0.8fr_1.15fr]">
+          <div className="rounded-2xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-black uppercase tracking-wide">Clientes del Hub</h2>
+              <span className="text-xs font-bold text-[#66745c]">{clientesDelHub.length} clientes · click marca vista previa</span>
             </div>
-
-            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-              <div className="flex items-center justify-between gap-3"><h2 className="text-2xl font-bold">2. Total facturado al Hub</h2><strong>{formatoMoneda(calculos.totalFacturado)}</strong></div>
-              <div className="mt-5 space-y-3">
-                {clientesDelHub.map((cliente) => (
-                  <div key={cliente.id} className={`rounded-2xl border p-4 ${cliente.id === jornada.clienteActivoId ? "border-[#1f2a1d] bg-[#eef4ea]" : "border-[#d5ddcf]"}`}>
-                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_140px_auto]">
-                      <input aria-label="Nombre del cliente" value={cliente.nombre} onFocus={() => actualizarJornada({ clienteActivoId: cliente.id })} onChange={(e) => actualizarCliente(cliente.id, { nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <input aria-label="Email del cliente" value={cliente.email} onFocus={() => actualizarJornada({ clienteActivoId: cliente.id })} onChange={(e) => actualizarCliente(cliente.id, { email: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <input aria-label="Importe cobrado" type="number" value={cliente.importeCobrado} onFocus={() => actualizarJornada({ clienteActivoId: cliente.id })} onChange={(e) => actualizarCliente(cliente.id, { importeCobrado: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <button onClick={() => eliminarCliente(cliente.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 grid gap-3 border-t border-[#e1e6dc] pt-5 md:grid-cols-[1fr_1fr_150px_auto]">
-                <input placeholder="Nombre" value={nuevoCliente.nombre} onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3" />
-                <input placeholder="Email" value={nuevoCliente.email} onChange={(e) => setNuevoCliente({ ...nuevoCliente, email: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3" />
-                <input placeholder="Importe" type="number" value={nuevoCliente.importeCobrado} onChange={(e) => setNuevoCliente({ ...nuevoCliente, importeCobrado: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3" />
-                <button onClick={agregarCliente} className="rounded-xl bg-[#1f2a1d] px-4 py-3 font-bold text-white">Agregar</button>
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Email</th><th className="border p-1">Importe</th><th className="border p-1">Sel.</th><th className="border p-1"></th></tr></thead>
+                <tbody>{clientesDelHub.map((cliente) => (
+                  <tr key={cliente.id} className={cliente.id === jornada.clienteActivoId ? "bg-[#eef4ea]" : "bg-white"}>
+                    <td className="border border-[#e1e6dc] p-1"><input value={cliente.nombre} onFocus={() => actualizarJornada({ clienteActivoId: cliente.id })} onChange={(e) => actualizarCliente(cliente.id, { nombre: e.target.value })} className="h-7 w-full bg-transparent px-1 outline-none" /></td>
+                    <td className="border border-[#e1e6dc] p-1"><input value={cliente.email} onFocus={() => actualizarJornada({ clienteActivoId: cliente.id })} onChange={(e) => actualizarCliente(cliente.id, { email: e.target.value })} className="h-7 w-full bg-transparent px-1 outline-none" /></td>
+                    <td className="border border-[#e1e6dc] p-1"><input type="number" value={cliente.importeCobrado} onFocus={() => actualizarJornada({ clienteActivoId: cliente.id })} onChange={(e) => actualizarCliente(cliente.id, { importeCobrado: normalizarImporte(e.target.value) })} className="h-7 w-24 bg-transparent px-1 text-right outline-none" /></td>
+                    <td className="border border-[#e1e6dc] p-1 text-center"><input type="radio" name="clienteActivo" checked={cliente.id === jornada.clienteActivoId} onChange={() => actualizarJornada({ clienteActivoId: cliente.id })} /></td>
+                    <td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => eliminarCliente(cliente.id)} className="font-black text-[#743c3c]">×</button></td>
+                  </tr>
+                ))}</tbody>
+              </table>
             </div>
+            <div className="mt-2 grid gap-1 md:grid-cols-[1fr_1fr_100px_78px]"><input placeholder="Nombre" value={nuevoCliente.nombre} onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><input placeholder="Email" value={nuevoCliente.email} onChange={(e) => setNuevoCliente({ ...nuevoCliente, email: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><input placeholder="Importe" type="number" value={nuevoCliente.importeCobrado} onChange={(e) => setNuevoCliente({ ...nuevoCliente, importeCobrado: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><button onClick={agregarCliente} className="h-8 rounded-lg bg-[#1f2a1d] text-xs font-black text-white">Agregar</button></div>
+          </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-                <div className="flex items-center justify-between"><h2 className="text-2xl font-bold">3. Gastos de la jornada</h2><strong>{formatoMoneda(calculos.totalGastos)}</strong></div>
-                <p className="mt-2 text-sm text-[#66745c]">Cargá cada gasto con concepto e importe. Esta lista reemplaza insumos, comisión y gastos administrativos separados.</p>
-                <div className="mt-5 space-y-3">
-                  {jornada.gastosJornada.map((gasto) => (
-                    <div key={gasto.id} className="grid gap-2 rounded-2xl border border-[#d5ddcf] p-3 md:grid-cols-[1fr_130px_auto]">
-                      <input aria-label="Concepto del gasto" value={gasto.concepto} onChange={(e) => actualizarGasto(gasto.id, { concepto: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <input aria-label="Importe del gasto" type="number" value={gasto.importe} onChange={(e) => actualizarGasto(gasto.id, { importe: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <button onClick={() => eliminarGasto(gasto.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 grid gap-2 border-t border-[#e1e6dc] pt-4 md:grid-cols-[1fr_130px_auto]">
-                  <input placeholder="Concepto" value={nuevoGasto.concepto} onChange={(e) => setNuevoGasto({ ...nuevoGasto, concepto: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <input placeholder="Importe" type="number" value={nuevoGasto.importe} onChange={(e) => setNuevoGasto({ ...nuevoGasto, importe: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <button onClick={agregarGasto} className="rounded-xl bg-[#1f2a1d] px-3 py-2 font-bold text-white">Agregar</button>
-                </div>
-              </div>
+          <div className="rounded-2xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+            <h2 className="mb-2 text-sm font-black uppercase tracking-wide">Gastos de jornada</h2>
+            <table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Concepto</th><th className="border p-1">Importe</th><th className="border p-1"></th></tr></thead><tbody>{jornada.gastosJornada.map((gasto) => (<tr key={gasto.id}><td className="border border-[#e1e6dc] p-1"><input value={gasto.concepto} onChange={(e) => actualizarGasto(gasto.id, { concepto: e.target.value })} className="h-7 w-full bg-transparent px-1 outline-none" /></td><td className="border border-[#e1e6dc] p-1"><input type="number" value={gasto.importe} onChange={(e) => actualizarGasto(gasto.id, { importe: normalizarImporte(e.target.value) })} className="h-7 w-24 bg-transparent px-1 text-right outline-none" /></td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => eliminarGasto(gasto.id)} className="font-black text-[#743c3c]">×</button></td></tr>))}</tbody></table>
+            <div className="mt-2 grid grid-cols-[1fr_95px_70px] gap-1"><input placeholder="Concepto" value={nuevoGasto.concepto} onChange={(e) => setNuevoGasto({ ...nuevoGasto, concepto: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><input placeholder="Importe" type="number" value={nuevoGasto.importe} onChange={(e) => setNuevoGasto({ ...nuevoGasto, importe: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><button onClick={agregarGasto} className="h-8 rounded-lg bg-[#1f2a1d] text-xs font-black text-white">Agregar</button></div>
+          </div>
 
-              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-                <div className="flex items-center justify-between"><h2 className="text-2xl font-bold">4. Participantes que trabajaron</h2><strong>{calculos.cantidadParticipantesActivos} activos</strong></div>
-                <div className="mt-5 space-y-3">
-                  {jornada.participantes.map((participante) => {
-                    const pago = calculos.pagosParticipantes.find((gananciaFinal) => gananciaFinal.id === participante.id)?.gananciaFinal || 0;
-                    return (
-                      <div key={participante.id} className="grid gap-2 rounded-2xl border border-[#d5ddcf] p-3 md:grid-cols-[1fr_110px_120px_130px_auto]">
-                        <input value={participante.nombre} onChange={(e) => actualizarParticipante(participante.id, { nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                        <label className="flex items-center justify-center gap-2 rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">
-                          <input type="checkbox" checked={participante.activoEnJornada} onChange={(e) => actualizarParticipante(participante.id, { activoEnJornada: e.target.checked })} />
-                          Activo
-                        </label>
-                        <label className="flex items-center justify-center gap-2 rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">
-                          <input type="radio" name="capataz" checked={participante.esCapataz} onChange={() => seleccionarCapataz(participante.id)} />
-                          Capataz
-                        </label>
-                        <span className="rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">{formatoMoneda(pago)}</span>
-                        <button onClick={() => eliminarParticipante(participante.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-4 grid gap-2 border-t border-[#e1e6dc] pt-4 md:grid-cols-[1fr_120px_auto]">
-                  <input placeholder="Participante" value={nuevoParticipante.nombre} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <label className="flex items-center justify-center gap-2 rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">
-                    <input type="checkbox" checked={nuevoParticipante.activoEnJornada} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, activoEnJornada: e.target.checked })} />
-                    Activo
-                  </label>
-                  <button onClick={agregarParticipante} className="rounded-xl bg-[#1f2a1d] px-3 py-2 font-bold text-white">Agregar</button>
-                </div>
-                <label className="mt-4 grid gap-2 text-sm font-semibold">
-                  Porcentaje utilidad capataz
-                  <input type="number" min="0" value={jornada.porcentajeUtilidadCapataz} onChange={(e) => actualizarJornada({ porcentajeUtilidadCapataz: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                </label>
-                <div className="mt-4 rounded-2xl bg-[#f6f8f3] p-4 text-sm">
-                  <div className="flex justify-between"><span>Saldo operativo</span><strong>{formatoMoneda(calculos.saldoOperativo)}</strong></div>
-                  <div className="mt-2 flex justify-between"><span>Utilidad capataz ({calculos.porcentajeUtilidadCapataz}%)</span><strong>{formatoMoneda(calculos.utilidadCapataz)}</strong></div>
-                  <div className="mt-2 flex justify-between"><span>Saldo distribuible entre equipo</span><strong>{formatoMoneda(calculos.saldoDistribuible)}</strong></div>
-                  <div className="mt-2 flex justify-between"><span>Pago base equitativo por participante activo</span><strong>{formatoMoneda(calculos.pagoBaseEquitativo)}</strong></div>
-                </div>
-              </div>
-            </div>
+          <div className="rounded-2xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black uppercase tracking-wide">Equipo</h2><span className="text-xs font-bold text-[#66745c]">{calculos.cantidadParticipantesActivos} activos · {capatazSeleccionado?.nombre || "sin capataz"}</span></div>
+            <table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Activo</th><th className="border p-1">Capataz</th><th className="border p-1">Ganancia</th><th className="border p-1"></th></tr></thead><tbody>{jornada.participantes.map((participante) => { const pago = calculos.pagosParticipantes.find((item) => item.id === participante.id)?.gananciaFinal || 0; return (<tr key={participante.id}><td className="border border-[#e1e6dc] p-1"><input value={participante.nombre} onChange={(e) => actualizarParticipante(participante.id, { nombre: e.target.value })} className="h-7 w-full bg-transparent px-1 outline-none" /></td><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={participante.activoEnJornada} onChange={(e) => actualizarParticipante(participante.id, { activoEnJornada: e.target.checked })} /></td><td className="border border-[#e1e6dc] p-1 text-center"><input type="radio" name="capataz" checked={participante.esCapataz} onChange={() => seleccionarCapataz(participante.id)} /></td><td className="border border-[#e1e6dc] p-1 text-right font-bold">{formatoMoneda(pago)}</td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => eliminarParticipante(participante.id)} className="font-black text-[#743c3c]">×</button></td></tr>); })}</tbody></table>
+            <div className="mt-2 grid grid-cols-[1fr_70px_78px] gap-1"><input placeholder="Actor" value={nuevoParticipante.nombre} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, nombre: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><label className="flex h-8 items-center justify-center gap-1 rounded-lg border text-xs font-bold"><input type="checkbox" checked={nuevoParticipante.activoEnJornada} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, activoEnJornada: e.target.checked })} />Activo</label><button onClick={agregarParticipante} className="h-8 rounded-lg bg-[#1f2a1d] text-xs font-black text-white">Agregar</button></div>
+            <label className="mt-2 grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Utilidad capataz %<input type="number" min="0" value={jornada.porcentajeUtilidadCapataz} onChange={(e) => actualizarJornada({ porcentajeUtilidadCapataz: normalizarImporte(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm" /></label>
+          </div>
+        </section>
 
-            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-              <h2 className="text-2xl font-bold">5. Trabajo realizado y pendiente</h2>
-              <div className="mt-5 grid gap-4">
-                <label className="grid gap-2 text-sm font-semibold">Trabajo realizado<textarea value={jornada.trabajoRealizado} onChange={(e) => actualizarJornada({ trabajoRealizado: e.target.value })} className="min-h-24 rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
-                <label className="grid gap-2 text-sm font-semibold">Trabajo pendiente<textarea value={jornada.trabajoPendiente} onChange={(e) => actualizarJornada({ trabajoPendiente: e.target.value })} className="min-h-24 rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
-              </div>
-            </div>
-          </section>
+        <section className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-2xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+            <h2 className="mb-2 text-sm font-black uppercase tracking-wide">Trabajo realizado y pendiente</h2>
+            <div className="grid gap-2 md:grid-cols-2"><label className="grid gap-1 text-xs font-bold">Realizado<textarea value={jornada.trabajoRealizado} onChange={(e) => actualizarJornada({ trabajoRealizado: e.target.value })} className="min-h-20 rounded-lg border px-2 py-1 text-sm outline-none" /></label><label className="grid gap-1 text-xs font-bold">Pendiente<textarea value={jornada.trabajoPendiente} onChange={(e) => actualizarJornada({ trabajoPendiente: e.target.value })} className="min-h-20 rounded-lg border px-2 py-1 text-sm outline-none" /></label></div>
+          </div>
 
-          <aside className="space-y-6">
-            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-              <h2 className="text-2xl font-bold">Resumen económico</h2>
-              <div className="mt-5 space-y-3 text-sm">
-                <div className="flex justify-between"><span>Total facturado al Hub</span><strong>{formatoMoneda(calculos.totalFacturado)}</strong></div>
-                <div className="flex justify-between"><span>Total gastos</span><strong>{formatoMoneda(calculos.totalGastos)}</strong></div>
-                <div className="flex justify-between border-t border-[#e1e6dc] pt-3 text-lg"><span>Saldo operativo</span><strong>{formatoMoneda(calculos.saldoOperativo)}</strong></div>
-                <div className="flex justify-between"><span>Porcentaje utilidad capataz</span><strong>{calculos.porcentajeUtilidadCapataz}%</strong></div>
-                <div className="flex justify-between"><span>Importe utilidad capataz</span><strong>{formatoMoneda(calculos.utilidadCapataz)}</strong></div>
-                <div className="flex justify-between"><span>Capataz seleccionado</span><strong>{capatazSeleccionado?.nombre || "Sin seleccionar"}</strong></div>
-                <div className="flex justify-between"><span>Saldo distribuible entre equipo</span><strong>{formatoMoneda(calculos.saldoDistribuible)}</strong></div>
-                <div className="flex justify-between"><span>Participantes activos</span><strong>{calculos.cantidadParticipantesActivos}</strong></div>
-                <div className="flex justify-between"><span>Pago base equitativo</span><strong>{formatoMoneda(calculos.pagoBaseEquitativo)}</strong></div>
-                <div className="border-t border-[#e1e6dc] pt-3">
-                  <p className="font-bold">Ganancia final por actor</p>
-                  {calculos.pagosParticipantes.map((participante) => (
-                    <div key={participante.id} className="mt-2 flex justify-between gap-3">
-                      <span>{participante.nombre}{participante.esCapataz ? " · capataz" : ""}</span>
-                      <strong>{formatoMoneda(participante.gananciaFinal)}</strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-3xl bg-[#1f2a1d] p-6 text-white shadow-sm">
-              <h2 className="text-2xl font-bold">Vista previa privada por cliente</h2>
-              <label className="mt-5 grid gap-2 text-sm font-semibold">
-                Cliente que verá el reporte
-                <select value={jornada.clienteActivoId} onChange={(e) => actualizarJornada({ clienteActivoId: Number(e.target.value) })} className="rounded-xl border border-white/20 bg-white px-4 py-3 text-[#182018]">
-                  {clientesDelHub.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
-                </select>
-              </label>
-
-              <div className="mt-5 rounded-2xl bg-white/10 p-5 text-sm leading-7">
-                <p className="text-lg font-bold">Reporte diario HubYa</p>
-                <p>Cliente seleccionado: <strong>{clienteActivo?.nombre || "cliente"}</strong></p>
-                <p>Hub: <strong>{jornada.hub}</strong></p>
-                <p>Fecha: <strong>{fechaFormateada}</strong></p>
-                {clienteActivo && <p>Importe correspondiente a su espacio verde: <strong>{formatoMoneda(numeroSeguro(clienteActivo.importeCobrado))}</strong></p>}
-                <p><strong>Trabajo realizado:</strong> {jornada.trabajoRealizado}</p>
-                <p><strong>Trabajo pendiente:</strong> {jornada.trabajoPendiente}</p>
-
-                <p className="mt-4">Hola {clienteActivo?.nombre || "cliente"},</p>
-                <p className="mt-4">Del total facturado por la jornada se descuentan los gastos operativos y administrativos. Sobre el saldo operativo se calcula la utilidad del capataz. Luego, el saldo restante se distribuye de manera equitativa entre los participantes activos. El capataz cobra su parte equitativa más la utilidad correspondiente a la coordinación de la jornada.</p>
-                <p className="mt-4">Por privacidad, los demás clientes figuran anonimizados y no se muestran emails de otros clientes.</p>
-
-                <p className="mt-4 font-bold">Total facturado al Hub</p>
-                <div className="flex justify-between gap-4"><span>Total facturado</span><span>{formatoMoneda(calculos.totalFacturado)}</span></div>
-                {clientesDelHub.map((cliente, index) => (
-                  <div key={cliente.id} className="flex justify-between gap-4">
-                    <span>{nombrePrivado(cliente, index)}</span>
-                    <span>{formatoMoneda(numeroSeguro(cliente.importeCobrado))}</span>
-                  </div>
-                ))}
-
-                <p className="mt-4 font-bold">Gastos de la jornada</p>
-                {jornada.gastosJornada.map((gasto) => (
-                  <div key={gasto.id} className="flex justify-between gap-4"><span>{gasto.concepto}</span><span>{formatoMoneda(numeroSeguro(gasto.importe))}</span></div>
-                ))}
-                <div className="flex justify-between font-bold"><span>Total gastos de la jornada</span><span>{formatoMoneda(calculos.totalGastos)}</span></div>
-                <div className="flex justify-between font-bold"><span>Saldo operativo</span><span>{formatoMoneda(calculos.saldoOperativo)}</span></div>
-                <div className="flex justify-between"><span>Porcentaje utilidad capataz</span><span>{calculos.porcentajeUtilidadCapataz}%</span></div>
-                <div className="flex justify-between"><span>Importe utilidad capataz</span><span>{formatoMoneda(calculos.utilidadCapataz)}</span></div>
-                <div className="flex justify-between"><span>Capataz seleccionado</span><span>{capatazSeleccionado?.nombre || "Sin seleccionar"}</span></div>
-                <div className="flex justify-between"><span>Saldo distribuible entre equipo</span><span>{formatoMoneda(calculos.saldoDistribuible)}</span></div>
-
-                <p className="mt-4 font-bold">Participantes que trabajaron</p>
-                {jornada.participantes.map((participante) => (
-                  <div key={participante.id} className="flex justify-between gap-4"><span>{participante.nombre}{participante.esCapataz ? " · capataz" : ""}</span><span>{participante.activoEnJornada ? "Sí" : "No"}</span></div>
-                ))}
-                <div className="flex justify-between"><span>Cantidad de participantes activos</span><span>{calculos.cantidadParticipantesActivos}</span></div>
-                <div className="flex justify-between font-bold"><span>Pago base equitativo por participante</span><span>{formatoMoneda(calculos.pagoBaseEquitativo)}</span></div>
-                <p className="mt-4 font-bold">Ganancia final de cada actor</p>
-                {calculos.pagosParticipantes.map((participante) => (
-                  <div key={participante.id} className="flex justify-between gap-4"><span>{participante.nombre}</span><span>{formatoMoneda(participante.gananciaFinal)}</span></div>
-                ))}
-                <p className="mt-4"><strong>Estado operativo de la jornada:</strong> {jornada.estadoOperativo}</p>
-                <p className="mt-4">Saludos,<br />HubYa</p>
-              </div>
-            </div>
-          </aside>
-        </div>
+          <details className="rounded-2xl border border-[#1f2a1d] bg-[#1f2a1d] p-3 text-white shadow-sm">
+            <summary className="cursor-pointer text-sm font-black uppercase tracking-wide">Ver email privado</summary>
+            <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]"><select value={jornada.clienteActivoId} onChange={(e) => actualizarJornada({ clienteActivoId: Number(e.target.value) })} className="h-8 rounded-lg bg-white px-2 text-sm font-semibold text-[#182018]">{clientesDelHub.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}</select><button onClick={copiarEmail} className="h-8 rounded-lg bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar email</button></div>
+            <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/10 p-3 text-xs leading-5">{emailPrivado}</pre>
+          </details>
+        </section>
       </section>
     </main>
   );
