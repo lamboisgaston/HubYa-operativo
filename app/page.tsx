@@ -56,7 +56,8 @@ const trabajoRealizadoInicial = "Mantenimiento integral de espacios verdes, cort
 const trabajoPendienteInicial = "Validación final con cada cliente y próximos repasos programados.";
 const observacionGeneralInicial = "Resumen cargado manualmente. Sin cálculos automáticos obligatorios.";
 const sobreHubYaLineas = [
-  "HubYa es una tecnología salteña que agrupa demanda para coordinar mejor la oferta disponible.",
+  "HubYa es una tecnología cooperativista de inteligencia salteña.",
+  "Agrupa demanda para coordinar mejor la oferta disponible y ejecutar procesos específicos según cada rama de servicio.",
   "La lógica es simple: una demanda agrupada permite organizar mejor horarios, tareas, personal, traslados y recursos. Por eso un Hub es más eficiente que clientes aislados y dispersos.",
   "En JardinerosYa hablamos de usuarios del sistema. En HubYa hablamos de clientes, porque el Hub se construye desde la demanda.",
   "Filosofía HubYa: el agrupamiento de la demanda mejora el agrupamiento de la oferta, y el agrupamiento de la oferta mejora la capacidad de abastecer la demanda.",
