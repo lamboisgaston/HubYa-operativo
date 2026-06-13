@@ -20,6 +20,7 @@ type Participante = {
   nombre: string;
   activoEnJornada: boolean;
   esCapataz: boolean;
+  horasEfectivas: number | "";
 };
 
 type CalculosDerivados = {
@@ -29,9 +30,18 @@ type CalculosDerivados = {
   porcentajeUtilidadCapataz: number;
   utilidadCapataz: number;
   saldoDistribuible: number;
-  cantidadParticipantesActivos: number;
-  pagoBaseEquitativo: number;
-  pagosParticipantes: { id: number; nombre: string; activoEnJornada: boolean; esCapataz: boolean; gananciaFinal: number }[];
+  horasTotales: number;
+  valorHora: number;
+  pagosParticipantes: {
+    id: number;
+    nombre: string;
+    activoEnJornada: boolean;
+    esCapataz: boolean;
+    horasEfectivas: number;
+    pagoPorHoras: number;
+    utilidadCapataz: number;
+    totalGanado: number;
+  }[];
 };
 
 type HubDisponible = (typeof HUBS_DISPONIBLES)[number];
@@ -103,9 +113,9 @@ const gastosJornadaIniciales: MovimientoEconomico[] = [
 ];
 
 const participantesIniciales: Participante[] = [
-  { id: 1, nombre: "Hernán Llanes", activoEnJornada: true, esCapataz: true },
-  { id: 2, nombre: "Armando Castillo", activoEnJornada: true, esCapataz: false },
-  { id: 3, nombre: "Mauricio Vallejos", activoEnJornada: true, esCapataz: false },
+  { id: 1, nombre: "Hernán Llanes", activoEnJornada: true, esCapataz: true, horasEfectivas: 8 },
+  { id: 2, nombre: "Armando Castillo", activoEnJornada: true, esCapataz: false, horasEfectivas: 8 },
+  { id: 3, nombre: "Mauricio Vallejos", activoEnJornada: true, esCapataz: false, horasEfectivas: 8 },
 ];
 
 const jornadaInicial: JornadaOperativa = {
@@ -160,15 +170,27 @@ function calcularJornada(jornada: JornadaOperativa, clientes: Cliente[]): Calcul
   const porcentajeUtilidadCapataz = numeroSeguro(jornada.porcentajeUtilidadCapataz);
   const utilidadCapataz = saldoOperativo * porcentajeUtilidadCapataz / 100;
   const saldoDistribuible = saldoOperativo - utilidadCapataz;
-  const cantidadParticipantesActivos = jornada.participantes.filter((participante) => participante.activoEnJornada).length;
-  const pagoBaseEquitativo = cantidadParticipantesActivos > 0 ? saldoDistribuible / cantidadParticipantesActivos : 0;
-  const pagosParticipantes = jornada.participantes.map((participante) => ({
-    id: participante.id,
-    nombre: participante.nombre,
-    activoEnJornada: participante.activoEnJornada,
-    esCapataz: participante.esCapataz,
-    gananciaFinal: participante.activoEnJornada ? pagoBaseEquitativo + (participante.esCapataz ? utilidadCapataz : 0) : 0,
-  }));
+  const horasTotales = jornada.participantes.reduce(
+    (total, participante) => total + (participante.activoEnJornada ? numeroSeguro(participante.horasEfectivas) : 0),
+    0,
+  );
+  const valorHora = horasTotales > 0 ? saldoDistribuible / horasTotales : 0;
+  const pagosParticipantes = jornada.participantes.map((participante) => {
+    const horasEfectivas = participante.activoEnJornada ? numeroSeguro(participante.horasEfectivas) : 0;
+    const pagoPorHoras = horasEfectivas * valorHora;
+    const utilidadDelActor = participante.activoEnJornada && participante.esCapataz ? utilidadCapataz : 0;
+
+    return {
+      id: participante.id,
+      nombre: participante.nombre,
+      activoEnJornada: participante.activoEnJornada,
+      esCapataz: participante.esCapataz,
+      horasEfectivas,
+      pagoPorHoras,
+      utilidadCapataz: utilidadDelActor,
+      totalGanado: pagoPorHoras + utilidadDelActor,
+    };
+  });
 
   return {
     totalFacturado,
@@ -177,8 +199,8 @@ function calcularJornada(jornada: JornadaOperativa, clientes: Cliente[]): Calcul
     porcentajeUtilidadCapataz,
     utilidadCapataz,
     saldoDistribuible,
-    cantidadParticipantesActivos,
-    pagoBaseEquitativo,
+    horasTotales,
+    valorHora,
     pagosParticipantes,
   };
 }
@@ -225,14 +247,18 @@ function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cli
   }));
 
 
+  let capatazYaAsignado = false;
   const participantes = (jornada.participantes || jornada.operarios || jornada.distribucionOperarios || []).map((participante) => {
     const participanteGuardado = participante as Partial<Participante> & { activo?: boolean; horasTrabajadas?: number | "" };
+    const esCapataz = Boolean(participanteGuardado.esCapataz) && !capatazYaAsignado;
+    if (esCapataz) capatazYaAsignado = true;
 
     return {
       id: participanteGuardado.id || crearId(),
       nombre: participanteGuardado.nombre || "",
       activoEnJornada: participanteGuardado.activoEnJornada ?? participanteGuardado.activo ?? numeroSeguro(participanteGuardado.horasTrabajadas) > 0,
-      esCapataz: participanteGuardado.esCapataz ?? false,
+      esCapataz,
+      horasEfectivas: participanteGuardado.horasEfectivas ?? participanteGuardado.horasTrabajadas ?? 0,
     };
   });
 
@@ -264,7 +290,7 @@ export default function Home() {
   const [jornada, setJornada] = useState<JornadaOperativa>(jornadaInicial);
   const [nuevoCliente, setNuevoCliente] = useState({ nombre: "", email: "", importeCobrado: "" });
   const [nuevoGasto, setNuevoGasto] = useState({ concepto: "", importe: "" });
-  const [nuevoParticipante, setNuevoParticipante] = useState({ nombre: "", activoEnJornada: true });
+  const [nuevoParticipante, setNuevoParticipante] = useState({ nombre: "", activoEnJornada: true, horasEfectivas: "8" });
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
 
   const clientesDelHub = useMemo(
@@ -281,13 +307,13 @@ export default function Home() {
   const cantidadCapatazes = jornada.participantes.filter((participante) => participante.esCapataz).length;
   const alertas = useMemo(() => {
     const mensajes: string[] = [];
-    if (calculos.cantidadParticipantesActivos === 0) mensajes.push("Debe haber al menos un participante activo para distribuir el saldo operativo.");
+    if (calculos.horasTotales === 0) mensajes.push("Las horas totales trabajadas son 0. Cargá horas efectivas para distribuir el saldo por trabajo.");
     if (cantidadCapatazes === 0) mensajes.push("No hay capataz seleccionado. Elegí un capataz para asignar la utilidad de coordinación.");
     if (cantidadCapatazes > 1) mensajes.push("Hay más de un capataz seleccionado. Debe quedar un solo capataz.");
     if (calculos.saldoOperativo < 0) mensajes.push("El saldo operativo es negativo. Revisá el total facturado o los gastos de la jornada.");
     if (jornada.gastosJornada.some((item) => item.importe === "")) mensajes.push("Falta importe en un gasto de la jornada.");
     return mensajes;
-  }, [calculos.cantidadParticipantesActivos, calculos.saldoOperativo, cantidadCapatazes, jornada.gastosJornada]);
+  }, [calculos.horasTotales, calculos.saldoOperativo, cantidadCapatazes, jornada.gastosJornada]);
 
   function actualizarJornada(cambios: Partial<JornadaOperativa>) {
     setJornada((jornadaActual) => {
@@ -372,7 +398,7 @@ export default function Home() {
     aplicarJornada(jornadaInicial);
     setNuevoCliente({ nombre: "", email: "", importeCobrado: "" });
     setNuevoGasto({ concepto: "", importe: "" });
-    setNuevoParticipante({ nombre: "", activoEnJornada: true });
+    setNuevoParticipante({ nombre: "", activoEnJornada: true, horasEfectivas: "8" });
     setMensajeGuardado("Jornada local limpiada y formulario reiniciado");
   }
 
@@ -417,10 +443,10 @@ export default function Home() {
       ...jornadaActual,
       participantes: [
         ...jornadaActual.participantes,
-        { id: crearId(), nombre: nuevoParticipante.nombre, activoEnJornada: nuevoParticipante.activoEnJornada, esCapataz: false },
+        { id: crearId(), nombre: nuevoParticipante.nombre, activoEnJornada: nuevoParticipante.activoEnJornada, esCapataz: false, horasEfectivas: normalizarImporte(nuevoParticipante.horasEfectivas) },
       ],
     }));
-    setNuevoParticipante({ nombre: "", activoEnJornada: true });
+    setNuevoParticipante({ nombre: "", activoEnJornada: true, horasEfectivas: "8" });
   }
 
   function eliminarCliente(id: number) {
@@ -469,36 +495,45 @@ export default function Home() {
       `- ${gasto.concepto || "Gasto sin concepto"}: ${formatoMoneda(numeroSeguro(gasto.importe))}`,
     );
     const lineasParticipantes = calculos.pagosParticipantes.map((participante) =>
-      `- ${participante.nombre}${participante.esCapataz ? " · capataz" : ""}: ${formatoMoneda(participante.gananciaFinal)}`,
+      `- ${participante.nombre}${participante.esCapataz ? " · capataz" : ""}: ${participante.horasEfectivas} h · pago por horas ${formatoMoneda(participante.pagoPorHoras)}${participante.esCapataz ? ` · utilidad capataz ${formatoMoneda(participante.utilidadCapataz)}` : ""} · total ganado ${formatoMoneda(participante.totalGanado)}`,
     );
 
     return [
       `Reporte diario HubYa`,
-      `Cliente seleccionado: ${clienteActivo?.nombre || "cliente"}`,
-      `Hub: ${jornada.hub}`,
+      `Hub correspondiente: ${jornada.hub}`,
       `Fecha: ${fechaFormateada}`,
-      clienteActivo ? `Importe correspondiente a su espacio verde: ${formatoMoneda(numeroSeguro(clienteActivo.importeCobrado))}` : "",
+      `Cliente seleccionado: ${clienteActivo?.nombre || "cliente"}`,
+      clienteActivo ? `IMPORTE CORRESPONDIENTE A SU ESPACIO VERDE: ${formatoMoneda(numeroSeguro(clienteActivo.importeCobrado))}` : "",
       "",
       `Hola ${clienteActivo?.nombre || "cliente"},`,
       "",
       `Trabajo realizado: ${jornada.trabajoRealizado}`,
       `Trabajo pendiente: ${jornada.trabajoPendiente}`,
       "",
-      "Por privacidad, los demás clientes figuran anonimizados y no se muestran emails de otros clientes.",
+      "Más abajo puede consultar el detalle completo de cómo se organizó la jornada del Hub.",
       "",
-      `Total facturado: ${formatoMoneda(calculos.totalFacturado)}`,
+      "Detalle ampliado del funcionamiento del Hub",
+      "",
+      "Del total facturado por la jornada del Hub se descuentan los gastos operativos y administrativos. Sobre el saldo operativo se calcula la utilidad del capataz. Luego, el saldo restante se distribuye según las horas efectivas trabajadas por cada integrante del equipo.",
+      "",
+      "Participantes de la jornada con privacidad:",
       ...lineasClientes,
       "",
-      `Gastos de la jornada: ${formatoMoneda(calculos.totalGastos)}`,
+      "Por privacidad, los demás clientes figuran anonimizados y no se muestran emails de otros clientes.",
+      "",
+      `Total facturado al Hub: ${formatoMoneda(calculos.totalFacturado)}`,
+      `Gastos de la jornada:`,
       ...lineasGastos,
+      `Total gastos: ${formatoMoneda(calculos.totalGastos)}`,
       "",
       `Saldo operativo: ${formatoMoneda(calculos.saldoOperativo)}`,
       `Utilidad capataz (${calculos.porcentajeUtilidadCapataz}%): ${formatoMoneda(calculos.utilidadCapataz)}`,
       `Capataz seleccionado: ${capatazSeleccionado?.nombre || "Sin seleccionar"}`,
-      `Saldo distribuible: ${formatoMoneda(calculos.saldoDistribuible)}`,
-      `Pago base equitativo: ${formatoMoneda(calculos.pagoBaseEquitativo)}`,
+      `Saldo distribuible por trabajo: ${formatoMoneda(calculos.saldoDistribuible)}`,
+      `Horas totales trabajadas: ${calculos.horasTotales} h`,
+      `Valor hora: ${formatoMoneda(calculos.valorHora)}`,
       "",
-      "Ganancia final por actor:",
+      "Total ganado por cada actor:",
       ...lineasParticipantes,
       "",
       `Estado operativo: ${jornada.estadoOperativo}`,
@@ -550,14 +585,16 @@ export default function Home() {
           </div>
         )}
 
-        <section className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        <section className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-8">
           {[
             ["Total facturado", formatoMoneda(calculos.totalFacturado)],
             ["Total gastos", formatoMoneda(calculos.totalGastos)],
             ["Saldo operativo", formatoMoneda(calculos.saldoOperativo)],
+            ["% utilidad capataz", `${calculos.porcentajeUtilidadCapataz}%`],
             ["Utilidad capataz", formatoMoneda(calculos.utilidadCapataz)],
-            ["Saldo distribuible", formatoMoneda(calculos.saldoDistribuible)],
-            ["Pago base", formatoMoneda(calculos.pagoBaseEquitativo)],
+            ["Saldo por trabajo", formatoMoneda(calculos.saldoDistribuible)],
+            ["Horas totales", `${calculos.horasTotales} h`],
+            ["Valor hora", formatoMoneda(calculos.valorHora)],
           ].map(([label, value]) => (
             <div key={label} className="rounded-xl border border-[#d8dfd1] bg-white p-2 shadow-sm">
               <p className="text-[10px] font-black uppercase tracking-wide text-[#66745c]">{label}</p>
@@ -596,10 +633,10 @@ export default function Home() {
           </div>
 
           <div className="rounded-2xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
-            <div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black uppercase tracking-wide">Equipo</h2><span className="text-xs font-bold text-[#66745c]">{calculos.cantidadParticipantesActivos} activos · {capatazSeleccionado?.nombre || "sin capataz"}</span></div>
-            <table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Activo</th><th className="border p-1">Capataz</th><th className="border p-1">Ganancia</th><th className="border p-1"></th></tr></thead><tbody>{jornada.participantes.map((participante) => { const pago = calculos.pagosParticipantes.find((item) => item.id === participante.id)?.gananciaFinal || 0; return (<tr key={participante.id}><td className="border border-[#e1e6dc] p-1"><input value={participante.nombre} onChange={(e) => actualizarParticipante(participante.id, { nombre: e.target.value })} className="h-7 w-full bg-transparent px-1 outline-none" /></td><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={participante.activoEnJornada} onChange={(e) => actualizarParticipante(participante.id, { activoEnJornada: e.target.checked })} /></td><td className="border border-[#e1e6dc] p-1 text-center"><input type="radio" name="capataz" checked={participante.esCapataz} onChange={() => seleccionarCapataz(participante.id)} /></td><td className="border border-[#e1e6dc] p-1 text-right font-bold">{formatoMoneda(pago)}</td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => eliminarParticipante(participante.id)} className="font-black text-[#743c3c]">×</button></td></tr>); })}</tbody></table>
-            <div className="mt-2 grid grid-cols-[1fr_70px_78px] gap-1"><input placeholder="Actor" value={nuevoParticipante.nombre} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, nombre: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><label className="flex h-8 items-center justify-center gap-1 rounded-lg border text-xs font-bold"><input type="checkbox" checked={nuevoParticipante.activoEnJornada} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, activoEnJornada: e.target.checked })} />Activo</label><button onClick={agregarParticipante} className="h-8 rounded-lg bg-[#1f2a1d] text-xs font-black text-white">Agregar</button></div>
-            <label className="mt-2 grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Utilidad capataz %<input type="number" min="0" value={jornada.porcentajeUtilidadCapataz} onChange={(e) => actualizarJornada({ porcentajeUtilidadCapataz: normalizarImporte(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm" /></label>
+            <div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black uppercase tracking-wide">Equipo</h2><span className="text-xs font-bold text-[#66745c]">{jornada.participantes.filter((participante) => participante.activoEnJornada).length} activos · {calculos.horasTotales} h · {capatazSeleccionado?.nombre || "sin capataz"}</span></div>
+            <div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Activo</th><th className="border p-1">Capataz</th><th className="border p-1">Horas efectivas</th><th className="border p-1">Pago horas</th><th className="border p-1">Utilidad capataz</th><th className="border p-1">Total ganado</th><th className="border p-1"></th></tr></thead><tbody>{jornada.participantes.map((participante) => { const pago = calculos.pagosParticipantes.find((item) => item.id === participante.id); return (<tr key={participante.id}><td className="border border-[#e1e6dc] p-1"><input value={participante.nombre} onChange={(e) => actualizarParticipante(participante.id, { nombre: e.target.value })} className="h-7 w-full min-w-32 bg-transparent px-1 outline-none" /></td><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={participante.activoEnJornada} onChange={(e) => actualizarParticipante(participante.id, { activoEnJornada: e.target.checked })} /></td><td className="border border-[#e1e6dc] p-1 text-center"><input type="radio" name="capataz" checked={participante.esCapataz} onChange={() => seleccionarCapataz(participante.id)} /></td><td className="border border-[#e1e6dc] p-1"><input type="number" min="0" step="0.25" value={participante.horasEfectivas} onChange={(e) => actualizarParticipante(participante.id, { horasEfectivas: normalizarImporte(e.target.value) })} className="h-7 w-20 bg-transparent px-1 text-right outline-none" /></td><td className="border border-[#e1e6dc] p-1 text-right font-bold">{formatoMoneda(pago?.pagoPorHoras || 0)}</td><td className="border border-[#e1e6dc] p-1 text-right font-bold">{formatoMoneda(pago?.utilidadCapataz || 0)}</td><td className="border border-[#e1e6dc] p-1 text-right font-black">{formatoMoneda(pago?.totalGanado || 0)}</td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => eliminarParticipante(participante.id)} className="font-black text-[#743c3c]">×</button></td></tr>); })}</tbody></table></div>
+            <div className="mt-2 grid grid-cols-[1fr_70px_85px_78px] gap-1"><input placeholder="Actor" value={nuevoParticipante.nombre} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, nombre: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><label className="flex h-8 items-center justify-center gap-1 rounded-lg border text-xs font-bold"><input type="checkbox" checked={nuevoParticipante.activoEnJornada} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, activoEnJornada: e.target.checked })} />Activo</label><input placeholder="Horas" type="number" min="0" step="0.25" value={nuevoParticipante.horasEfectivas} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, horasEfectivas: e.target.value })} className="h-8 rounded-lg border px-2 text-sm" /><button onClick={agregarParticipante} className="h-8 rounded-lg bg-[#1f2a1d] text-xs font-black text-white">Agregar</button></div>
+            <label className="mt-2 grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Porcentaje utilidad capataz<input type="number" min="0" value={jornada.porcentajeUtilidadCapataz} onChange={(e) => actualizarJornada({ porcentajeUtilidadCapataz: normalizarImporte(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm" /></label>
           </div>
         </section>
 
