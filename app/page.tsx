@@ -219,18 +219,6 @@ export default function Home() {
   }
 
   const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : `Cliente ${index + 1}`, [clienteActivo?.id]);
-  const gastoPorConcepto = useCallback((patrones: string[]) => datosHub.gastos.find((gasto) => patrones.some((patron) => gasto.concepto.toLowerCase().includes(patron)))?.importe || 0, [datosHub.gastos]);
-  const detalleItemsCliente = useMemo(() => [
-    { etiqueta: "Tiempo trabajado", valor: clienteActivo?.trabajoRealizado || "Sin detalle cargado" },
-    { etiqueta: "Valor del tiempo", valor: formatoPlano(clienteActivo?.importe) || formatoMoneda(0) },
-    { etiqueta: "Comisión capataz", valor: formatoMoneda(0) },
-    { etiqueta: "Maquinaria", valor: formatoPlano(gastoPorConcepto(["maquinaria", "máquina"])) || formatoMoneda(0) },
-    { etiqueta: "Nafta/aceite", valor: formatoPlano(gastoPorConcepto(["nafta", "aceite", "combustible"])) || formatoMoneda(0) },
-    { etiqueta: "Transporte/movilidad", valor: formatoPlano(gastoPorConcepto(["transporte", "movilidad", "flete"])) || formatoMoneda(0) },
-    { etiqueta: "Software JardinerosYa", valor: formatoPlano(gastoPorConcepto(["jardinerosya", "software"])) || formatoMoneda(0) },
-    { etiqueta: "Otros", valor: formatoPlano(gastoPorConcepto(["otros", "otro", "tanza"])) || formatoMoneda(0) },
-    { etiqueta: "Total", valor: formatoPlano(clienteActivo?.importe) || formatoMoneda(0), destacado: true },
-  ], [clienteActivo, gastoPorConcepto]);
 
   const reporteHub = useMemo(() => [
     "Reporte diario HubYa",
@@ -256,32 +244,19 @@ export default function Home() {
     "Privacidad: el cliente seleccionado figura con su nombre real; los demás clientes están anonimizados y sin emails.",
   ].join("\n"), [datosHub, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
   const emailPrivado = useMemo(() => [
-    "Hola, compartimos el reporte diario de HubYa.",
-    "El detalle completo está preparado como imagen adjunta o visual del reporte.",
+    `Hola ${clienteActivo?.nombre || ""},`,
+    "",
+    "Compartimos el reporte diario del Hub como imagen/resumen para revisar y guardar como comprobante simple.",
     "",
     `Hub: ${jornada.hub}`,
     `Fecha: ${fechaFormateada}`,
-    `Cliente: ${clienteActivo?.nombre || "cliente"}`,
-    `Importe correspondiente a su espacio verde: ${formatoPlano(clienteActivo?.importe)}`,
+    `Importe de tu registro: ${formatoPlano(clienteActivo?.importe) || formatoMoneda(0)}`,
     "",
-    `Trabajo realizado: ${clienteActivo?.trabajoRealizado || ""}`,
-    `Trabajo pendiente: ${clienteActivo?.trabajoPendiente || ""}`,
-    "",
-    "Detalle ampliado del Hub con privacidad:",
-    ...datosHub.clientesIngresos.map((cliente, index) => `- ${nombrePrivado(cliente, index)}: ${formatoPlano(cliente.importe)}`),
-    "",
-    "",
-    `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
-    `Total gastos: ${formatoMoneda(totalGastos)}`,
-    `Total a distribuir: ${formatoMoneda(totalADistribuir)}`,
-    "Distribución automática entre actores:",
-    ...distribucionCalculada.map((actor) => `- ${actor.nombre || "Sin actor"}: ${formatoMoneda(actor.importeFinal)}`),
-    "",
-    "Por privacidad, los demás clientes figuran anonimizados y no se muestran emails de otros clientes.",
+    "En la imagen, tu nombre aparece visible y el resto de los clientes figura anonimizado por privacidad.",
     "",
     "Saludos cordiales,",
     "Equipo HubYa",
-  ].join("\n"), [clienteActivo, datosHub.clientesIngresos, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalFacturadoHub, totalGastos]);
+  ].join("\n"), [clienteActivo, fechaFormateada, jornada.hub]);
 
   async function descargarImagenReporte() {
     const nodo = reporteVisualRef.current;
@@ -391,68 +366,41 @@ export default function Home() {
           <section className="rounded-xl border border-[#b9c5ae] bg-white p-3 shadow-sm">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Vista visual para cliente</p>
-                <h2 className="text-lg font-black">Factura / reporte diario</h2>
-                <p className="text-xs font-bold text-[#66745c]">Lista para convertir en imagen PNG y adjuntar al mail.</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Vista previa exacta para mail</p>
+                <h2 className="text-lg font-black">Imagen / resumen operativo</h2>
+                <p className="text-xs font-bold text-[#66745c]">Planilla simple para insertar en el mail, descargar y usar como comprobante.</p>
               </div>
-              <button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Descargar imagen</button>
+              <button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar imagen del reporte</button>
             </div>
 
-            <article ref={reporteVisualRef} xmlns="http://www.w3.org/1999/xhtml" className="w-full max-w-[720px] overflow-hidden rounded-2xl border border-[#d8dfd1] bg-[#f8faf5] p-5 text-[#182018] shadow-sm">
-              <div className="rounded-xl bg-[#1f2a1d] p-4 text-white">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#cbd8bd]">Reporte diario HubYa</p>
-                <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h3 className="text-2xl font-black leading-none">{jornada.hub}</h3>
-                    <p className="mt-1 text-sm font-bold text-[#dfe9d4]">Fecha: {fechaFormateada}</p>
-                  </div>
-                  <div className="rounded-lg bg-white/10 px-3 py-2 text-right">
-                    <p className="text-[10px] font-black uppercase text-[#cbd8bd]">Cliente</p>
-                    <p className="text-base font-black">{clienteActivo?.nombre || "Sin cliente seleccionado"}</p>
-                  </div>
+            <article ref={reporteVisualRef} xmlns="http://www.w3.org/1999/xhtml" className="w-full max-w-[720px] border border-[#b9c5ae] bg-white p-4 text-[#182018]">
+              <header className="mb-3 border-b-2 border-[#1f2a1d] pb-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#66745c]">Reporte diario HubYa</p>
+                <div className="mt-1 flex flex-wrap justify-between gap-2 text-sm">
+                  <h3 className="text-lg font-black leading-tight">{jornada.hub}</h3>
+                  <p className="font-bold">Fecha: {fechaFormateada}</p>
                 </div>
-              </div>
+                <p className="mt-1 text-xs font-bold text-[#66745c]">Cliente seleccionado: <span className="text-[#182018]">{clienteActivo?.nombre || "Sin cliente seleccionado"}</span></p>
+              </header>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px]">
-                <section className="rounded-xl border border-[#d8dfd1] bg-white p-3">
-                  <h4 className="mb-2 text-xs font-black uppercase tracking-wide text-[#66745c]">Detalle de ítems</h4>
-                  <table className="w-full border-collapse text-xs">
-                    <tbody>{detalleItemsCliente.map((item) => <tr key={item.etiqueta} className={item.destacado ? "bg-[#eef4ea] font-black" : ""}><td className="border-b border-[#e8ede2] py-1 pr-2">{item.etiqueta}</td><td className="border-b border-[#e8ede2] py-1 text-right">{item.valor}</td></tr>)}</tbody>
-                  </table>
-                </section>
-                <section className="rounded-xl border border-[#5d7032] bg-[#eef4ea] p-3">
-                  <p className="text-[10px] font-black uppercase tracking-wide text-[#66745c]">Importe espacio verde</p>
-                  <p className="mt-2 text-3xl font-black">{formatoPlano(clienteActivo?.importe) || formatoMoneda(0)}</p>
-                  <p className="mt-3 text-[11px] font-bold text-[#66745c]">Los demás clientes del Hub se muestran anonimizados por privacidad.</p>
-                </section>
-              </div>
-
-              <section className="mt-4 rounded-xl border border-[#d8dfd1] bg-white p-3">
-                <h4 className="mb-2 text-xs font-black uppercase tracking-wide text-[#66745c]">Resumen del Hub</h4>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] font-black uppercase text-[#66745c]">Participantes del Hub</p>
-                    <ul className="mt-1 space-y-1 text-xs">{datosHub.clientesIngresos.map((cliente, index) => <li key={cliente.id} className="flex justify-between gap-2 border-b border-[#edf1e8] pb-1"><span>{nombrePrivado(cliente, index)}</span><span className="font-bold">{formatoPlano(cliente.importe)}</span></li>)}</ul>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between gap-2"><span>Total facturado del Hub</span><strong>{formatoMoneda(totalFacturadoHub)}</strong></div>
-                    <div><p className="font-black uppercase text-[#66745c]">Gastos</p>{datosHub.gastos.map((gasto) => <div key={gasto.id} className="flex justify-between gap-2"><span>{gasto.concepto || "Sin concepto"}</span><strong>{formatoPlano(gasto.importe)}</strong></div>)}</div>
-                    <div className="flex justify-between gap-2"><span>Total gastos</span><strong>{formatoMoneda(totalGastos)}</strong></div>
-                    <div className="flex justify-between gap-2 rounded-lg bg-[#eef4ea] px-2 py-1 font-black"><span>Total a distribuir</span><span>{formatoMoneda(totalADistribuir)}</span></div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="mt-4 rounded-xl border border-[#d8dfd1] bg-white p-3">
-                <h4 className="mb-2 text-xs font-black uppercase tracking-wide text-[#66745c]">Distribución entre actores</h4>
-                <div className="grid gap-2 text-xs md:grid-cols-3">{distribucionCalculada.map((actor) => <div key={actor.id} className="rounded-lg border border-[#e1e6dc] p-2"><p className="font-black">{actor.nombre || "Sin actor"}</p><p>Activo: {actor.activo ? "sí" : "no"}</p><p>Final: <strong>{formatoMoneda(actor.importeFinal)}</strong></p></div>)}</div>
-              </section>
-
-              <section className="mt-4 grid gap-2 text-xs md:grid-cols-3">
-                <div className="rounded-lg bg-white p-2"><p className="font-black uppercase text-[#66745c]">Tiempo efectivo por operario</p><p>{datosHub.resumen.tiempoEfectivo || "Sin cargar"}</p></div>
-                <div className="rounded-lg bg-white p-2"><p className="font-black uppercase text-[#66745c]">Estado operativo</p><p>{datosHub.resumen.estadoOperativo || "Sin cargar"}</p></div>
-                <div className="rounded-lg bg-white p-2"><p className="font-black uppercase text-[#66745c]">Observación general</p><p>{datosHub.resumen.observacionGeneral || "Sin cargar"}</p></div>
-              </section>
+              <table className="w-full border-collapse bg-white text-xs">
+                <tbody>
+                  <tr className="bg-[#f1f4ec]"><th colSpan={3} className="border border-[#b9c5ae] p-1.5 text-left uppercase">Clientes / ingresos</th></tr>
+                  {datosHub.clientesIngresos.map((cliente, index) => <tr key={cliente.id}><td className="border border-[#d8dfd1] p-1.5">{cliente.origen || "Sin origen"}</td><td className="border border-[#d8dfd1] p-1.5">{nombrePrivado(cliente, index) || "Sin cliente"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(cliente.importe)}</td></tr>)}
+                  <tr className="font-black"><td colSpan={2} className="border border-[#b9c5ae] p-1.5">Total facturado al Hub</td><td className="border border-[#b9c5ae] p-1.5 text-right">{formatoPlano(totalFacturadoHub)}</td></tr>
+                  <tr className="bg-[#f1f4ec]"><th colSpan={3} className="border border-[#b9c5ae] p-1.5 text-left uppercase">Gastos</th></tr>
+                  {datosHub.gastos.map((gasto) => <tr key={gasto.id}><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{gasto.concepto || "Sin concepto"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(gasto.importe)}</td></tr>)}
+                  <tr className="font-black"><td colSpan={2} className="border border-[#b9c5ae] p-1.5">Total gastos</td><td className="border border-[#b9c5ae] p-1.5 text-right">{formatoPlano(totalGastos)}</td></tr>
+                  <tr className="font-black"><td colSpan={2} className="border border-[#b9c5ae] p-1.5">Total a distribuir</td><td className="border border-[#b9c5ae] p-1.5 text-right">{formatoPlano(totalADistribuir)}</td></tr>
+                  <tr className="bg-[#f1f4ec]"><th colSpan={3} className="border border-[#b9c5ae] p-1.5 text-left uppercase">Distribución automática por actor</th></tr>
+                  {distribucionCalculada.map((actor) => <tr key={actor.id}><td className="border border-[#d8dfd1] p-1.5">{actor.nombre || "Sin actor"}</td><td className="border border-[#d8dfd1] p-1.5 text-center">{actor.activo ? "sí" : "no"} · {numero(actor.participacion)}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoMoneda(actor.importeFinal)}</td></tr>)}
+                  <tr className="font-black"><td colSpan={2} className="border border-[#b9c5ae] p-1.5">Total distribuido</td><td className="border border-[#b9c5ae] p-1.5 text-right">{formatoPlano(totalDistribuido)}</td></tr>
+                  <tr><td className="border border-[#d8dfd1] p-1.5 font-black">Tiempo efectivo</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.tiempoEfectivo || "Sin cargar"}</td></tr>
+                  <tr><td className="border border-[#d8dfd1] p-1.5 font-black">Estado operativo</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.estadoOperativo || "Sin cargar"}</td></tr>
+                  <tr><td className="border border-[#d8dfd1] p-1.5 font-black">Observación</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.observacionGeneral || "Sin cargar"}</td></tr>
+                </tbody>
+              </table>
+              <p className="mt-2 text-[10px] font-semibold text-[#66745c]">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados y no se incluyen emails.</p>
             </article>
           </section>
 
