@@ -220,43 +220,17 @@ export default function Home() {
 
   const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : `Cliente ${index + 1}`, [clienteActivo?.id]);
 
-  const reporteHub = useMemo(() => [
-    "Reporte diario HubYa",
-    `${jornada.hub} — ${fechaFormateada}`,
-    "",
-    "Clientes / ingresos:",
-    ...datosHub.clientesIngresos.map((cliente, index) => `- ${cliente.origen} | ${nombrePrivado(cliente, index) || "Sin cliente"} | ${formatoPlano(cliente.importe)}`),
-    `Total facturado al Hub: ${formatoPlano(totalFacturadoHub)}`,
-    "",
-    "Gastos:",
-    ...datosHub.gastos.map((gasto) => `- ${gasto.concepto || "Sin concepto"} | ${formatoPlano(gasto.importe)}`),
-    `Total gastos: ${formatoPlano(totalGastos)}`,
-    `Total a distribuir: ${formatoPlano(totalADistribuir)}`,
-    "",
-    "Distribución:",
-    ...distribucionCalculada.map((actor) => `- ${actor.nombre || "Sin actor"} | activo: ${actor.activo ? "sí" : "no"} | participación: ${numero(actor.participacion)} | calculado: ${formatoMoneda(actor.importeDistribuido)} | ajuste: ${formatoPlano(actor.ajusteManual)} | final: ${formatoMoneda(actor.importeFinal)}`),
-    `Total distribuido: ${formatoPlano(totalDistribuido)}`,
-    "",
-    `Tiempo efectivo: ${datosHub.resumen.tiempoEfectivo}`,
-    `Estado operativo: ${datosHub.resumen.estadoOperativo}`,
-    `Observación: ${datosHub.resumen.observacionGeneral}`,
-    "",
-    "Privacidad: el cliente seleccionado figura con su nombre real; los demás clientes están anonimizados y sin emails.",
-  ].join("\n"), [datosHub, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
   const emailPrivado = useMemo(() => [
     `Hola ${clienteActivo?.nombre || ""},`,
     "",
-    "Compartimos el reporte diario del Hub como imagen/resumen para revisar y guardar como comprobante simple.",
+    "Adjuntamos el reporte administrativo del Hub emitido por sistema.",
     "",
     `Hub: ${jornada.hub}`,
     `Fecha: ${fechaFormateada}`,
-    `Importe de tu registro: ${formatoPlano(clienteActivo?.importe) || formatoMoneda(0)}`,
-    "",
-    "En la imagen, tu nombre aparece visible y el resto de los clientes figura anonimizado por privacidad.",
     "",
     "Saludos cordiales,",
     "Equipo HubYa",
-  ].join("\n"), [clienteActivo, fechaFormateada, jornada.hub]);
+  ].join("\n"), [clienteActivo?.nombre, fechaFormateada, jornada.hub]);
 
   async function descargarImagenReporte() {
     const nodo = reporteVisualRef.current;
@@ -285,7 +259,7 @@ export default function Home() {
     const contexto = canvas.getContext("2d");
     if (!contexto) return;
     contexto.scale(2, 2);
-    contexto.fillStyle = "#f8faf5";
+    contexto.fillStyle = "#ffffff";
     contexto.fillRect(0, 0, ancho, alto);
     contexto.drawImage(imagen, 0, 0);
     URL.revokeObjectURL(url);
@@ -361,50 +335,63 @@ export default function Home() {
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Datos operativos</h3><div className="grid gap-2 lg:grid-cols-3"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Tiempo efectivo por operario<input value={datosHub.resumen.tiempoEfectivo} onChange={(e) => actualizarResumen({ tiempoEfectivo: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Estado operativo<input value={datosHub.resumen.estadoOperativo} onChange={(e) => actualizarResumen({ estadoOperativo: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Observación general<input value={datosHub.resumen.observacionGeneral} onChange={(e) => actualizarResumen({ observacionGeneral: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label></div></section>
           </div>
 
-          <aside className="space-y-3"><section className="rounded-xl border border-[#b9c5ae] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between gap-2"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Zona B · Reporte del Hub</p><h2 className="text-lg font-black">Reporte diario HubYa</h2><p className="text-xs font-bold text-[#66745c]">{jornada.hub} — {fechaFormateada}</p></div><button onClick={() => copiarTexto(reporteHub, "Reporte del Hub")} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Copiar reporte del Hub</button></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><tbody><tr className="bg-[#f1f4ec]"><th colSpan={3} className="border p-1 text-left uppercase">Clientes / ingresos</th></tr>{datosHub.clientesIngresos.map((cliente, index) => <tr key={cliente.id}><td className="border p-1">{cliente.origen}</td><td className="border p-1">{nombrePrivado(cliente, index)}</td><td className="border p-1 text-right">{formatoPlano(cliente.importe)}</td></tr>)}<tr className="font-black"><td colSpan={2} className="border p-1">Total facturado al Hub</td><td className="border p-1 text-right">{formatoPlano(totalFacturadoHub)}</td></tr><tr className="bg-[#f1f4ec]"><th colSpan={3} className="border p-1 text-left uppercase">Gastos</th></tr>{datosHub.gastos.map((gasto) => <tr key={gasto.id}><td colSpan={2} className="border p-1">{gasto.concepto}</td><td className="border p-1 text-right">{formatoPlano(gasto.importe)}</td></tr>)}<tr className="font-black"><td colSpan={2} className="border p-1">Total gastos</td><td className="border p-1 text-right">{formatoPlano(totalGastos)}</td></tr><tr className="font-black"><td colSpan={2} className="border p-1">Total a distribuir</td><td className="border p-1 text-right">{formatoPlano(totalADistribuir)}</td></tr><tr className="bg-[#f1f4ec]"><th colSpan={3} className="border p-1 text-left uppercase">Distribución automática por actor</th></tr>{distribucionCalculada.map((actor) => <tr key={actor.id}><td className="border p-1">{actor.nombre}</td><td className="border p-1 text-center">{actor.activo ? "sí" : "no"} · {numero(actor.participacion)}</td><td className="border p-1 text-right">{formatoMoneda(actor.importeFinal)}</td></tr>)}<tr className="font-black"><td colSpan={2} className="border p-1">Total distribuido</td><td className="border p-1 text-right">{formatoPlano(totalDistribuido)}</td></tr><tr><td className="border p-1 font-black">Tiempo efectivo</td><td colSpan={2} className="border p-1">{datosHub.resumen.tiempoEfectivo}</td></tr><tr><td className="border p-1 font-black">Estado operativo</td><td colSpan={2} className="border p-1">{datosHub.resumen.estadoOperativo}</td></tr><tr><td className="border p-1 font-black">Observación</td><td colSpan={2} className="border p-1">{datosHub.resumen.observacionGeneral}</td></tr></tbody></table></div></section>
-
-          <section className="rounded-xl border border-[#b9c5ae] bg-white p-3 shadow-sm">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <aside className="space-y-3">
+          <section className="border border-[#b9c5ae] bg-white p-3 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[#d8dfd1] pb-2">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Vista previa exacta para mail</p>
-                <h2 className="text-lg font-black">Imagen / resumen operativo</h2>
-                <p className="text-xs font-bold text-[#66745c]">Planilla simple para insertar en el mail, descargar y usar como comprobante.</p>
+                <h2 className="text-lg font-black">Documento administrativo emitido por sistema</h2>
+                <p className="text-xs font-bold text-[#66745c]">La imagen generada usa exactamente este formato de factura / presupuesto / reporte.</p>
               </div>
               <button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar imagen del reporte</button>
             </div>
 
-            <article ref={reporteVisualRef} xmlns="http://www.w3.org/1999/xhtml" className="w-full max-w-[720px] border border-[#b9c5ae] bg-white p-4 text-[#182018]">
-              <header className="mb-3 border-b-2 border-[#1f2a1d] pb-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#66745c]">Reporte diario HubYa</p>
-                <div className="mt-1 flex flex-wrap justify-between gap-2 text-sm">
-                  <h3 className="text-lg font-black leading-tight">{jornada.hub}</h3>
-                  <p className="font-bold">Fecha: {fechaFormateada}</p>
+            <article ref={reporteVisualRef} xmlns="http://www.w3.org/1999/xhtml" className="w-full max-w-[760px] border border-[#6f7968] bg-white p-0 font-sans text-[#182018] shadow-none">
+              <header className="grid grid-cols-[1.1fr_0.9fr] border-b-2 border-[#1f2a1d]">
+                <div className="border-r border-[#b9c5ae] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#66745c]">HubYa</p>
+                  <h3 className="mt-1 text-xl font-black uppercase leading-tight">Reporte administrativo del Hub</h3>
+                  <p className="mt-1 text-xs font-semibold text-[#66745c]">Documento emitido por sistema</p>
                 </div>
-                <p className="mt-1 text-xs font-bold text-[#66745c]">Cliente seleccionado: <span className="text-[#182018]">{clienteActivo?.nombre || "Sin cliente seleccionado"}</span></p>
+                <div className="p-4 text-xs">
+                  <table className="w-full border-collapse">
+                    <tbody>
+                      <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Sistema</td><td className="border border-[#d8dfd1] p-1.5">HubYa</td></tr>
+                      <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Hub</td><td className="border border-[#d8dfd1] p-1.5">{jornada.hub}</td></tr>
+                      <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Fecha</td><td className="border border-[#d8dfd1] p-1.5">{fechaFormateada}</td></tr>
+                      <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Cliente</td><td className="border border-[#d8dfd1] p-1.5 font-bold">{clienteActivo?.nombre || "Sin cliente seleccionado"}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </header>
 
-              <table className="w-full border-collapse bg-white text-xs">
-                <tbody>
-                  <tr className="bg-[#f1f4ec]"><th colSpan={3} className="border border-[#b9c5ae] p-1.5 text-left uppercase">Clientes / ingresos</th></tr>
-                  {datosHub.clientesIngresos.map((cliente, index) => <tr key={cliente.id}><td className="border border-[#d8dfd1] p-1.5">{cliente.origen || "Sin origen"}</td><td className="border border-[#d8dfd1] p-1.5">{nombrePrivado(cliente, index) || "Sin cliente"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(cliente.importe)}</td></tr>)}
-                  <tr className="font-black"><td colSpan={2} className="border border-[#b9c5ae] p-1.5">Total facturado al Hub</td><td className="border border-[#b9c5ae] p-1.5 text-right">{formatoPlano(totalFacturadoHub)}</td></tr>
-                  <tr className="bg-[#f1f4ec]"><th colSpan={3} className="border border-[#b9c5ae] p-1.5 text-left uppercase">Gastos</th></tr>
-                  {datosHub.gastos.map((gasto) => <tr key={gasto.id}><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{gasto.concepto || "Sin concepto"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(gasto.importe)}</td></tr>)}
-                  <tr className="font-black"><td colSpan={2} className="border border-[#b9c5ae] p-1.5">Total gastos</td><td className="border border-[#b9c5ae] p-1.5 text-right">{formatoPlano(totalGastos)}</td></tr>
-                  <tr className="font-black"><td colSpan={2} className="border border-[#b9c5ae] p-1.5">Total a distribuir</td><td className="border border-[#b9c5ae] p-1.5 text-right">{formatoPlano(totalADistribuir)}</td></tr>
-                  <tr className="bg-[#f1f4ec]"><th colSpan={3} className="border border-[#b9c5ae] p-1.5 text-left uppercase">Distribución automática por actor</th></tr>
-                  {distribucionCalculada.map((actor) => <tr key={actor.id}><td className="border border-[#d8dfd1] p-1.5">{actor.nombre || "Sin actor"}</td><td className="border border-[#d8dfd1] p-1.5 text-center">{actor.activo ? "sí" : "no"} · {numero(actor.participacion)}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoMoneda(actor.importeFinal)}</td></tr>)}
-                  <tr className="font-black"><td colSpan={2} className="border border-[#b9c5ae] p-1.5">Total distribuido</td><td className="border border-[#b9c5ae] p-1.5 text-right">{formatoPlano(totalDistribuido)}</td></tr>
-                  <tr><td className="border border-[#d8dfd1] p-1.5 font-black">Tiempo efectivo</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.tiempoEfectivo || "Sin cargar"}</td></tr>
-                  <tr><td className="border border-[#d8dfd1] p-1.5 font-black">Estado operativo</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.estadoOperativo || "Sin cargar"}</td></tr>
-                  <tr><td className="border border-[#d8dfd1] p-1.5 font-black">Observación</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.observacionGeneral || "Sin cargar"}</td></tr>
-                </tbody>
-              </table>
-              <p className="mt-2 text-[10px] font-semibold text-[#66745c]">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados y no se incluyen emails.</p>
+              <div className="p-4">
+                <table className="w-full border-collapse bg-white text-xs">
+                  <tbody>
+                    <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Clientes / ingresos</th></tr>
+                    <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th className="border border-[#d8dfd1] p-1.5 text-left">Origen / sistema</th><th className="border border-[#d8dfd1] p-1.5 text-left">Nombre cliente</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
+                    {datosHub.clientesIngresos.map((cliente, index) => <tr key={cliente.id}><td className="border border-[#d8dfd1] p-1.5">{cliente.origen || "Sin origen"}</td><td className="border border-[#d8dfd1] p-1.5">{nombrePrivado(cliente, index) || "Sin cliente"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(cliente.importe)}</td></tr>)}
+                    <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total facturado al Hub</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalFacturadoHub)}</td></tr>
+                    <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Gastos</th></tr>
+                    <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th colSpan={2} className="border border-[#d8dfd1] p-1.5 text-left">Concepto</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
+                    {datosHub.gastos.map((gasto) => <tr key={gasto.id}><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{gasto.concepto || "Sin concepto"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(gasto.importe)}</td></tr>)}
+                    <tr className="font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total gastos</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalGastos)}</td></tr>
+                    <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total a distribuir</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalADistribuir)}</td></tr>
+                    <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Distribución automática por actor</th></tr>
+                    <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th className="border border-[#d8dfd1] p-1.5 text-left">Actor</th><th className="border border-[#d8dfd1] p-1.5 text-center">Participación / activo</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
+                    {distribucionCalculada.map((actor) => <tr key={actor.id}><td className="border border-[#d8dfd1] p-1.5">{actor.nombre || "Sin actor"}</td><td className="border border-[#d8dfd1] p-1.5 text-center">{numero(actor.participacion)} / {actor.activo ? "activo" : "inactivo"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoMoneda(actor.importeFinal)}</td></tr>)}
+                    <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total distribuido</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalDistribuido)}</td></tr>
+                    <tr><td className="border border-[#d8dfd1] bg-[#f8faf5] p-1.5 font-black">Tiempo efectivo</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.tiempoEfectivo || "Sin cargar"}</td></tr>
+                    <tr><td className="border border-[#d8dfd1] bg-[#f8faf5] p-1.5 font-black">Estado operativo</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.estadoOperativo || "Sin cargar"}</td></tr>
+                    <tr><td className="border border-[#d8dfd1] bg-[#f8faf5] p-1.5 font-black">Observación</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.observacionGeneral || "Sin cargar"}</td></tr>
+                  </tbody>
+                </table>
+                <p className="mt-2 border border-[#d8dfd1] bg-[#f8faf5] p-2 text-[10px] font-semibold text-[#66745c]">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados como Cliente 2, Cliente 3, Cliente 4, etc. y no se incluyen emails.</p>
+              </div>
             </article>
           </section>
 
-          <details className="rounded-xl border border-[#1f2a1d] bg-[#1f2a1d] p-3 text-white shadow-sm"><summary className="cursor-pointer text-sm font-black uppercase tracking-wide">Vista secundaria · email privado</summary><div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]"><select value={datosHub.clienteActivoId} onChange={(e) => actualizarDatosHub({ clienteActivoId: Number(e.target.value) })} className="h-8 rounded-lg bg-white px-2 text-sm font-semibold text-[#182018]">{datosHub.clientesIngresos.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre || "Sin cliente"}</option>)}</select><button onClick={() => copiarTexto(emailPrivado, "Email privado")} className="h-8 rounded-lg bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar texto del mail</button></div><div className="mt-3 grid gap-2 md:grid-cols-2"><label className="grid gap-1 text-xs font-bold">Trabajo realizado<textarea value={clienteActivo?.trabajoRealizado || ""} onChange={(e) => clienteActivo && actualizarCliente(clienteActivo.id, { trabajoRealizado: e.target.value })} className="min-h-20 rounded-lg border px-2 py-1 text-sm text-[#182018] outline-none" /></label><label className="grid gap-1 text-xs font-bold">Trabajo pendiente<textarea value={clienteActivo?.trabajoPendiente || ""} onChange={(e) => clienteActivo && actualizarCliente(clienteActivo.id, { trabajoPendiente: e.target.value })} className="min-h-20 rounded-lg border px-2 py-1 text-sm text-[#182018] outline-none" /></label></div><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/10 p-3 text-xs leading-5">{emailPrivado}</pre></details>
+          <details className="rounded-xl border border-[#1f2a1d] bg-[#1f2a1d] p-3 text-white shadow-sm"><summary className="cursor-pointer text-sm font-black uppercase tracking-wide">Mail corto para enviar con el documento</summary><div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]"><select value={datosHub.clienteActivoId} onChange={(e) => actualizarDatosHub({ clienteActivoId: Number(e.target.value) })} className="h-8 rounded-lg bg-white px-2 text-sm font-semibold text-[#182018]">{datosHub.clientesIngresos.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre || "Sin cliente"}</option>)}</select><button onClick={() => copiarTexto(emailPrivado, "Email privado")} className="h-8 rounded-lg bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar texto del mail</button></div><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/10 p-3 text-xs leading-5">{emailPrivado}</pre></details>
         </aside>
         </section>
       </section>
