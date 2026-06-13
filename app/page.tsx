@@ -18,16 +18,20 @@ type MovimientoEconomico = {
 type Participante = {
   id: number;
   nombre: string;
-  activo: boolean;
+  activoEnJornada: boolean;
+  esCapataz: boolean;
 };
 
 type CalculosDerivados = {
   totalFacturado: number;
   totalGastos: number;
-  saldoDisponible: number;
+  saldoOperativo: number;
+  porcentajeUtilidadCapataz: number;
+  utilidadCapataz: number;
+  saldoDistribuible: number;
   cantidadParticipantesActivos: number;
-  pagoEquitativo: number;
-  pagosParticipantes: { id: number; nombre: string; activo: boolean; pagoParticipante: number }[];
+  pagoBaseEquitativo: number;
+  pagosParticipantes: { id: number; nombre: string; activoEnJornada: boolean; esCapataz: boolean; gananciaFinal: number }[];
 };
 
 type HubDisponible = (typeof HUBS_DISPONIBLES)[number];
@@ -44,6 +48,7 @@ type JornadaOperativa = {
   clientesPorHub: ClientesPorHub;
   gastosJornada: MovimientoEconomico[];
   participantes: Participante[];
+  porcentajeUtilidadCapataz: number | "";
   clienteActivoId: number;
   calculosDerivados?: CalculosDerivados;
 };
@@ -95,13 +100,12 @@ const gastosJornadaIniciales: MovimientoEconomico[] = [
   { id: 2, concepto: "Maquinaria", importe: 1000 },
   { id: 3, concepto: "Tanza", importe: 10000 },
   { id: 4, concepto: "JardinerosYa", importe: 15000 },
-  { id: 5, concepto: "Comisión capataz", importe: 14000 },
 ];
 
 const participantesIniciales: Participante[] = [
-  { id: 1, nombre: "Hernán Llanes", activo: true },
-  { id: 2, nombre: "Armando Castillo", activo: true },
-  { id: 3, nombre: "Mauricio Vallejos", activo: true },
+  { id: 1, nombre: "Hernán Llanes", activoEnJornada: true, esCapataz: true },
+  { id: 2, nombre: "Armando Castillo", activoEnJornada: true, esCapataz: false },
+  { id: 3, nombre: "Mauricio Vallejos", activoEnJornada: true, esCapataz: false },
 ];
 
 const jornadaInicial: JornadaOperativa = {
@@ -114,6 +118,7 @@ const jornadaInicial: JornadaOperativa = {
   clientesPorHub: clientesInicialesPorHub,
   gastosJornada: gastosJornadaIniciales,
   participantes: participantesIniciales,
+  porcentajeUtilidadCapataz: 10,
   clienteActivoId: 101,
 };
 
@@ -151,22 +156,29 @@ function calcularJornada(jornada: JornadaOperativa, clientes: Cliente[]): Calcul
     (total, gasto) => total + numeroSeguro(gasto.importe),
     0,
   );
-  const saldoDisponible = totalFacturado - totalGastos;
-  const cantidadParticipantesActivos = jornada.participantes.filter((participante) => participante.activo).length;
-  const pagoEquitativo = cantidadParticipantesActivos > 0 ? saldoDisponible / cantidadParticipantesActivos : 0;
+  const saldoOperativo = totalFacturado - totalGastos;
+  const porcentajeUtilidadCapataz = numeroSeguro(jornada.porcentajeUtilidadCapataz);
+  const utilidadCapataz = saldoOperativo * porcentajeUtilidadCapataz / 100;
+  const saldoDistribuible = saldoOperativo - utilidadCapataz;
+  const cantidadParticipantesActivos = jornada.participantes.filter((participante) => participante.activoEnJornada).length;
+  const pagoBaseEquitativo = cantidadParticipantesActivos > 0 ? saldoDistribuible / cantidadParticipantesActivos : 0;
   const pagosParticipantes = jornada.participantes.map((participante) => ({
     id: participante.id,
     nombre: participante.nombre,
-    activo: participante.activo,
-    pagoParticipante: participante.activo ? pagoEquitativo : 0,
+    activoEnJornada: participante.activoEnJornada,
+    esCapataz: participante.esCapataz,
+    gananciaFinal: participante.activoEnJornada ? pagoBaseEquitativo + (participante.esCapataz ? utilidadCapataz : 0) : 0,
   }));
 
   return {
     totalFacturado,
     totalGastos,
-    saldoDisponible,
+    saldoOperativo,
+    porcentajeUtilidadCapataz,
+    utilidadCapataz,
+    saldoDistribuible,
     cantidadParticipantesActivos,
-    pagoEquitativo,
+    pagoBaseEquitativo,
     pagosParticipantes,
   };
 }
@@ -199,7 +211,7 @@ function normalizarClientesPorHub(jornada: Partial<JornadaOperativa> & { cliente
   return base;
 }
 
-function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cliente[]; gastosComunes?: MovimientoEconomico[]; insumosOperativos?: MovimientoEconomico[]; gastosAdministrativos?: MovimientoEconomico[]; operarios?: { id?: number; nombre?: string; activo?: boolean; horasTrabajadas?: number | "" }[]; distribucionOperarios?: { id?: number; nombre?: string; activo?: boolean; importeAsignado?: number; horasTrabajadas?: number | "" }[]; porcentajeComisionCapataz?: number | ""; tiempoEfectivoPorOperario?: string }): JornadaOperativa {
+function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cliente[]; gastosComunes?: MovimientoEconomico[]; insumosOperativos?: MovimientoEconomico[]; gastosAdministrativos?: MovimientoEconomico[]; operarios?: { id?: number; nombre?: string; activo?: boolean; activoEnJornada?: boolean; esCapataz?: boolean; horasTrabajadas?: number | "" }[]; distribucionOperarios?: { id?: number; nombre?: string; activo?: boolean; activoEnJornada?: boolean; esCapataz?: boolean; importeAsignado?: number; horasTrabajadas?: number | "" }[]; porcentajeComisionCapataz?: number | ""; tiempoEfectivoPorOperario?: string }): JornadaOperativa {
   const gastosBase = jornada.gastosJornada
     || [
       ...(jornada.insumosOperativos || jornada.gastosComunes || []),
@@ -212,16 +224,17 @@ function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cli
     importe: numeroSeguro(gasto.importe),
   }));
 
-  const comisionExistente = gastosJornada.some((gasto) => gasto.concepto.toLowerCase().includes("comisión capataz"));
-  if (!jornada.gastosJornada && !comisionExistente && numeroSeguro(jornada.porcentajeComisionCapataz) > 0) {
-    gastosJornada.push({ id: crearId(), concepto: "Comisión capataz", importe: 0 });
-  }
 
-  const participantes = (jornada.participantes || jornada.operarios || jornada.distribucionOperarios || []).map((participante) => ({
-    id: participante.id || crearId(),
-    nombre: participante.nombre || "",
-    activo: participante.activo ?? numeroSeguro(participante.horasTrabajadas) > 0,
-  }));
+  const participantes = (jornada.participantes || jornada.operarios || jornada.distribucionOperarios || []).map((participante) => {
+    const participanteGuardado = participante as Partial<Participante> & { activo?: boolean; horasTrabajadas?: number | "" };
+
+    return {
+      id: participanteGuardado.id || crearId(),
+      nombre: participanteGuardado.nombre || "",
+      activoEnJornada: participanteGuardado.activoEnJornada ?? participanteGuardado.activo ?? numeroSeguro(participanteGuardado.horasTrabajadas) > 0,
+      esCapataz: participanteGuardado.esCapataz ?? false,
+    };
+  });
 
   const hubNormalizado: HubDisponible = HUBS_DISPONIBLES.includes(jornada.hub as HubDisponible)
     ? (jornada.hub as HubDisponible)
@@ -239,6 +252,7 @@ function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cli
     clientesPorHub,
     gastosJornada,
     participantes,
+    porcentajeUtilidadCapataz: jornada.porcentajeUtilidadCapataz ?? jornadaInicial.porcentajeUtilidadCapataz,
     clienteActivoId: clientesDelHub.some((cliente) => cliente.id === jornada.clienteActivoId)
       ? Number(jornada.clienteActivoId)
       : clientesDelHub[0]?.id || 0,
@@ -250,7 +264,7 @@ export default function Home() {
   const [jornada, setJornada] = useState<JornadaOperativa>(jornadaInicial);
   const [nuevoCliente, setNuevoCliente] = useState({ nombre: "", email: "", importeCobrado: "" });
   const [nuevoGasto, setNuevoGasto] = useState({ concepto: "", importe: "" });
-  const [nuevoParticipante, setNuevoParticipante] = useState({ nombre: "", activo: true });
+  const [nuevoParticipante, setNuevoParticipante] = useState({ nombre: "", activoEnJornada: true });
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
 
   const clientesDelHub = useMemo(
@@ -263,13 +277,17 @@ export default function Home() {
   const calculos = useMemo(() => calcularJornada(jornada, clientesDelHub), [clientesDelHub, jornada]);
   const fechaFormateada = formatoFecha(jornada.fecha);
   const tituloReporteDiario = `Reporte diario — ${jornada.hub} — ${fechaFormateada}`;
+  const capatazSeleccionado = jornada.participantes.find((participante) => participante.esCapataz);
+  const cantidadCapatazes = jornada.participantes.filter((participante) => participante.esCapataz).length;
   const alertas = useMemo(() => {
     const mensajes: string[] = [];
-    if (calculos.cantidadParticipantesActivos === 0) mensajes.push("No hay participantes activos para distribuir el saldo disponible.");
-    if (calculos.saldoDisponible < 0) mensajes.push("El saldo disponible es negativo. Revisá el total facturado o los gastos de la jornada.");
+    if (calculos.cantidadParticipantesActivos === 0) mensajes.push("Debe haber al menos un participante activo para distribuir el saldo operativo.");
+    if (cantidadCapatazes === 0) mensajes.push("No hay capataz seleccionado. Elegí un capataz para asignar la utilidad de coordinación.");
+    if (cantidadCapatazes > 1) mensajes.push("Hay más de un capataz seleccionado. Debe quedar un solo capataz.");
+    if (calculos.saldoOperativo < 0) mensajes.push("El saldo operativo es negativo. Revisá el total facturado o los gastos de la jornada.");
     if (jornada.gastosJornada.some((item) => item.importe === "")) mensajes.push("Falta importe en un gasto de la jornada.");
     return mensajes;
-  }, [calculos.cantidadParticipantesActivos, calculos.saldoDisponible, jornada.gastosJornada]);
+  }, [calculos.cantidadParticipantesActivos, calculos.saldoOperativo, cantidadCapatazes, jornada.gastosJornada]);
 
   function actualizarJornada(cambios: Partial<JornadaOperativa>) {
     setJornada((jornadaActual) => {
@@ -317,6 +335,16 @@ export default function Home() {
     }));
   }
 
+  function seleccionarCapataz(id: number) {
+    setJornada((jornadaActual) => ({
+      ...jornadaActual,
+      participantes: jornadaActual.participantes.map((participante) => ({
+        ...participante,
+        esCapataz: participante.id === id,
+      })),
+    }));
+  }
+
   function aplicarJornada(jornadaNueva: Partial<JornadaOperativa>) {
     setJornada(normalizarJornada(jornadaNueva));
   }
@@ -344,7 +372,7 @@ export default function Home() {
     aplicarJornada(jornadaInicial);
     setNuevoCliente({ nombre: "", email: "", importeCobrado: "" });
     setNuevoGasto({ concepto: "", importe: "" });
-    setNuevoParticipante({ nombre: "", activo: true });
+    setNuevoParticipante({ nombre: "", activoEnJornada: true });
     setMensajeGuardado("Jornada local limpiada y formulario reiniciado");
   }
 
@@ -389,10 +417,10 @@ export default function Home() {
       ...jornadaActual,
       participantes: [
         ...jornadaActual.participantes,
-        { id: crearId(), nombre: nuevoParticipante.nombre, activo: nuevoParticipante.activo },
+        { id: crearId(), nombre: nuevoParticipante.nombre, activoEnJornada: nuevoParticipante.activoEnJornada, esCapataz: false },
       ],
     }));
-    setNuevoParticipante({ nombre: "", activo: true });
+    setNuevoParticipante({ nombre: "", activoEnJornada: true });
   }
 
   function eliminarCliente(id: number) {
@@ -546,13 +574,17 @@ export default function Home() {
                 <div className="flex items-center justify-between"><h2 className="text-2xl font-bold">4. Participantes que trabajaron</h2><strong>{calculos.cantidadParticipantesActivos} activos</strong></div>
                 <div className="mt-5 space-y-3">
                   {jornada.participantes.map((participante) => {
-                    const pago = calculos.pagosParticipantes.find((pagoParticipante) => pagoParticipante.id === participante.id)?.pagoParticipante || 0;
+                    const pago = calculos.pagosParticipantes.find((gananciaFinal) => gananciaFinal.id === participante.id)?.gananciaFinal || 0;
                     return (
-                      <div key={participante.id} className="grid gap-2 rounded-2xl border border-[#d5ddcf] p-3 md:grid-cols-[1fr_120px_130px_auto]">
+                      <div key={participante.id} className="grid gap-2 rounded-2xl border border-[#d5ddcf] p-3 md:grid-cols-[1fr_110px_120px_130px_auto]">
                         <input value={participante.nombre} onChange={(e) => actualizarParticipante(participante.id, { nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
                         <label className="flex items-center justify-center gap-2 rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">
-                          <input type="checkbox" checked={participante.activo} onChange={(e) => actualizarParticipante(participante.id, { activo: e.target.checked })} />
+                          <input type="checkbox" checked={participante.activoEnJornada} onChange={(e) => actualizarParticipante(participante.id, { activoEnJornada: e.target.checked })} />
                           Activo
+                        </label>
+                        <label className="flex items-center justify-center gap-2 rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">
+                          <input type="radio" name="capataz" checked={participante.esCapataz} onChange={() => seleccionarCapataz(participante.id)} />
+                          Capataz
                         </label>
                         <span className="rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">{formatoMoneda(pago)}</span>
                         <button onClick={() => eliminarParticipante(participante.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
@@ -563,14 +595,20 @@ export default function Home() {
                 <div className="mt-4 grid gap-2 border-t border-[#e1e6dc] pt-4 md:grid-cols-[1fr_120px_auto]">
                   <input placeholder="Participante" value={nuevoParticipante.nombre} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
                   <label className="flex items-center justify-center gap-2 rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">
-                    <input type="checkbox" checked={nuevoParticipante.activo} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, activo: e.target.checked })} />
+                    <input type="checkbox" checked={nuevoParticipante.activoEnJornada} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, activoEnJornada: e.target.checked })} />
                     Activo
                   </label>
                   <button onClick={agregarParticipante} className="rounded-xl bg-[#1f2a1d] px-3 py-2 font-bold text-white">Agregar</button>
                 </div>
+                <label className="mt-4 grid gap-2 text-sm font-semibold">
+                  Porcentaje utilidad capataz
+                  <input type="number" min="0" value={jornada.porcentajeUtilidadCapataz} onChange={(e) => actualizarJornada({ porcentajeUtilidadCapataz: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
+                </label>
                 <div className="mt-4 rounded-2xl bg-[#f6f8f3] p-4 text-sm">
-                  <div className="flex justify-between"><span>Saldo disponible</span><strong>{formatoMoneda(calculos.saldoDisponible)}</strong></div>
-                  <div className="mt-2 flex justify-between"><span>Pago equitativo por participante activo</span><strong>{formatoMoneda(calculos.pagoEquitativo)}</strong></div>
+                  <div className="flex justify-between"><span>Saldo operativo</span><strong>{formatoMoneda(calculos.saldoOperativo)}</strong></div>
+                  <div className="mt-2 flex justify-between"><span>Utilidad capataz ({calculos.porcentajeUtilidadCapataz}%)</span><strong>{formatoMoneda(calculos.utilidadCapataz)}</strong></div>
+                  <div className="mt-2 flex justify-between"><span>Saldo distribuible entre equipo</span><strong>{formatoMoneda(calculos.saldoDistribuible)}</strong></div>
+                  <div className="mt-2 flex justify-between"><span>Pago base equitativo por participante activo</span><strong>{formatoMoneda(calculos.pagoBaseEquitativo)}</strong></div>
                 </div>
               </div>
             </div>
@@ -590,9 +628,22 @@ export default function Home() {
               <div className="mt-5 space-y-3 text-sm">
                 <div className="flex justify-between"><span>Total facturado al Hub</span><strong>{formatoMoneda(calculos.totalFacturado)}</strong></div>
                 <div className="flex justify-between"><span>Total gastos</span><strong>{formatoMoneda(calculos.totalGastos)}</strong></div>
-                <div className="flex justify-between border-t border-[#e1e6dc] pt-3 text-lg"><span>Saldo disponible</span><strong>{formatoMoneda(calculos.saldoDisponible)}</strong></div>
+                <div className="flex justify-between border-t border-[#e1e6dc] pt-3 text-lg"><span>Saldo operativo</span><strong>{formatoMoneda(calculos.saldoOperativo)}</strong></div>
+                <div className="flex justify-between"><span>Porcentaje utilidad capataz</span><strong>{calculos.porcentajeUtilidadCapataz}%</strong></div>
+                <div className="flex justify-between"><span>Importe utilidad capataz</span><strong>{formatoMoneda(calculos.utilidadCapataz)}</strong></div>
+                <div className="flex justify-between"><span>Capataz seleccionado</span><strong>{capatazSeleccionado?.nombre || "Sin seleccionar"}</strong></div>
+                <div className="flex justify-between"><span>Saldo distribuible entre equipo</span><strong>{formatoMoneda(calculos.saldoDistribuible)}</strong></div>
                 <div className="flex justify-between"><span>Participantes activos</span><strong>{calculos.cantidadParticipantesActivos}</strong></div>
-                <div className="flex justify-between"><span>Pago equitativo</span><strong>{formatoMoneda(calculos.pagoEquitativo)}</strong></div>
+                <div className="flex justify-between"><span>Pago base equitativo</span><strong>{formatoMoneda(calculos.pagoBaseEquitativo)}</strong></div>
+                <div className="border-t border-[#e1e6dc] pt-3">
+                  <p className="font-bold">Ganancia final por actor</p>
+                  {calculos.pagosParticipantes.map((participante) => (
+                    <div key={participante.id} className="mt-2 flex justify-between gap-3">
+                      <span>{participante.nombre}{participante.esCapataz ? " · capataz" : ""}</span>
+                      <strong>{formatoMoneda(participante.gananciaFinal)}</strong>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -615,7 +666,7 @@ export default function Home() {
                 <p><strong>Trabajo pendiente:</strong> {jornada.trabajoPendiente}</p>
 
                 <p className="mt-4">Hola {clienteActivo?.nombre || "cliente"},</p>
-                <p className="mt-4">Del total facturado por la jornada del Hub se descuentan los gastos operativos y administrativos. El saldo disponible se distribuye de manera equitativa entre los participantes que trabajaron.</p>
+                <p className="mt-4">Del total facturado por la jornada se descuentan los gastos operativos y administrativos. Sobre el saldo operativo se calcula la utilidad del capataz. Luego, el saldo restante se distribuye de manera equitativa entre los participantes activos. El capataz cobra su parte equitativa más la utilidad correspondiente a la coordinación de la jornada.</p>
                 <p className="mt-4">Por privacidad, los demás clientes figuran anonimizados y no se muestran emails de otros clientes.</p>
 
                 <p className="mt-4 font-bold">Total facturado al Hub</p>
@@ -631,14 +682,23 @@ export default function Home() {
                 {jornada.gastosJornada.map((gasto) => (
                   <div key={gasto.id} className="flex justify-between gap-4"><span>{gasto.concepto}</span><span>{formatoMoneda(numeroSeguro(gasto.importe))}</span></div>
                 ))}
-                <div className="flex justify-between font-bold"><span>Total gastos</span><span>{formatoMoneda(calculos.totalGastos)}</span></div>
-                <div className="flex justify-between font-bold"><span>Saldo disponible</span><span>{formatoMoneda(calculos.saldoDisponible)}</span></div>
+                <div className="flex justify-between font-bold"><span>Total gastos de la jornada</span><span>{formatoMoneda(calculos.totalGastos)}</span></div>
+                <div className="flex justify-between font-bold"><span>Saldo operativo</span><span>{formatoMoneda(calculos.saldoOperativo)}</span></div>
+                <div className="flex justify-between"><span>Porcentaje utilidad capataz</span><span>{calculos.porcentajeUtilidadCapataz}%</span></div>
+                <div className="flex justify-between"><span>Importe utilidad capataz</span><span>{formatoMoneda(calculos.utilidadCapataz)}</span></div>
+                <div className="flex justify-between"><span>Capataz seleccionado</span><span>{capatazSeleccionado?.nombre || "Sin seleccionar"}</span></div>
+                <div className="flex justify-between"><span>Saldo distribuible entre equipo</span><span>{formatoMoneda(calculos.saldoDistribuible)}</span></div>
 
                 <p className="mt-4 font-bold">Participantes que trabajaron</p>
                 {jornada.participantes.map((participante) => (
-                  <div key={participante.id} className="flex justify-between gap-4"><span>{participante.nombre}</span><span>{participante.activo ? "Sí" : "No"}</span></div>
+                  <div key={participante.id} className="flex justify-between gap-4"><span>{participante.nombre}{participante.esCapataz ? " · capataz" : ""}</span><span>{participante.activoEnJornada ? "Sí" : "No"}</span></div>
                 ))}
-                <div className="flex justify-between font-bold"><span>Pago equitativo por participante</span><span>{formatoMoneda(calculos.pagoEquitativo)}</span></div>
+                <div className="flex justify-between"><span>Cantidad de participantes activos</span><span>{calculos.cantidadParticipantesActivos}</span></div>
+                <div className="flex justify-between font-bold"><span>Pago base equitativo por participante</span><span>{formatoMoneda(calculos.pagoBaseEquitativo)}</span></div>
+                <p className="mt-4 font-bold">Ganancia final de cada actor</p>
+                {calculos.pagosParticipantes.map((participante) => (
+                  <div key={participante.id} className="flex justify-between gap-4"><span>{participante.nombre}</span><span>{formatoMoneda(participante.gananciaFinal)}</span></div>
+                ))}
                 <p className="mt-4"><strong>Estado operativo de la jornada:</strong> {jornada.estadoOperativo}</p>
                 <p className="mt-4">Saludos,<br />HubYa</p>
               </div>
