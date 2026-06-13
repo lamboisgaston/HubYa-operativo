@@ -50,6 +50,17 @@ type JornadaOperativa = {
 
 const LOCAL_STORAGE_KEY = "hubya-jornada-operativa-actual";
 
+const HUBS_DISPONIBLES = [
+  "Hub Tipal",
+  "Hub Punto",
+  "Hub Praderas",
+  "Hub Valle Escondido",
+  "Hub Chacras de Santa María",
+  "Hub La Aguada",
+  "Hub Prado",
+  "Hub La Reserva",
+] as const;
+
 const clientesIniciales: Cliente[] = [
   { id: 1, nombre: "Carolina Yovi", email: "carolina@email.com", importeCobrado: 72000 },
   { id: 2, nombre: "Gabriela Aguiar", email: "gabriela@email.com", importeCobrado: 56000 },
@@ -91,6 +102,14 @@ function formatoMoneda(valor: number) {
 
 function formatoHoras(valor: number) {
   return `${valor.toLocaleString("es-AR", { maximumFractionDigits: 2 })} hs`;
+}
+
+function formatoFecha(fecha: string) {
+  const [anio, mes, dia] = fecha.split("-").map(Number);
+
+  if (!anio || !mes || !dia) return fecha;
+
+  return new Date(anio, mes - 1, dia).toLocaleDateString("es-AR");
 }
 
 function crearId() {
@@ -179,8 +198,12 @@ function normalizarJornada(jornada: Partial<JornadaOperativa> & { gastosComunes?
     horasTrabajadas: numeroSeguro(operario.horasTrabajadas),
   }));
 
+  const hubNormalizado = HUBS_DISPONIBLES.includes(jornada.hub as (typeof HUBS_DISPONIBLES)[number])
+    ? String(jornada.hub)
+    : jornadaInicial.hub;
+
   return {
-    hub: jornada.hub || jornadaInicial.hub,
+    hub: hubNormalizado,
     fecha: jornada.fecha || jornadaInicial.fecha,
     nombreReporte: jornada.nombreReporte || jornadaInicial.nombreReporte,
     estadoOperativo: jornada.estadoOperativo || jornadaInicial.estadoOperativo,
@@ -208,6 +231,8 @@ export default function Home() {
     jornada.clientes.find((cliente) => cliente.id === jornada.clienteActivoId) || jornada.clientes[0];
 
   const calculos = useMemo(() => calcularJornada(jornada), [jornada]);
+  const fechaFormateada = formatoFecha(jornada.fecha);
+  const tituloReporteDiario = `Reporte diario — ${jornada.hub} — ${fechaFormateada}`;
   const alertas = useMemo(() => {
     const mensajes: string[] = [];
     if (calculos.horasTotales === 0) mensajes.push("Las horas totales son 0. Cargá horas trabajadas para distribuir el neto.");
@@ -398,7 +423,7 @@ export default function Home() {
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#66745c]">Plataforma Operativa</p>
             <h1 className="mt-2 text-4xl font-bold tracking-tight">HubYa Operativo</h1>
-            <p className="mt-2 text-[#66745c]">Reporte económico completo de la jornada del Hub.</p>
+            <p className="mt-2 text-[#66745c]">{tituloReporteDiario}</p>
           </div>
 
           <div className="flex flex-col gap-3 lg:items-end">
@@ -425,10 +450,36 @@ export default function Home() {
             <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
               <h2 className="text-2xl font-bold">1. Datos de la jornada</h2>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm font-semibold">Hub<input value={jornada.hub} onChange={(e) => actualizarJornada({ hub: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
+                <label className="grid gap-2 text-sm font-semibold">
+                  Hub
+                  <select value={jornada.hub} onChange={(e) => actualizarJornada({ hub: e.target.value })} className="rounded-xl border border-[#d5ddcf] bg-white px-4 py-3 outline-none">
+                    {HUBS_DISPONIBLES.map((hub) => <option key={hub} value={hub}>{hub}</option>)}
+                  </select>
+                </label>
                 <label className="grid gap-2 text-sm font-semibold">Fecha<input type="date" value={jornada.fecha} onChange={(e) => actualizarJornada({ fecha: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
                 <label className="grid gap-2 text-sm font-semibold md:col-span-2">Nombre del reporte<input value={jornada.nombreReporte} onChange={(e) => actualizarJornada({ nombreReporte: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
                 <label className="grid gap-2 text-sm font-semibold md:col-span-2">Estado operativo<input value={jornada.estadoOperativo} onChange={(e) => actualizarJornada({ estadoOperativo: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
+              </div>
+            </div>
+
+
+
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
+              <h2 className="text-2xl font-bold">Hubs activos en Salta</h2>
+              <p className="mt-2 text-sm text-[#66745c]">Seleccioná el Hub operativo de esta jornada y verificá el resto de Hubs prearmados disponibles.</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {HUBS_DISPONIBLES.map((hub) => (
+                  <span
+                    key={hub}
+                    className={`rounded-full border px-4 py-2 text-sm font-bold ${
+                      hub === jornada.hub
+                        ? "border-[#1f2a1d] bg-[#1f2a1d] text-white shadow-sm"
+                        : "border-[#d5ddcf] bg-[#f6f8f3] text-[#3c4937]"
+                    }`}
+                  >
+                    {hub}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -557,9 +608,14 @@ export default function Home() {
               </label>
 
               <div className="mt-5 rounded-2xl bg-white/10 p-5 text-sm leading-7">
-                <p>Asunto: {jornada.nombreReporte}</p>
+                <p className="text-lg font-bold">Reporte diario HubYa</p>
+                <p>Hub correspondiente: <strong>{jornada.hub}</strong></p>
+                <p>Fecha de la jornada: <strong>{fechaFormateada}</strong></p>
+                <p className="mt-2 font-semibold">Este reporte corresponde únicamente a la jornada del Hub seleccionado.</p>
+                <p className="mt-4">Asunto: {jornada.nombreReporte}</p>
+                <p className="mt-4">HubYa opera distintos Hubs en Salta. Este reporte corresponde a {jornada.hub}.</p>
                 <p className="mt-4">Hola {clienteActivo?.nombre || "cliente"},</p>
-                <p className="mt-4">Compartimos la vista privada de la jornada {jornada.fecha} de {jornada.hub}. Por privacidad, los demás participantes figuran anonimizados y no se muestran emails de otros clientes.</p>
+                <p className="mt-4">Compartimos la vista privada de la jornada {fechaFormateada} de {jornada.hub}. Por privacidad, los demás participantes figuran anonimizados y no se muestran emails de otros clientes.</p>
 
                 <p className="mt-4 font-bold">Total facturado al Hub</p>
                 <div className="flex justify-between gap-4"><span>Total facturado</span><span>{formatoMoneda(calculos.totalFacturado)}</span></div>
