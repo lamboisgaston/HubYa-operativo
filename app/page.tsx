@@ -34,12 +34,16 @@ type CalculosDerivados = {
   distribucionIgualitaria: boolean;
 };
 
+type HubDisponible = (typeof HUBS_DISPONIBLES)[number];
+
+type ClientesPorHub = Record<HubDisponible, Cliente[]>;
+
 type JornadaOperativa = {
-  hub: string;
+  hub: HubDisponible;
   fecha: string;
   nombreReporte: string;
   estadoOperativo: string;
-  clientes: Cliente[];
+  clientesPorHub: ClientesPorHub;
   insumosOperativos: MovimientoEconomico[];
   porcentajeComisionCapataz: number | "";
   gastosAdministrativos: MovimientoEconomico[];
@@ -61,11 +65,34 @@ const HUBS_DISPONIBLES = [
   "Hub La Reserva",
 ] as const;
 
-const clientesIniciales: Cliente[] = [
-  { id: 1, nombre: "Carolina Yovi", email: "carolina@email.com", importeCobrado: 72000 },
-  { id: 2, nombre: "Gabriela Aguiar", email: "gabriela@email.com", importeCobrado: 56000 },
-  { id: 3, nombre: "Fleming", email: "fleming@email.com", importeCobrado: 95000 },
-];
+function clienteInicial(id: number, nombre: string): Cliente {
+  return { id, nombre, email: "", importeCobrado: 0 };
+}
+
+const clientesInicialesPorHub: ClientesPorHub = {
+  "Hub Tipal": [clienteInicial(101, "Carolina Yovi"), clienteInicial(102, "Gabriela Aguiar"), clienteInicial(103, "Fleming")],
+  "Hub Punto": [],
+  "Hub Praderas": [
+    clienteInicial(301, "Milagros Carrizo"),
+    clienteInicial(302, "Florencia Siufi"),
+    clienteInicial(303, "Celeste Recamán"),
+    clienteInicial(304, "Verónica Burgos"),
+    clienteInicial(305, "Andrés Jaraba"),
+    clienteInicial(306, "Javier Astudillo"),
+    clienteInicial(307, "María del Mar"),
+  ],
+  "Hub Valle Escondido": [],
+  "Hub Chacras de Santa María": [],
+  "Hub La Aguada": [],
+  "Hub Prado": [
+    clienteInicial(701, "Javier Astudillo"),
+    clienteInicial(702, "Mariana Espeche"),
+    clienteInicial(703, "Marisa Belmar"),
+    clienteInicial(704, "Facundo Quintana"),
+    clienteInicial(705, "Guido Alonso"),
+  ],
+  "Hub La Reserva": [],
+};
 
 const insumosIniciales: MovimientoEconomico[] = [
   { id: 1, concepto: "Nafta", importe: 20000 },
@@ -88,12 +115,12 @@ const jornadaInicial: JornadaOperativa = {
   fecha: "2026-06-13",
   nombreReporte: "Reporte económico operativo — Hub Tipal",
   estadoOperativo: "Jornada completada sin incidentes. Pendiente validación final de distribución.",
-  clientes: clientesIniciales,
+  clientesPorHub: clientesInicialesPorHub,
   insumosOperativos: insumosIniciales,
   porcentajeComisionCapataz: 10,
   gastosAdministrativos: gastosAdministrativosIniciales,
   operarios: operariosIniciales,
-  clienteActivoId: 1,
+  clienteActivoId: 101,
 };
 
 function formatoMoneda(valor: number) {
@@ -124,8 +151,8 @@ function normalizarImporte(valor: string) {
   return valor === "" ? "" : Number(valor);
 }
 
-function calcularJornada(jornada: JornadaOperativa): CalculosDerivados {
-  const totalFacturado = jornada.clientes.reduce(
+function calcularJornada(jornada: JornadaOperativa, clientes: Cliente[]): CalculosDerivados {
+  const totalFacturado = clientes.reduce(
     (total, cliente) => total + numeroSeguro(cliente.importeCobrado),
     0,
   );
@@ -172,13 +199,35 @@ function calcularJornada(jornada: JornadaOperativa): CalculosDerivados {
   };
 }
 
-function normalizarJornada(jornada: Partial<JornadaOperativa> & { gastosComunes?: MovimientoEconomico[]; distribucionOperarios?: { id?: number; nombre?: string; importeAsignado?: number; horasTrabajadas?: number }[]; tiempoEfectivoPorOperario?: string }): JornadaOperativa {
-  const clientes = (jornada.clientes || []).map((cliente) => ({
+function normalizarCliente(cliente: Partial<Cliente>): Cliente {
+  return {
     id: cliente.id || crearId(),
     nombre: cliente.nombre || "",
     email: cliente.email || "",
     importeCobrado: numeroSeguro(cliente.importeCobrado),
-  }));
+  };
+}
+
+function normalizarClientesPorHub(jornada: Partial<JornadaOperativa> & { clientes?: Cliente[] }, hub: HubDisponible): ClientesPorHub {
+  const base = Object.fromEntries(
+    HUBS_DISPONIBLES.map((hubDisponible) => [
+      hubDisponible,
+      (clientesInicialesPorHub[hubDisponible] || []).map((cliente) => ({ ...cliente })),
+    ]),
+  ) as ClientesPorHub;
+
+  if (jornada.clientesPorHub) {
+    HUBS_DISPONIBLES.forEach((hubDisponible) => {
+      base[hubDisponible] = (jornada.clientesPorHub?.[hubDisponible] || []).map(normalizarCliente);
+    });
+  } else if (jornada.clientes) {
+    base[hub] = jornada.clientes.map(normalizarCliente);
+  }
+
+  return base;
+}
+
+function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cliente[]; gastosComunes?: MovimientoEconomico[]; distribucionOperarios?: { id?: number; nombre?: string; importeAsignado?: number; horasTrabajadas?: number }[]; tiempoEfectivoPorOperario?: string }): JornadaOperativa {
 
   const insumosOperativos = (jornada.insumosOperativos || jornada.gastosComunes || []).map((insumo) => ({
     id: insumo.id || crearId(),
@@ -198,23 +247,25 @@ function normalizarJornada(jornada: Partial<JornadaOperativa> & { gastosComunes?
     horasTrabajadas: numeroSeguro(operario.horasTrabajadas),
   }));
 
-  const hubNormalizado = HUBS_DISPONIBLES.includes(jornada.hub as (typeof HUBS_DISPONIBLES)[number])
-    ? String(jornada.hub)
+  const hubNormalizado: HubDisponible = HUBS_DISPONIBLES.includes(jornada.hub as HubDisponible)
+    ? (jornada.hub as HubDisponible)
     : jornadaInicial.hub;
+  const clientesPorHub = normalizarClientesPorHub(jornada, hubNormalizado);
+  const clientesDelHub = clientesPorHub[hubNormalizado];
 
   return {
     hub: hubNormalizado,
     fecha: jornada.fecha || jornadaInicial.fecha,
     nombreReporte: jornada.nombreReporte || jornadaInicial.nombreReporte,
     estadoOperativo: jornada.estadoOperativo || jornadaInicial.estadoOperativo,
-    clientes,
+    clientesPorHub,
     insumosOperativos,
     porcentajeComisionCapataz: numeroSeguro(jornada.porcentajeComisionCapataz),
     gastosAdministrativos,
     operarios,
-    clienteActivoId: clientes.some((cliente) => cliente.id === jornada.clienteActivoId)
+    clienteActivoId: clientesDelHub.some((cliente) => cliente.id === jornada.clienteActivoId)
       ? Number(jornada.clienteActivoId)
-      : clientes[0]?.id || 0,
+      : clientesDelHub[0]?.id || 0,
     calculosDerivados: jornada.calculosDerivados,
   };
 }
@@ -227,10 +278,14 @@ export default function Home() {
   const [nuevoOperario, setNuevoOperario] = useState({ nombre: "", horasTrabajadas: "" });
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
 
+  const clientesDelHub = useMemo(
+    () => jornada.clientesPorHub[jornada.hub] || [],
+    [jornada.clientesPorHub, jornada.hub],
+  );
   const clienteActivo =
-    jornada.clientes.find((cliente) => cliente.id === jornada.clienteActivoId) || jornada.clientes[0];
+    clientesDelHub.find((cliente) => cliente.id === jornada.clienteActivoId) || clientesDelHub[0];
 
-  const calculos = useMemo(() => calcularJornada(jornada), [jornada]);
+  const calculos = useMemo(() => calcularJornada(jornada, clientesDelHub), [clientesDelHub, jornada]);
   const fechaFormateada = formatoFecha(jornada.fecha);
   const tituloReporteDiario = `Reporte diario — ${jornada.hub} — ${fechaFormateada}`;
   const alertas = useMemo(() => {
@@ -243,15 +298,30 @@ export default function Home() {
   }, [calculos.horasTotales, calculos.netoParaDistribuir, jornada.gastosAdministrativos, jornada.insumosOperativos, jornada.operarios]);
 
   function actualizarJornada(cambios: Partial<JornadaOperativa>) {
-    setJornada((jornadaActual) => ({ ...jornadaActual, ...cambios }));
+    setJornada((jornadaActual) => {
+      const hubNuevo = cambios.hub || jornadaActual.hub;
+      const clientesHubNuevo = jornadaActual.clientesPorHub[hubNuevo] || [];
+
+      return {
+        ...jornadaActual,
+        ...cambios,
+        clienteActivoId:
+          cambios.hub && !clientesHubNuevo.some((cliente) => cliente.id === jornadaActual.clienteActivoId)
+            ? clientesHubNuevo[0]?.id || 0
+            : cambios.clienteActivoId ?? jornadaActual.clienteActivoId,
+      };
+    });
   }
 
   function actualizarCliente(id: number, cambios: Partial<Cliente>) {
     setJornada((jornadaActual) => ({
       ...jornadaActual,
-      clientes: jornadaActual.clientes.map((cliente) =>
-        cliente.id === id ? { ...cliente, ...cambios } : cliente,
-      ),
+      clientesPorHub: {
+        ...jornadaActual.clientesPorHub,
+        [jornadaActual.hub]: jornadaActual.clientesPorHub[jornadaActual.hub].map((cliente) =>
+          cliente.id === id ? { ...cliente, ...cambios } : cliente,
+        ),
+      },
     }));
   }
 
@@ -315,7 +385,7 @@ export default function Home() {
   }
 
   function agregarCliente() {
-    if (!nuevoCliente.nombre.trim() || !nuevoCliente.email.trim()) return;
+    if (!nuevoCliente.nombre.trim()) return;
 
     const cliente: Cliente = {
       id: crearId(),
@@ -326,7 +396,10 @@ export default function Home() {
 
     setJornada((jornadaActual) => ({
       ...jornadaActual,
-      clientes: [...jornadaActual.clientes, cliente],
+      clientesPorHub: {
+        ...jornadaActual.clientesPorHub,
+        [jornadaActual.hub]: [...jornadaActual.clientesPorHub[jornadaActual.hub], cliente],
+      },
       clienteActivoId: cliente.id,
     }));
     setNuevoCliente({ nombre: "", email: "", importeCobrado: "" });
@@ -380,11 +453,19 @@ export default function Home() {
   }
 
   function eliminarCliente(id: number) {
+    const cliente = clientesDelHub.find((clienteActual) => clienteActual.id === id);
+    const confirmado = window.confirm(`¿Eliminar ${cliente?.nombre || "este cliente"} del ${jornada.hub}?`);
+
+    if (!confirmado) return;
+
     setJornada((jornadaActual) => {
-      const clientes = jornadaActual.clientes.filter((cliente) => cliente.id !== id);
+      const clientes = jornadaActual.clientesPorHub[jornadaActual.hub].filter((clienteActual) => clienteActual.id !== id);
       return {
         ...jornadaActual,
-        clientes,
+        clientesPorHub: {
+          ...jornadaActual.clientesPorHub,
+          [jornadaActual.hub]: clientes,
+        },
         clienteActivoId:
           jornadaActual.clienteActivoId === id ? clientes[0]?.id || 0 : jornadaActual.clienteActivoId,
       };
@@ -452,7 +533,7 @@ export default function Home() {
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm font-semibold">
                   Hub
-                  <select value={jornada.hub} onChange={(e) => actualizarJornada({ hub: e.target.value })} className="rounded-xl border border-[#d5ddcf] bg-white px-4 py-3 outline-none">
+                  <select value={jornada.hub} onChange={(e) => actualizarJornada({ hub: e.target.value as HubDisponible })} className="rounded-xl border border-[#d5ddcf] bg-white px-4 py-3 outline-none">
                     {HUBS_DISPONIBLES.map((hub) => <option key={hub} value={hub}>{hub}</option>)}
                   </select>
                 </label>
@@ -486,7 +567,7 @@ export default function Home() {
             <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
               <div className="flex items-center justify-between gap-3"><h2 className="text-2xl font-bold">2. Total facturado al Hub</h2><strong>{formatoMoneda(calculos.totalFacturado)}</strong></div>
               <div className="mt-5 space-y-3">
-                {jornada.clientes.map((cliente) => (
+                {clientesDelHub.map((cliente) => (
                   <div key={cliente.id} className={`rounded-2xl border p-4 ${cliente.id === jornada.clienteActivoId ? "border-[#1f2a1d] bg-[#eef4ea]" : "border-[#d5ddcf]"}`}>
                     <div className="grid gap-3 md:grid-cols-[1fr_1fr_140px_auto]">
                       <input aria-label="Nombre del cliente" value={cliente.nombre} onFocus={() => actualizarJornada({ clienteActivoId: cliente.id })} onChange={(e) => actualizarCliente(cliente.id, { nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
@@ -603,7 +684,7 @@ export default function Home() {
               <label className="mt-5 grid gap-2 text-sm font-semibold">
                 Cliente que verá el reporte
                 <select value={jornada.clienteActivoId} onChange={(e) => actualizarJornada({ clienteActivoId: Number(e.target.value) })} className="rounded-xl border border-white/20 bg-white px-4 py-3 text-[#182018]">
-                  {jornada.clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
+                  {clientesDelHub.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
                 </select>
               </label>
 
@@ -621,7 +702,7 @@ export default function Home() {
                 <div className="flex justify-between gap-4"><span>Total facturado</span><span>{formatoMoneda(calculos.totalFacturado)}</span></div>
 
                 <p className="mt-4 font-bold">Detalle de clientes</p>
-                {jornada.clientes.map((cliente, index) => (
+                {clientesDelHub.map((cliente, index) => (
                   <div key={cliente.id} className="flex justify-between gap-4">
                     <span>{nombrePrivado(cliente, index)}</span>
                     <span>{formatoMoneda(numeroSeguro(cliente.importeCobrado))}</span>
