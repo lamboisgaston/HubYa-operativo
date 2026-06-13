@@ -82,6 +82,15 @@ function formatoPlano(valor: CampoNumerico | undefined) {
   return valor === "" || valor === undefined ? "" : formatoMoneda(valor);
 }
 
+function escaparHtml(valor: string) {
+  return valor
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function formatoFecha(fecha: string) {
   const [anio, mes, dia] = fecha.split("-").map(Number);
   if (!anio || !mes || !dia) return fecha;
@@ -175,6 +184,8 @@ function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientesPorHub
 export default function Home() {
   const [jornada, setJornada] = useState<JornadaOperativa>(jornadaInicial);
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
+  const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
+  const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
   const reporteVisualRef = useRef<HTMLElement>(null);
 
   const datosHub = jornada.datosPorHub[jornada.hub];
@@ -245,11 +256,74 @@ export default function Home() {
     `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
   ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
 
+  const asuntoReporte = `Reporte diario HubYa — ${jornada.hub} — ${fechaFormateada}`;
+
   const emailPrivado = useMemo(() => [
-    `Hola ${clienteActivo?.nombre || ""}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}.`,
+    `Hola ${clienteActivo?.nombre || "cliente"}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}. Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.`,
     "",
-    "Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.",
+    "Saludos,",
+    "HubYa",
   ].join("\n"), [clienteActivo?.nombre, fechaFormateada, jornada.hub]);
+
+  const reporteHtml = useMemo(() => `
+    <section style="border:1px solid #6f7968;background:#fff;color:#182018;font-family:Arial,Helvetica,sans-serif;max-width:760px;">
+      <header style="border-bottom:2px solid #1f2a1d;padding:16px;">
+        <p style="margin:0;color:#66745c;font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;">HubYa</p>
+        <h1 style="margin:4px 0 0;font-size:20px;text-transform:uppercase;">Reporte administrativo del Hub</h1>
+        <p style="margin:4px 0 0;color:#66745c;font-size:12px;font-weight:700;">Documento emitido por sistema</p>
+      </header>
+      <div style="padding:16px;">
+        <h2 style="font-size:12px;text-transform:uppercase;">Resumen rápido para el cliente</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <tbody>
+            <tr><td style="border:1px solid #d8dfd1;padding:6px;background:#f6f8f3;font-weight:800;text-transform:uppercase;">Cliente seleccionado</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(clienteActivo?.nombre || "Sin cliente seleccionado")}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;padding:6px;background:#f6f8f3;font-weight:800;text-transform:uppercase;">Hub</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(jornada.hub)}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;padding:6px;background:#f6f8f3;font-weight:800;text-transform:uppercase;">Fecha</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(fechaFormateada)}</td></tr>
+            <tr><td style="border:1px solid #1f2a1d;padding:8px;background:#eef2e8;font-weight:800;text-transform:uppercase;">Importe correspondiente a su espacio verde</td><td style="border:1px solid #1f2a1d;padding:8px;background:#eef2e8;font-size:18px;font-weight:800;">${escaparHtml(formatoPlano(clienteActivo?.importe) || formatoMoneda(0))}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;padding:6px;background:#f6f8f3;font-weight:800;text-transform:uppercase;">Estado operativo</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(datosHub.resumen.estadoOperativo || "Sin cargar")}</td></tr>
+          </tbody>
+        </table>
+        <pre style="white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;border:1px solid #d8dfd1;background:#fbfcf9;padding:12px;">${escaparHtml(reporteTexto)}</pre>
+        <p style="border:1px solid #d8dfd1;background:#f8faf5;padding:8px;color:#66745c;font-size:10px;font-weight:700;">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados como Cliente 2, Cliente 3, Cliente 4, etc. y no se incluyen emails.</p>
+      </div>
+    </section>`, [clienteActivo?.importe, clienteActivo?.nombre, datosHub.resumen.estadoOperativo, fechaFormateada, jornada.hub, reporteTexto]);
+
+
+  async function enviarReporteClienteSeleccionado() {
+    if (!clienteActivo?.email.trim()) {
+      setEstadoEnvio("error");
+      setMensajeEnvio("Error al enviar: el cliente seleccionado no tiene email.");
+      return;
+    }
+
+    setEstadoEnvio("enviando");
+    setMensajeEnvio("Enviando...");
+
+    const respuesta = await fetch("/api/enviar-reporte", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        emailDestino: clienteActivo.email,
+        nombreCliente: clienteActivo.nombre,
+        hub: jornada.hub,
+        fecha: fechaFormateada,
+        asunto: asuntoReporte,
+        cuerpoMail: emailPrivado,
+        reporteHtml,
+        reporteTexto,
+      }),
+    });
+    const data = await respuesta.json().catch(() => ({}));
+
+    if (!respuesta.ok) {
+      setEstadoEnvio("error");
+      setMensajeEnvio(`Error al enviar: ${data?.error || "no se pudo enviar el reporte."}`);
+      return;
+    }
+
+    setEstadoEnvio("enviado");
+    setMensajeEnvio("Enviado correctamente");
+  }
 
   async function descargarImagenReporte() {
     const nodo = reporteVisualRef.current;
@@ -363,8 +437,9 @@ export default function Home() {
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Vista previa exacta para mail</p>
                 <h2 className="text-lg font-black">Documento administrativo emitido por sistema</h2>
                 <p className="text-xs font-bold text-[#66745c]">La imagen generada usa exactamente este formato de factura / presupuesto / reporte.</p>
+                <p className={`mt-1 text-xs font-black ${estadoEnvio === "error" ? "text-[#743c3c]" : estadoEnvio === "enviado" ? "text-[#2f6d32]" : "text-[#66745c]"}`}>{mensajeEnvio}</p>
               </div>
-              <div className="flex flex-wrap gap-2"><button onClick={() => copiarTexto(reporteTexto, "Reporte")} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar reporte</button><button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar imagen del reporte</button></div>
+              <div className="flex flex-wrap gap-2"><button onClick={() => copiarTexto(reporteTexto, "Reporte")} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar reporte</button><button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar imagen del reporte</button><button onClick={enviarReporteClienteSeleccionado} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar reporte al cliente seleccionado</button></div>
             </div>
 
             <article ref={reporteVisualRef} xmlns="http://www.w3.org/1999/xhtml" className="w-full max-w-[760px] border border-[#6f7968] bg-white p-0 font-sans text-[#182018] shadow-none">
