@@ -15,23 +15,19 @@ type MovimientoEconomico = {
   importe: number | "";
 };
 
-type Operario = {
+type Participante = {
   id: number;
   nombre: string;
-  horasTrabajadas: number | "";
+  activo: boolean;
 };
 
 type CalculosDerivados = {
   totalFacturado: number;
-  totalInsumos: number;
-  subtotalDespuesDeInsumos: number;
-  comisionCapataz: number;
-  totalGastosAdministrativos: number;
-  netoParaDistribuir: number;
-  horasTotales: number;
-  valorHoraOperativa: number;
-  pagosOperarios: { id: number; nombre: string; horasTrabajadas: number; pagoOperario: number }[];
-  distribucionIgualitaria: boolean;
+  totalGastos: number;
+  saldoDisponible: number;
+  cantidadParticipantesActivos: number;
+  pagoEquitativo: number;
+  pagosParticipantes: { id: number; nombre: string; activo: boolean; pagoParticipante: number }[];
 };
 
 type HubDisponible = (typeof HUBS_DISPONIBLES)[number];
@@ -43,11 +39,11 @@ type JornadaOperativa = {
   fecha: string;
   nombreReporte: string;
   estadoOperativo: string;
+  trabajoRealizado: string;
+  trabajoPendiente: string;
   clientesPorHub: ClientesPorHub;
-  insumosOperativos: MovimientoEconomico[];
-  porcentajeComisionCapataz: number | "";
-  gastosAdministrativos: MovimientoEconomico[];
-  operarios: Operario[];
+  gastosJornada: MovimientoEconomico[];
+  participantes: Participante[];
   clienteActivoId: number;
   calculosDerivados?: CalculosDerivados;
 };
@@ -94,20 +90,18 @@ const clientesInicialesPorHub: ClientesPorHub = {
   "Hub La Reserva": [],
 };
 
-const insumosIniciales: MovimientoEconomico[] = [
+const gastosJornadaIniciales: MovimientoEconomico[] = [
   { id: 1, concepto: "Nafta", importe: 20000 },
   { id: 2, concepto: "Maquinaria", importe: 1000 },
   { id: 3, concepto: "Tanza", importe: 10000 },
+  { id: 4, concepto: "JardinerosYa", importe: 15000 },
+  { id: 5, concepto: "Comisión capataz", importe: 14000 },
 ];
 
-const gastosAdministrativosIniciales: MovimientoEconomico[] = [
-  { id: 1, concepto: "JardinerosYa", importe: 15000 },
-];
-
-const operariosIniciales: Operario[] = [
-  { id: 1, nombre: "Hernán Llanes", horasTrabajadas: 6 },
-  { id: 2, nombre: "Armando Castillo", horasTrabajadas: 6 },
-  { id: 3, nombre: "Mauricio Vallejos", horasTrabajadas: 6 },
+const participantesIniciales: Participante[] = [
+  { id: 1, nombre: "Hernán Llanes", activo: true },
+  { id: 2, nombre: "Armando Castillo", activo: true },
+  { id: 3, nombre: "Mauricio Vallejos", activo: true },
 ];
 
 const jornadaInicial: JornadaOperativa = {
@@ -115,11 +109,11 @@ const jornadaInicial: JornadaOperativa = {
   fecha: "2026-06-13",
   nombreReporte: "Reporte económico operativo — Hub Tipal",
   estadoOperativo: "Jornada completada sin incidentes. Pendiente validación final de distribución.",
+  trabajoRealizado: "Mantenimiento integral de espacios verdes, corte, bordes y limpieza general.",
+  trabajoPendiente: "Validación final con cada cliente y próximos repasos programados.",
   clientesPorHub: clientesInicialesPorHub,
-  insumosOperativos: insumosIniciales,
-  porcentajeComisionCapataz: 10,
-  gastosAdministrativos: gastosAdministrativosIniciales,
-  operarios: operariosIniciales,
+  gastosJornada: gastosJornadaIniciales,
+  participantes: participantesIniciales,
   clienteActivoId: 101,
 };
 
@@ -127,9 +121,6 @@ function formatoMoneda(valor: number) {
   return valor.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 }
 
-function formatoHoras(valor: number) {
-  return `${valor.toLocaleString("es-AR", { maximumFractionDigits: 2 })} hs`;
-}
 
 function formatoFecha(fecha: string) {
   const [anio, mes, dia] = fecha.split("-").map(Number);
@@ -156,46 +147,27 @@ function calcularJornada(jornada: JornadaOperativa, clientes: Cliente[]): Calcul
     (total, cliente) => total + numeroSeguro(cliente.importeCobrado),
     0,
   );
-  const totalInsumos = jornada.insumosOperativos.reduce(
-    (total, insumo) => total + numeroSeguro(insumo.importe),
-    0,
-  );
-  const subtotalDespuesDeInsumos = totalFacturado - totalInsumos;
-  const comisionCapataz = (subtotalDespuesDeInsumos * numeroSeguro(jornada.porcentajeComisionCapataz)) / 100;
-  const totalGastosAdministrativos = jornada.gastosAdministrativos.reduce(
+  const totalGastos = jornada.gastosJornada.reduce(
     (total, gasto) => total + numeroSeguro(gasto.importe),
     0,
   );
-  const netoParaDistribuir = subtotalDespuesDeInsumos - comisionCapataz - totalGastosAdministrativos;
-  const horasTotales = jornada.operarios.reduce(
-    (total, operario) => total + numeroSeguro(operario.horasTrabajadas),
-    0,
-  );
-  const valorHoraOperativa = horasTotales > 0 ? netoParaDistribuir / horasTotales : 0;
-  const pagosOperarios = jornada.operarios.map((operario) => {
-    const horasTrabajadas = numeroSeguro(operario.horasTrabajadas);
-    return {
-      id: operario.id,
-      nombre: operario.nombre,
-      horasTrabajadas,
-      pagoOperario: horasTrabajadas * valorHoraOperativa,
-    };
-  });
-  const horasValidas = jornada.operarios.map((operario) => numeroSeguro(operario.horasTrabajadas));
-  const distribucionIgualitaria =
-    horasValidas.length > 1 && horasValidas.every((horas) => horas > 0 && horas === horasValidas[0]);
+  const saldoDisponible = totalFacturado - totalGastos;
+  const cantidadParticipantesActivos = jornada.participantes.filter((participante) => participante.activo).length;
+  const pagoEquitativo = cantidadParticipantesActivos > 0 ? saldoDisponible / cantidadParticipantesActivos : 0;
+  const pagosParticipantes = jornada.participantes.map((participante) => ({
+    id: participante.id,
+    nombre: participante.nombre,
+    activo: participante.activo,
+    pagoParticipante: participante.activo ? pagoEquitativo : 0,
+  }));
 
   return {
     totalFacturado,
-    totalInsumos,
-    subtotalDespuesDeInsumos,
-    comisionCapataz,
-    totalGastosAdministrativos,
-    netoParaDistribuir,
-    horasTotales,
-    valorHoraOperativa,
-    pagosOperarios,
-    distribucionIgualitaria,
+    totalGastos,
+    saldoDisponible,
+    cantidadParticipantesActivos,
+    pagoEquitativo,
+    pagosParticipantes,
   };
 }
 
@@ -227,24 +199,28 @@ function normalizarClientesPorHub(jornada: Partial<JornadaOperativa> & { cliente
   return base;
 }
 
-function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cliente[]; gastosComunes?: MovimientoEconomico[]; distribucionOperarios?: { id?: number; nombre?: string; importeAsignado?: number; horasTrabajadas?: number }[]; tiempoEfectivoPorOperario?: string }): JornadaOperativa {
+function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cliente[]; gastosComunes?: MovimientoEconomico[]; insumosOperativos?: MovimientoEconomico[]; gastosAdministrativos?: MovimientoEconomico[]; operarios?: { id?: number; nombre?: string; activo?: boolean; horasTrabajadas?: number | "" }[]; distribucionOperarios?: { id?: number; nombre?: string; activo?: boolean; importeAsignado?: number; horasTrabajadas?: number | "" }[]; porcentajeComisionCapataz?: number | ""; tiempoEfectivoPorOperario?: string }): JornadaOperativa {
+  const gastosBase = jornada.gastosJornada
+    || [
+      ...(jornada.insumosOperativos || jornada.gastosComunes || []),
+      ...(jornada.gastosAdministrativos || []),
+    ];
 
-  const insumosOperativos = (jornada.insumosOperativos || jornada.gastosComunes || []).map((insumo) => ({
-    id: insumo.id || crearId(),
-    concepto: insumo.concepto || "",
-    importe: numeroSeguro(insumo.importe),
-  }));
-
-  const gastosAdministrativos = (jornada.gastosAdministrativos || []).map((gasto) => ({
+  const gastosJornada = gastosBase.map((gasto) => ({
     id: gasto.id || crearId(),
     concepto: gasto.concepto || "",
     importe: numeroSeguro(gasto.importe),
   }));
 
-  const operarios = (jornada.operarios || jornada.distribucionOperarios || []).map((operario) => ({
-    id: operario.id || crearId(),
-    nombre: operario.nombre || "",
-    horasTrabajadas: numeroSeguro(operario.horasTrabajadas),
+  const comisionExistente = gastosJornada.some((gasto) => gasto.concepto.toLowerCase().includes("comisión capataz"));
+  if (!jornada.gastosJornada && !comisionExistente && numeroSeguro(jornada.porcentajeComisionCapataz) > 0) {
+    gastosJornada.push({ id: crearId(), concepto: "Comisión capataz", importe: 0 });
+  }
+
+  const participantes = (jornada.participantes || jornada.operarios || jornada.distribucionOperarios || []).map((participante) => ({
+    id: participante.id || crearId(),
+    nombre: participante.nombre || "",
+    activo: participante.activo ?? numeroSeguro(participante.horasTrabajadas) > 0,
   }));
 
   const hubNormalizado: HubDisponible = HUBS_DISPONIBLES.includes(jornada.hub as HubDisponible)
@@ -258,11 +234,11 @@ function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cli
     fecha: jornada.fecha || jornadaInicial.fecha,
     nombreReporte: jornada.nombreReporte || jornadaInicial.nombreReporte,
     estadoOperativo: jornada.estadoOperativo || jornadaInicial.estadoOperativo,
+    trabajoRealizado: jornada.trabajoRealizado || jornadaInicial.trabajoRealizado,
+    trabajoPendiente: jornada.trabajoPendiente || jornadaInicial.trabajoPendiente,
     clientesPorHub,
-    insumosOperativos,
-    porcentajeComisionCapataz: numeroSeguro(jornada.porcentajeComisionCapataz),
-    gastosAdministrativos,
-    operarios,
+    gastosJornada,
+    participantes,
     clienteActivoId: clientesDelHub.some((cliente) => cliente.id === jornada.clienteActivoId)
       ? Number(jornada.clienteActivoId)
       : clientesDelHub[0]?.id || 0,
@@ -273,9 +249,8 @@ function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientes?: Cli
 export default function Home() {
   const [jornada, setJornada] = useState<JornadaOperativa>(jornadaInicial);
   const [nuevoCliente, setNuevoCliente] = useState({ nombre: "", email: "", importeCobrado: "" });
-  const [nuevoInsumo, setNuevoInsumo] = useState({ concepto: "", importe: "" });
-  const [nuevoGastoAdministrativo, setNuevoGastoAdministrativo] = useState({ concepto: "", importe: "" });
-  const [nuevoOperario, setNuevoOperario] = useState({ nombre: "", horasTrabajadas: "" });
+  const [nuevoGasto, setNuevoGasto] = useState({ concepto: "", importe: "" });
+  const [nuevoParticipante, setNuevoParticipante] = useState({ nombre: "", activo: true });
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
 
   const clientesDelHub = useMemo(
@@ -290,12 +265,11 @@ export default function Home() {
   const tituloReporteDiario = `Reporte diario — ${jornada.hub} — ${fechaFormateada}`;
   const alertas = useMemo(() => {
     const mensajes: string[] = [];
-    if (calculos.horasTotales === 0) mensajes.push("Las horas totales son 0. Cargá horas trabajadas para distribuir el neto.");
-    if (calculos.netoParaDistribuir < 0) mensajes.push("El neto para distribuir es negativo. Revisá insumos, comisión o gastos administrativos.");
-    if ([...jornada.insumosOperativos, ...jornada.gastosAdministrativos].some((item) => item.importe === "")) mensajes.push("Falta importe en un insumo operativo o gasto administrativo.");
-    if (jornada.operarios.some((operario) => operario.horasTrabajadas === "")) mensajes.push("Falta cargar horas en un operario.");
+    if (calculos.cantidadParticipantesActivos === 0) mensajes.push("No hay participantes activos para distribuir el saldo disponible.");
+    if (calculos.saldoDisponible < 0) mensajes.push("El saldo disponible es negativo. Revisá el total facturado o los gastos de la jornada.");
+    if (jornada.gastosJornada.some((item) => item.importe === "")) mensajes.push("Falta importe en un gasto de la jornada.");
     return mensajes;
-  }, [calculos.horasTotales, calculos.netoParaDistribuir, jornada.gastosAdministrativos, jornada.insumosOperativos, jornada.operarios]);
+  }, [calculos.cantidadParticipantesActivos, calculos.saldoDisponible, jornada.gastosJornada]);
 
   function actualizarJornada(cambios: Partial<JornadaOperativa>) {
     setJornada((jornadaActual) => {
@@ -325,29 +299,20 @@ export default function Home() {
     }));
   }
 
-  function actualizarInsumo(id: number, cambios: Partial<MovimientoEconomico>) {
+  function actualizarGasto(id: number, cambios: Partial<MovimientoEconomico>) {
     setJornada((jornadaActual) => ({
       ...jornadaActual,
-      insumosOperativos: jornadaActual.insumosOperativos.map((insumo) =>
-        insumo.id === id ? { ...insumo, ...cambios } : insumo,
-      ),
-    }));
-  }
-
-  function actualizarGastoAdministrativo(id: number, cambios: Partial<MovimientoEconomico>) {
-    setJornada((jornadaActual) => ({
-      ...jornadaActual,
-      gastosAdministrativos: jornadaActual.gastosAdministrativos.map((gasto) =>
+      gastosJornada: jornadaActual.gastosJornada.map((gasto) =>
         gasto.id === id ? { ...gasto, ...cambios } : gasto,
       ),
     }));
   }
 
-  function actualizarOperario(id: number, cambios: Partial<Operario>) {
+  function actualizarParticipante(id: number, cambios: Partial<Participante>) {
     setJornada((jornadaActual) => ({
       ...jornadaActual,
-      operarios: jornadaActual.operarios.map((operario) =>
-        operario.id === id ? { ...operario, ...cambios } : operario,
+      participantes: jornadaActual.participantes.map((participante) =>
+        participante.id === id ? { ...participante, ...cambios } : participante,
       ),
     }));
   }
@@ -378,9 +343,8 @@ export default function Home() {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     aplicarJornada(jornadaInicial);
     setNuevoCliente({ nombre: "", email: "", importeCobrado: "" });
-    setNuevoInsumo({ concepto: "", importe: "" });
-    setNuevoGastoAdministrativo({ concepto: "", importe: "" });
-    setNuevoOperario({ nombre: "", horasTrabajadas: "" });
+    setNuevoGasto({ concepto: "", importe: "" });
+    setNuevoParticipante({ nombre: "", activo: true });
     setMensajeGuardado("Jornada local limpiada y formulario reiniciado");
   }
 
@@ -405,51 +369,30 @@ export default function Home() {
     setNuevoCliente({ nombre: "", email: "", importeCobrado: "" });
   }
 
-  function agregarInsumo() {
-    if (!nuevoInsumo.concepto.trim()) return;
+  function agregarGasto() {
+    if (!nuevoGasto.concepto.trim()) return;
 
     setJornada((jornadaActual) => ({
       ...jornadaActual,
-      insumosOperativos: [
-        ...jornadaActual.insumosOperativos,
-        { id: crearId(), concepto: nuevoInsumo.concepto, importe: normalizarImporte(nuevoInsumo.importe) },
+      gastosJornada: [
+        ...jornadaActual.gastosJornada,
+        { id: crearId(), concepto: nuevoGasto.concepto, importe: normalizarImporte(nuevoGasto.importe) },
       ],
     }));
-    setNuevoInsumo({ concepto: "", importe: "" });
+    setNuevoGasto({ concepto: "", importe: "" });
   }
 
-  function agregarGastoAdministrativo() {
-    if (!nuevoGastoAdministrativo.concepto.trim()) return;
+  function agregarParticipante() {
+    if (!nuevoParticipante.nombre.trim()) return;
 
     setJornada((jornadaActual) => ({
       ...jornadaActual,
-      gastosAdministrativos: [
-        ...jornadaActual.gastosAdministrativos,
-        {
-          id: crearId(),
-          concepto: nuevoGastoAdministrativo.concepto,
-          importe: normalizarImporte(nuevoGastoAdministrativo.importe),
-        },
+      participantes: [
+        ...jornadaActual.participantes,
+        { id: crearId(), nombre: nuevoParticipante.nombre, activo: nuevoParticipante.activo },
       ],
     }));
-    setNuevoGastoAdministrativo({ concepto: "", importe: "" });
-  }
-
-  function agregarOperario() {
-    if (!nuevoOperario.nombre.trim()) return;
-
-    setJornada((jornadaActual) => ({
-      ...jornadaActual,
-      operarios: [
-        ...jornadaActual.operarios,
-        {
-          id: crearId(),
-          nombre: nuevoOperario.nombre,
-          horasTrabajadas: normalizarImporte(nuevoOperario.horasTrabajadas),
-        },
-      ],
-    }));
-    setNuevoOperario({ nombre: "", horasTrabajadas: "" });
+    setNuevoParticipante({ nombre: "", activo: true });
   }
 
   function eliminarCliente(id: number) {
@@ -472,24 +415,17 @@ export default function Home() {
     });
   }
 
-  function eliminarInsumo(id: number) {
+  function eliminarGasto(id: number) {
     setJornada((jornadaActual) => ({
       ...jornadaActual,
-      insumosOperativos: jornadaActual.insumosOperativos.filter((insumo) => insumo.id !== id),
+      gastosJornada: jornadaActual.gastosJornada.filter((gasto) => gasto.id !== id),
     }));
   }
 
-  function eliminarGastoAdministrativo(id: number) {
+  function eliminarParticipante(id: number) {
     setJornada((jornadaActual) => ({
       ...jornadaActual,
-      gastosAdministrativos: jornadaActual.gastosAdministrativos.filter((gasto) => gasto.id !== id),
-    }));
-  }
-
-  function eliminarOperario(id: number) {
-    setJornada((jornadaActual) => ({
-      ...jornadaActual,
-      operarios: jornadaActual.operarios.filter((operario) => operario.id !== id),
+      participantes: jornadaActual.participantes.filter((participante) => participante.id !== id),
     }));
   }
 
@@ -588,78 +524,62 @@ export default function Home() {
 
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-                <div className="flex items-center justify-between"><h2 className="text-2xl font-bold">3. Insumos operativos</h2><strong>{formatoMoneda(calculos.totalInsumos)}</strong></div>
+                <div className="flex items-center justify-between"><h2 className="text-2xl font-bold">3. Gastos de la jornada</h2><strong>{formatoMoneda(calculos.totalGastos)}</strong></div>
+                <p className="mt-2 text-sm text-[#66745c]">Cargá cada gasto con concepto e importe. Esta lista reemplaza insumos, comisión y gastos administrativos separados.</p>
                 <div className="mt-5 space-y-3">
-                  {jornada.insumosOperativos.map((insumo) => (
-                    <div key={insumo.id} className="grid gap-2 rounded-2xl border border-[#d5ddcf] p-3 md:grid-cols-[1fr_130px_auto]">
-                      <input value={insumo.concepto} onChange={(e) => actualizarInsumo(insumo.id, { concepto: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <input type="number" value={insumo.importe} onChange={(e) => actualizarInsumo(insumo.id, { importe: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <button onClick={() => eliminarInsumo(insumo.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 grid gap-2 border-t border-[#e1e6dc] pt-4 md:grid-cols-[1fr_130px_auto]">
-                  <input placeholder="Concepto" value={nuevoInsumo.concepto} onChange={(e) => setNuevoInsumo({ ...nuevoInsumo, concepto: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <input placeholder="Importe" type="number" value={nuevoInsumo.importe} onChange={(e) => setNuevoInsumo({ ...nuevoInsumo, importe: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <button onClick={agregarInsumo} className="rounded-xl bg-[#1f2a1d] px-3 py-2 font-bold text-white">Agregar</button>
-                </div>
-                <div className="mt-4 rounded-2xl bg-[#f6f8f3] p-4 text-sm font-bold">Subtotal después de insumos: {formatoMoneda(calculos.subtotalDespuesDeInsumos)}</div>
-              </div>
-
-              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-                <h2 className="text-2xl font-bold">4. Comisión del capataz</h2>
-                <label className="mt-5 grid gap-2 text-sm font-semibold">Porcentaje de comisión<input type="number" value={jornada.porcentajeComisionCapataz} onChange={(e) => actualizarJornada({ porcentajeComisionCapataz: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
-                <div className="mt-4 rounded-2xl bg-[#f6f8f3] p-4 text-sm">
-                  <div className="flex justify-between"><span>Base: subtotal después de insumos</span><strong>{formatoMoneda(calculos.subtotalDespuesDeInsumos)}</strong></div>
-                  <div className="mt-2 flex justify-between text-lg"><span>Comisión calculada</span><strong>{formatoMoneda(calculos.comisionCapataz)}</strong></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-                <div className="flex items-center justify-between"><h2 className="text-2xl font-bold">5. Gastos administrativos</h2><strong>{formatoMoneda(calculos.totalGastosAdministrativos)}</strong></div>
-                <div className="mt-5 space-y-3">
-                  {jornada.gastosAdministrativos.map((gasto) => (
+                  {jornada.gastosJornada.map((gasto) => (
                     <div key={gasto.id} className="grid gap-2 rounded-2xl border border-[#d5ddcf] p-3 md:grid-cols-[1fr_130px_auto]">
-                      <input value={gasto.concepto} onChange={(e) => actualizarGastoAdministrativo(gasto.id, { concepto: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <input type="number" value={gasto.importe} onChange={(e) => actualizarGastoAdministrativo(gasto.id, { importe: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                      <button onClick={() => eliminarGastoAdministrativo(gasto.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
+                      <input aria-label="Concepto del gasto" value={gasto.concepto} onChange={(e) => actualizarGasto(gasto.id, { concepto: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
+                      <input aria-label="Importe del gasto" type="number" value={gasto.importe} onChange={(e) => actualizarGasto(gasto.id, { importe: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
+                      <button onClick={() => eliminarGasto(gasto.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
                     </div>
                   ))}
                 </div>
                 <div className="mt-4 grid gap-2 border-t border-[#e1e6dc] pt-4 md:grid-cols-[1fr_130px_auto]">
-                  <input placeholder="Concepto" value={nuevoGastoAdministrativo.concepto} onChange={(e) => setNuevoGastoAdministrativo({ ...nuevoGastoAdministrativo, concepto: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <input placeholder="Importe" type="number" value={nuevoGastoAdministrativo.importe} onChange={(e) => setNuevoGastoAdministrativo({ ...nuevoGastoAdministrativo, importe: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <button onClick={agregarGastoAdministrativo} className="rounded-xl bg-[#1f2a1d] px-3 py-2 font-bold text-white">Agregar</button>
+                  <input placeholder="Concepto" value={nuevoGasto.concepto} onChange={(e) => setNuevoGasto({ ...nuevoGasto, concepto: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
+                  <input placeholder="Importe" type="number" value={nuevoGasto.importe} onChange={(e) => setNuevoGasto({ ...nuevoGasto, importe: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
+                  <button onClick={agregarGasto} className="rounded-xl bg-[#1f2a1d] px-3 py-2 font-bold text-white">Agregar</button>
                 </div>
               </div>
 
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
-                <div className="flex items-center justify-between"><h2 className="text-2xl font-bold">6. Operarios y horas</h2><strong>{formatoHoras(calculos.horasTotales)}</strong></div>
+                <div className="flex items-center justify-between"><h2 className="text-2xl font-bold">4. Participantes que trabajaron</h2><strong>{calculos.cantidadParticipantesActivos} activos</strong></div>
                 <div className="mt-5 space-y-3">
-                  {jornada.operarios.map((operario) => {
-                    const pago = calculos.pagosOperarios.find((pagoOperario) => pagoOperario.id === operario.id)?.pagoOperario || 0;
+                  {jornada.participantes.map((participante) => {
+                    const pago = calculos.pagosParticipantes.find((pagoParticipante) => pagoParticipante.id === participante.id)?.pagoParticipante || 0;
                     return (
-                      <div key={operario.id} className="grid gap-2 rounded-2xl border border-[#d5ddcf] p-3 md:grid-cols-[1fr_110px_120px_auto]">
-                        <input value={operario.nombre} onChange={(e) => actualizarOperario(operario.id, { nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                        <input aria-label="Horas trabajadas" type="number" value={operario.horasTrabajadas} onChange={(e) => actualizarOperario(operario.id, { horasTrabajadas: normalizarImporte(e.target.value) })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
+                      <div key={participante.id} className="grid gap-2 rounded-2xl border border-[#d5ddcf] p-3 md:grid-cols-[1fr_120px_130px_auto]">
+                        <input value={participante.nombre} onChange={(e) => actualizarParticipante(participante.id, { nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
+                        <label className="flex items-center justify-center gap-2 rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">
+                          <input type="checkbox" checked={participante.activo} onChange={(e) => actualizarParticipante(participante.id, { activo: e.target.checked })} />
+                          Activo
+                        </label>
                         <span className="rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">{formatoMoneda(pago)}</span>
-                        <button onClick={() => eliminarOperario(operario.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
+                        <button onClick={() => eliminarParticipante(participante.id)} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-sm font-bold text-[#743c3c]">Quitar</button>
                       </div>
                     );
                   })}
                 </div>
-                <div className="mt-4 grid gap-2 border-t border-[#e1e6dc] pt-4 md:grid-cols-[1fr_130px_auto]">
-                  <input placeholder="Operario o capataz" value={nuevoOperario.nombre} onChange={(e) => setNuevoOperario({ ...nuevoOperario, nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <input placeholder="Horas" type="number" value={nuevoOperario.horasTrabajadas} onChange={(e) => setNuevoOperario({ ...nuevoOperario, horasTrabajadas: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
-                  <button onClick={agregarOperario} className="rounded-xl bg-[#1f2a1d] px-3 py-2 font-bold text-white">Agregar</button>
+                <div className="mt-4 grid gap-2 border-t border-[#e1e6dc] pt-4 md:grid-cols-[1fr_120px_auto]">
+                  <input placeholder="Participante" value={nuevoParticipante.nombre} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, nombre: e.target.value })} className="rounded-xl border border-[#d5ddcf] px-3 py-2" />
+                  <label className="flex items-center justify-center gap-2 rounded-xl bg-[#f6f8f3] px-3 py-2 text-sm font-bold">
+                    <input type="checkbox" checked={nuevoParticipante.activo} onChange={(e) => setNuevoParticipante({ ...nuevoParticipante, activo: e.target.checked })} />
+                    Activo
+                  </label>
+                  <button onClick={agregarParticipante} className="rounded-xl bg-[#1f2a1d] px-3 py-2 font-bold text-white">Agregar</button>
                 </div>
                 <div className="mt-4 rounded-2xl bg-[#f6f8f3] p-4 text-sm">
-                  <div className="flex justify-between"><span>Neto para distribuir</span><strong>{formatoMoneda(calculos.netoParaDistribuir)}</strong></div>
-                  <div className="mt-2 flex justify-between"><span>Valor hora operativa</span><strong>{formatoMoneda(calculos.valorHoraOperativa)}</strong></div>
-                  {calculos.distribucionIgualitaria && <p className="mt-3 font-bold text-[#265b2b]">La distribución es proporcional e igualitaria por tiempo trabajado.</p>}
+                  <div className="flex justify-between"><span>Saldo disponible</span><strong>{formatoMoneda(calculos.saldoDisponible)}</strong></div>
+                  <div className="mt-2 flex justify-between"><span>Pago equitativo por participante activo</span><strong>{formatoMoneda(calculos.pagoEquitativo)}</strong></div>
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#dde4d6]">
+              <h2 className="text-2xl font-bold">5. Trabajo realizado y pendiente</h2>
+              <div className="mt-5 grid gap-4">
+                <label className="grid gap-2 text-sm font-semibold">Trabajo realizado<textarea value={jornada.trabajoRealizado} onChange={(e) => actualizarJornada({ trabajoRealizado: e.target.value })} className="min-h-24 rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
+                <label className="grid gap-2 text-sm font-semibold">Trabajo pendiente<textarea value={jornada.trabajoPendiente} onChange={(e) => actualizarJornada({ trabajoPendiente: e.target.value })} className="min-h-24 rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none" /></label>
               </div>
             </div>
           </section>
@@ -669,13 +589,10 @@ export default function Home() {
               <h2 className="text-2xl font-bold">Resumen económico</h2>
               <div className="mt-5 space-y-3 text-sm">
                 <div className="flex justify-between"><span>Total facturado al Hub</span><strong>{formatoMoneda(calculos.totalFacturado)}</strong></div>
-                <div className="flex justify-between"><span>Total insumos</span><strong>{formatoMoneda(calculos.totalInsumos)}</strong></div>
-                <div className="flex justify-between"><span>Subtotal después de insumos</span><strong>{formatoMoneda(calculos.subtotalDespuesDeInsumos)}</strong></div>
-                <div className="flex justify-between"><span>Comisión capataz ({numeroSeguro(jornada.porcentajeComisionCapataz)}%)</span><strong>{formatoMoneda(calculos.comisionCapataz)}</strong></div>
-                <div className="flex justify-between"><span>Total gastos administrativos</span><strong>{formatoMoneda(calculos.totalGastosAdministrativos)}</strong></div>
-                <div className="flex justify-between border-t border-[#e1e6dc] pt-3 text-lg"><span>Neto para distribuir al equipo</span><strong>{formatoMoneda(calculos.netoParaDistribuir)}</strong></div>
-                <div className="flex justify-between"><span>Horas totales</span><strong>{formatoHoras(calculos.horasTotales)}</strong></div>
-                <div className="flex justify-between"><span>Valor hora operativa</span><strong>{formatoMoneda(calculos.valorHoraOperativa)}</strong></div>
+                <div className="flex justify-between"><span>Total gastos</span><strong>{formatoMoneda(calculos.totalGastos)}</strong></div>
+                <div className="flex justify-between border-t border-[#e1e6dc] pt-3 text-lg"><span>Saldo disponible</span><strong>{formatoMoneda(calculos.saldoDisponible)}</strong></div>
+                <div className="flex justify-between"><span>Participantes activos</span><strong>{calculos.cantidadParticipantesActivos}</strong></div>
+                <div className="flex justify-between"><span>Pago equitativo</span><strong>{formatoMoneda(calculos.pagoEquitativo)}</strong></div>
               </div>
             </div>
 
@@ -690,59 +607,38 @@ export default function Home() {
 
               <div className="mt-5 rounded-2xl bg-white/10 p-5 text-sm leading-7">
                 <p className="text-lg font-bold">Reporte diario HubYa</p>
-                <p>Hub correspondiente: <strong>{jornada.hub}</strong></p>
-                <p>Fecha de la jornada: <strong>{fechaFormateada}</strong></p>
-                <p className="mt-2 font-semibold">Este reporte corresponde únicamente a la jornada del Hub seleccionado.</p>
-                <p className="mt-4">Asunto: {jornada.nombreReporte}</p>
-                <p className="mt-4">HubYa opera distintos Hubs en Salta. Este reporte corresponde a {jornada.hub}.</p>
+                <p>Cliente seleccionado: <strong>{clienteActivo?.nombre || "cliente"}</strong></p>
+                <p>Hub: <strong>{jornada.hub}</strong></p>
+                <p>Fecha: <strong>{fechaFormateada}</strong></p>
+                {clienteActivo && <p>Importe correspondiente a su espacio verde: <strong>{formatoMoneda(numeroSeguro(clienteActivo.importeCobrado))}</strong></p>}
+                <p><strong>Trabajo realizado:</strong> {jornada.trabajoRealizado}</p>
+                <p><strong>Trabajo pendiente:</strong> {jornada.trabajoPendiente}</p>
+
                 <p className="mt-4">Hola {clienteActivo?.nombre || "cliente"},</p>
-                <p className="mt-4">Compartimos la vista privada de la jornada {fechaFormateada} de {jornada.hub}. Por privacidad, los demás participantes figuran anonimizados y no se muestran emails de otros clientes.</p>
+                <p className="mt-4">Del total facturado por la jornada del Hub se descuentan los gastos operativos y administrativos. El saldo disponible se distribuye de manera equitativa entre los participantes que trabajaron.</p>
+                <p className="mt-4">Por privacidad, los demás clientes figuran anonimizados y no se muestran emails de otros clientes.</p>
 
                 <p className="mt-4 font-bold">Total facturado al Hub</p>
                 <div className="flex justify-between gap-4"><span>Total facturado</span><span>{formatoMoneda(calculos.totalFacturado)}</span></div>
-
-                <p className="mt-4 font-bold">Detalle de clientes</p>
                 {clientesDelHub.map((cliente, index) => (
                   <div key={cliente.id} className="flex justify-between gap-4">
                     <span>{nombrePrivado(cliente, index)}</span>
                     <span>{formatoMoneda(numeroSeguro(cliente.importeCobrado))}</span>
                   </div>
                 ))}
-                {clienteActivo && <p className="mt-2">Tu importe cobrado: <strong>{formatoMoneda(numeroSeguro(clienteActivo.importeCobrado))}</strong></p>}
 
-                <p className="mt-4 font-bold">Insumos operativos</p>
-                {jornada.insumosOperativos.map((insumo) => (
-                  <div key={insumo.id} className="flex justify-between gap-4"><span>{insumo.concepto}</span><span>{formatoMoneda(numeroSeguro(insumo.importe))}</span></div>
-                ))}
-                <div className="flex justify-between font-bold"><span>Total insumos</span><span>{formatoMoneda(calculos.totalInsumos)}</span></div>
-                <div className="flex justify-between font-bold"><span>Subtotal después de insumos</span><span>{formatoMoneda(calculos.subtotalDespuesDeInsumos)}</span></div>
-
-                <p className="mt-4 font-bold">Comisión del capataz</p>
-                <div className="flex justify-between gap-4"><span>Porcentaje</span><span>{numeroSeguro(jornada.porcentajeComisionCapataz)}%</span></div>
-                <div className="flex justify-between gap-4"><span>Importe calculado</span><span>{formatoMoneda(calculos.comisionCapataz)}</span></div>
-
-                <p className="mt-4 font-bold">Gastos administrativos</p>
-                {jornada.gastosAdministrativos.map((gasto) => (
+                <p className="mt-4 font-bold">Gastos de la jornada</p>
+                {jornada.gastosJornada.map((gasto) => (
                   <div key={gasto.id} className="flex justify-between gap-4"><span>{gasto.concepto}</span><span>{formatoMoneda(numeroSeguro(gasto.importe))}</span></div>
                 ))}
-                <div className="flex justify-between font-bold"><span>Total gastos administrativos</span><span>{formatoMoneda(calculos.totalGastosAdministrativos)}</span></div>
+                <div className="flex justify-between font-bold"><span>Total gastos</span><span>{formatoMoneda(calculos.totalGastos)}</span></div>
+                <div className="flex justify-between font-bold"><span>Saldo disponible</span><span>{formatoMoneda(calculos.saldoDisponible)}</span></div>
 
-                <p className="mt-4 font-bold">Neto para distribuir al equipo</p>
-                <div className="flex justify-between gap-4"><span>Neto distribuible</span><span>{formatoMoneda(calculos.netoParaDistribuir)}</span></div>
-
-                <p className="mt-4 font-bold">Horas trabajadas por operario</p>
-                {jornada.operarios.map((operario) => (
-                  <div key={operario.id} className="flex justify-between gap-4"><span>{operario.nombre}</span><span>{formatoHoras(numeroSeguro(operario.horasTrabajadas))}</span></div>
+                <p className="mt-4 font-bold">Participantes que trabajaron</p>
+                {jornada.participantes.map((participante) => (
+                  <div key={participante.id} className="flex justify-between gap-4"><span>{participante.nombre}</span><span>{participante.activo ? "Sí" : "No"}</span></div>
                 ))}
-                <div className="flex justify-between font-bold"><span>Horas totales</span><span>{formatoHoras(calculos.horasTotales)}</span></div>
-                <div className="flex justify-between font-bold"><span>Valor hora operativa</span><span>{formatoMoneda(calculos.valorHoraOperativa)}</span></div>
-                {calculos.distribucionIgualitaria && <p className="mt-2 font-bold">Distribución proporcional e igualitaria por tiempo trabajado.</p>}
-
-                <p className="mt-4 font-bold">Pago proporcional de cada operario</p>
-                {calculos.pagosOperarios.map((operario) => (
-                  <div key={operario.id} className="flex justify-between gap-4"><span>{operario.nombre}</span><span>{formatoMoneda(operario.pagoOperario)}</span></div>
-                ))}
-
+                <div className="flex justify-between font-bold"><span>Pago equitativo por participante</span><span>{formatoMoneda(calculos.pagoEquitativo)}</span></div>
                 <p className="mt-4"><strong>Estado operativo de la jornada:</strong> {jornada.estadoOperativo}</p>
                 <p className="mt-4">Saludos,<br />HubYa</p>
               </div>
