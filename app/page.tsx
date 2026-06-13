@@ -221,15 +221,9 @@ export default function Home() {
   const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : `Cliente ${index + 1}`, [clienteActivo?.id]);
 
   const emailPrivado = useMemo(() => [
-    `Hola ${clienteActivo?.nombre || ""},`,
+    `Hola ${clienteActivo?.nombre || ""}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}.`,
     "",
-    "Adjuntamos el reporte administrativo del Hub emitido por sistema.",
-    "",
-    `Hub: ${jornada.hub}`,
-    `Fecha: ${fechaFormateada}`,
-    "",
-    "Saludos cordiales,",
-    "Equipo HubYa",
+    "Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.",
   ].join("\n"), [clienteActivo?.nombre, fechaFormateada, jornada.hub]);
 
   async function descargarImagenReporte() {
@@ -347,23 +341,24 @@ export default function Home() {
             </div>
 
             <article ref={reporteVisualRef} xmlns="http://www.w3.org/1999/xhtml" className="w-full max-w-[760px] border border-[#6f7968] bg-white p-0 font-sans text-[#182018] shadow-none">
-              <header className="grid grid-cols-[1.1fr_0.9fr] border-b-2 border-[#1f2a1d]">
-                <div className="border-r border-[#b9c5ae] p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#66745c]">HubYa</p>
-                  <h3 className="mt-1 text-xl font-black uppercase leading-tight">Reporte administrativo del Hub</h3>
-                  <p className="mt-1 text-xs font-semibold text-[#66745c]">Documento emitido por sistema</p>
-                </div>
-                <div className="p-4 text-xs">
-                  <table className="w-full border-collapse">
-                    <tbody>
-                      <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Sistema</td><td className="border border-[#d8dfd1] p-1.5">HubYa</td></tr>
-                      <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Hub</td><td className="border border-[#d8dfd1] p-1.5">{jornada.hub}</td></tr>
-                      <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Fecha</td><td className="border border-[#d8dfd1] p-1.5">{fechaFormateada}</td></tr>
-                      <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Cliente</td><td className="border border-[#d8dfd1] p-1.5 font-bold">{clienteActivo?.nombre || "Sin cliente seleccionado"}</td></tr>
-                    </tbody>
-                  </table>
-                </div>
+              <header className="border-b-2 border-[#1f2a1d] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#66745c]">HubYa</p>
+                <h3 className="mt-1 text-xl font-black uppercase leading-tight">Reporte administrativo del Hub</h3>
+                <p className="mt-1 text-xs font-semibold text-[#66745c]">Documento emitido por sistema</p>
               </header>
+
+              <section className="border-b border-[#9aa78f] p-4">
+                <h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Resumen rápido para el cliente</h4>
+                <table className="w-full border-collapse text-xs">
+                  <tbody>
+                    <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Cliente seleccionado</td><td className="border border-[#d8dfd1] p-1.5 font-bold">{clienteActivo?.nombre || "Sin cliente seleccionado"}</td></tr>
+                    <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Hub</td><td className="border border-[#d8dfd1] p-1.5">{jornada.hub}</td></tr>
+                    <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Fecha</td><td className="border border-[#d8dfd1] p-1.5">{fechaFormateada}</td></tr>
+                    <tr><td className="border border-[#1f2a1d] bg-[#eef2e8] p-2 font-black uppercase">Importe correspondiente a su espacio verde</td><td className="border border-[#1f2a1d] bg-[#eef2e8] p-2 text-lg font-black text-[#1f2a1d]">{formatoPlano(clienteActivo?.importe) || formatoMoneda(0)}</td></tr>
+                    <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Estado operativo</td><td className="border border-[#d8dfd1] p-1.5 font-bold">{datosHub.resumen.estadoOperativo || "Sin cargar"}</td></tr>
+                  </tbody>
+                </table>
+              </section>
 
               <div className="p-4">
                 <table className="w-full border-collapse bg-white text-xs">
@@ -387,6 +382,13 @@ export default function Home() {
                   </tbody>
                 </table>
                 <p className="mt-2 border border-[#d8dfd1] bg-[#f8faf5] p-2 text-[10px] font-semibold text-[#66745c]">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados como Cliente 2, Cliente 3, Cliente 4, etc. y no se incluyen emails.</p>
+
+                <section className="mt-3 border border-[#9aa78f] p-3 text-xs leading-5">
+                  <h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Sobre HubYa</h4>
+                  <p>HubYa es una empresa tecnológica salteña que agrupa demanda y organiza oferta para ejecutar procesos específicos según cada rama de servicio.</p>
+                  <p className="mt-2">Nuestra filosofía es simple: el agrupamiento de la demanda mejora el agrupamiento de la oferta, y el agrupamiento de la oferta mejora la capacidad de abastecer la demanda.</p>
+                  <p className="mt-2">Este reporte se emite como respaldo de transparencia operativa. No es necesario leer todo el detalle para validar el servicio; la información queda disponible para trazabilidad, control y mejora del proceso.</p>
+                </section>
               </div>
             </article>
           </section>
