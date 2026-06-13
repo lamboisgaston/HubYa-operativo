@@ -9,43 +9,148 @@ type Cliente = {
   total: number;
 };
 
+type JornadaOperativa = {
+  hub: string;
+  fecha: string;
+  clientes: Cliente[];
+  clienteActivoId: number;
+  realizado: string;
+  pendiente: string;
+  capataz: number;
+  ayudante: number;
+  maquinaria: number;
+  traslado: number;
+  combustible: number;
+  informe: number;
+  utilidad: number;
+};
+
+const LOCAL_STORAGE_KEY = "hubya-jornada-operativa-actual";
+
 const clientesIniciales: Cliente[] = [
   { id: 1, nombre: "Carolina Yovi", email: "carolina@email.com", total: 45000 },
   { id: 2, nombre: "Gabriela Aguiar", email: "gabriela@email.com", total: 38000 },
   { id: 3, nombre: "Fleming", email: "fleming@email.com", total: 52000 },
 ];
 
+const jornadaInicial: JornadaOperativa = {
+  hub: "Hub Tipal",
+  fecha: "2026-06-13",
+  clientes: clientesIniciales,
+  clienteActivoId: 1,
+  realizado: "Se realizó corte de césped, limpieza general, bordeado y soplado final.",
+  pendiente:
+    "No se realizó poda alta por falta de tiempo operativo. Se recomienda programarla para próxima visita.",
+  capataz: 15000,
+  ayudante: 10000,
+  maquinaria: 3000,
+  traslado: 4000,
+  combustible: 2000,
+  informe: 2500,
+  utilidad: 8500,
+};
+
 export default function Home() {
-  const [hub, setHub] = useState("Hub Tipal");
-  const [fecha, setFecha] = useState("2026-06-13");
-  const [clientes, setClientes] = useState<Cliente[]>(clientesIniciales);
-  const [clienteActivoId, setClienteActivoId] = useState(1);
+  const [hub, setHub] = useState(jornadaInicial.hub);
+  const [fecha, setFecha] = useState(jornadaInicial.fecha);
+  const [clientes, setClientes] = useState<Cliente[]>(jornadaInicial.clientes);
+  const [clienteActivoId, setClienteActivoId] = useState(jornadaInicial.clienteActivoId);
 
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [emailNuevo, setEmailNuevo] = useState("");
   const [totalNuevo, setTotalNuevo] = useState("");
 
-  const [realizado, setRealizado] = useState(
-    "Se realizó corte de césped, limpieza general, bordeado y soplado final."
-  );
+  const [realizado, setRealizado] = useState(jornadaInicial.realizado);
 
-  const [pendiente, setPendiente] = useState(
-    "No se realizó poda alta por falta de tiempo operativo. Se recomienda programarla para próxima visita."
-  );
+  const [pendiente, setPendiente] = useState(jornadaInicial.pendiente);
 
-  const [capataz, setCapataz] = useState(15000);
-  const [ayudante, setAyudante] = useState(10000);
-  const [maquinaria, setMaquinaria] = useState(3000);
-  const [traslado, setTraslado] = useState(4000);
-  const [combustible, setCombustible] = useState(2000);
-  const [informe, setInforme] = useState(2500);
-  const [utilidad, setUtilidad] = useState(8500);
+  const [capataz, setCapataz] = useState(jornadaInicial.capataz);
+  const [ayudante, setAyudante] = useState(jornadaInicial.ayudante);
+  const [maquinaria, setMaquinaria] = useState(jornadaInicial.maquinaria);
+  const [traslado, setTraslado] = useState(jornadaInicial.traslado);
+  const [combustible, setCombustible] = useState(jornadaInicial.combustible);
+  const [informe, setInforme] = useState(jornadaInicial.informe);
+  const [utilidad, setUtilidad] = useState(jornadaInicial.utilidad);
+  const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
 
   const clienteActivo = clientes.find((c) => c.id === clienteActivoId) || clientes[0];
 
   const totalDistribuido = useMemo(() => {
     return capataz + ayudante + maquinaria + traslado + combustible + informe + utilidad;
   }, [capataz, ayudante, maquinaria, traslado, combustible, informe, utilidad]);
+  const jornadaActual = useMemo<JornadaOperativa>(() => {
+    return {
+      hub,
+      fecha,
+      clientes,
+      clienteActivoId,
+      realizado,
+      pendiente,
+      capataz,
+      ayudante,
+      maquinaria,
+      traslado,
+      combustible,
+      informe,
+      utilidad,
+    };
+  }, [
+    hub,
+    fecha,
+    clientes,
+    clienteActivoId,
+    realizado,
+    pendiente,
+    capataz,
+    ayudante,
+    maquinaria,
+    traslado,
+    combustible,
+    informe,
+    utilidad,
+  ]);
+
+  function aplicarJornada(jornada: JornadaOperativa) {
+    setHub(jornada.hub);
+    setFecha(jornada.fecha);
+    setClientes(jornada.clientes);
+    setClienteActivoId(jornada.clienteActivoId);
+    setRealizado(jornada.realizado);
+    setPendiente(jornada.pendiente);
+    setCapataz(jornada.capataz);
+    setAyudante(jornada.ayudante);
+    setMaquinaria(jornada.maquinaria);
+    setTraslado(jornada.traslado);
+    setCombustible(jornada.combustible);
+    setInforme(jornada.informe);
+    setUtilidad(jornada.utilidad);
+  }
+
+  function guardarJornada() {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(jornadaActual));
+    setMensajeGuardado(`Jornada guardada localmente: ${new Date().toLocaleTimeString("es-AR")}`);
+  }
+
+  function cargarJornada() {
+    const jornadaGuardada = localStorage.getItem(LOCAL_STORAGE_KEY);
+
+    if (!jornadaGuardada) {
+      setMensajeGuardado("No hay una jornada guardada para cargar");
+      return;
+    }
+
+    aplicarJornada(JSON.parse(jornadaGuardada) as JornadaOperativa);
+    setMensajeGuardado("Jornada cargada desde este navegador");
+  }
+
+  function limpiarJornada() {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    aplicarJornada(jornadaInicial);
+    setNombreNuevo("");
+    setEmailNuevo("");
+    setTotalNuevo("");
+    setMensajeGuardado("Jornada local limpiada y formulario reiniciado");
+  }
 
   function agregarCliente() {
     if (!nombreNuevo.trim() || !emailNuevo.trim()) return;
@@ -84,8 +189,28 @@ export default function Home() {
             <h1 className="mt-2 text-4xl font-bold tracking-tight">HubYa</h1>
           </div>
 
-          <div className="rounded-full border border-[#cfd7c6] bg-white px-4 py-2 text-sm font-medium text-[#3c4937] shadow-sm">
-            Jornada manual
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                onClick={guardarJornada}
+                className="rounded-full border border-[#cfd7c6] bg-white px-4 py-2 text-sm font-bold text-[#3c4937] shadow-sm"
+              >
+                Guardar jornada
+              </button>
+              <button
+                onClick={cargarJornada}
+                className="rounded-full border border-[#cfd7c6] bg-white px-4 py-2 text-sm font-bold text-[#3c4937] shadow-sm"
+              >
+                Cargar jornada
+              </button>
+              <button
+                onClick={limpiarJornada}
+                className="rounded-full border border-[#d6b7b7] bg-[#fff7f7] px-4 py-2 text-sm font-bold text-[#743c3c] shadow-sm"
+              >
+                Limpiar
+              </button>
+            </div>
+            <p className="max-w-xs text-right text-xs font-medium text-[#66745c]">{mensajeGuardado}</p>
           </div>
         </header>
 
