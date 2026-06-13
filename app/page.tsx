@@ -15,7 +15,7 @@ type FilaClienteIngreso = {
 };
 
 type FilaGasto = { id: number; concepto: string; importe: CampoNumerico };
-type FilaPlataformaEcosistema = { id: number; nombre: string; detalle: string };
+type FilaPlataformaEcosistema = { id: number; plataforma: string; clienteRelacionado: string; tipoMovimiento: string; detalle: string; importe: CampoNumerico };
 type FilaActor = { id: number; nombre: string; activo: boolean; participacion: CampoNumerico; ajusteManual: CampoNumerico };
 
 type ResumenHubManual = {
@@ -57,14 +57,18 @@ const HUBS_DISPONIBLES = [
 const trabajoRealizadoInicial = "Mantenimiento integral de espacios verdes, corte, bordes y limpieza general.";
 const trabajoPendienteInicial = "Validación final con cada cliente y próximos repasos programados.";
 const observacionGeneralInicial = "Resumen cargado manualmente. Sin cálculos automáticos obligatorios.";
-const plataformasEcosistemaIniciales = [
-  { nombre: "JardinerosYa", detalle: "descuento aplicado $12.000" },
-  { nombre: "HueverosYa", detalle: "sin descuentos aplicados" },
-  { nombre: "PileterosYa", detalle: "sin descuentos aplicados" },
+const plataformasEcosistemaIniciales: Omit<FilaPlataformaEcosistema, "id">[] = [
+  { plataforma: "JardinerosYa", clienteRelacionado: "general de la jornada", tipoMovimiento: "descuento aplicado", detalle: "descuento operativo", importe: 12000 },
+  { plataforma: "HueverosYa", clienteRelacionado: "Carolina Yobi", tipoMovimiento: "descuento aplicado", detalle: "consumo asociado", importe: "" },
+  { plataforma: "VerdulerosYa", clienteRelacionado: "Cliente 2", tipoMovimiento: "consumo registrado", detalle: "entrega de verduras", importe: 78400 },
+  { plataforma: "PileterosYa", clienteRelacionado: "general de la jornada", tipoMovimiento: "sin movimientos", detalle: "sin descuentos aplicados", importe: 0 },
 ];
 
+const leyendaEcosistema =
+  "Los movimientos de otras plataformas del ecosistema se informan como referencia complementaria. El eje principal de este reporte corresponde al servicio operativo de jardinería y personal asignado a la jornada.";
+
 const clientesBasePorHub: Record<HubDisponible, string[]> = {
-  "Hub Tipal": ["Carolina Yovi", "Gabriela Aguiar", "Fleming"],
+  "Hub Tipal": ["Carolina Yobi", "Gabriela Aguiar", "Fleming"],
   "Hub Punto": [],
   "Hub Praderas": ["Milagros Carrizo", "Florencia Siufi", "Celeste Recamán", "Verónica Burgos", "Andrés Jaraba", "Javier Astudillo", "María del Mar"],
   "Hub Valle Escondido": [],
@@ -169,7 +173,14 @@ function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partia
   return {
     clientesIngresos,
     gastos: (datos?.gastos || base.gastos).map((gasto) => ({ id: gasto.id || crearId(), concepto: gasto.concepto || "", importe: gasto.importe ?? 0 })),
-    plataformasEcosistema: (datos?.plataformasEcosistema || base.plataformasEcosistema).map((plataforma) => ({ id: plataforma.id || crearId(), nombre: plataforma.nombre || "", detalle: plataforma.detalle || "" })),
+    plataformasEcosistema: (datos?.plataformasEcosistema || base.plataformasEcosistema).map((plataforma) => ({
+      id: plataforma.id || crearId(),
+      plataforma: plataforma.plataforma || (plataforma as Partial<FilaPlataformaEcosistema> & { nombre?: string }).nombre || "",
+      clienteRelacionado: plataforma.clienteRelacionado || "general de la jornada",
+      tipoMovimiento: plataforma.tipoMovimiento || "",
+      detalle: plataforma.detalle || "",
+      importe: plataforma.importe ?? "",
+    })),
     actores: (datos?.actores || datos?.distribucion || base.actores).map(normalizarActor),
     resumen: { ...resumenInicial(), ...datos?.resumen },
     clienteActivoId: clientesIngresos.some((cliente) => cliente.id === datos?.clienteActivoId) ? Number(datos?.clienteActivoId) : clientesIngresos[0]?.id || 0,
@@ -232,6 +243,23 @@ export default function Home() {
   }
 
   const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : `Cliente ${index + 1}`, [clienteActivo?.id]);
+
+  const clienteRelacionadoPrivado = useCallback((clienteRelacionado: string) => {
+    const clienteLimpio = clienteRelacionado.trim();
+    if (!clienteLimpio || clienteLimpio.toLowerCase() === "general de la jornada") return clienteRelacionado || "general de la jornada";
+    if (clienteLimpio.toLowerCase().startsWith("cliente ")) return clienteRelacionado;
+
+    const clienteIndex = datosHub.clientesIngresos.findIndex((cliente) => cliente.nombre.trim().toLowerCase() === clienteLimpio.toLowerCase());
+    if (clienteIndex === -1) return clienteRelacionado;
+    const clienteEncontrado = datosHub.clientesIngresos[clienteIndex];
+    return clienteEncontrado.id === clienteActivo?.id ? clienteEncontrado.nombre : `Cliente ${clienteIndex + 1}`;
+  }, [clienteActivo?.id, datosHub.clientesIngresos]);
+
+  const detalleMovimientoPrivado = useCallback((movimiento: FilaPlataformaEcosistema) => {
+    const cliente = clienteRelacionadoPrivado(movimiento.clienteRelacionado);
+    const importe = formatoPlano(movimiento.importe);
+    return `${cliente} → ${movimiento.plataforma || "Sin plataforma"} → ${movimiento.tipoMovimiento || "Sin tipo"}${importe ? ` ${importe}` : ""}`;
+  }, [clienteRelacionadoPrivado]);
 
   const emailPrivado = useMemo(() => [
     `Hola ${clienteActivo?.nombre || ""}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}.`,
@@ -337,7 +365,7 @@ export default function Home() {
             <section className="grid gap-3 lg:grid-cols-2">
               <div className="space-y-3">
                 <div className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Gastos</h3><table className="w-full border-collapse text-xs"><tbody>{datosHub.gastos.map((gasto) => <tr key={gasto.id}><td className="border p-1">{inputTexto(gasto.concepto, (valor) => actualizarGasto(gasto.id, { concepto: valor }), "min-w-28")}</td><td className="border p-1">{inputNumero(gasto.importe, (valor) => actualizarGasto(gasto.id, { importe: valor }))}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ gastos: datosHub.gastos.filter((fila) => fila.id !== gasto.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table><button onClick={() => actualizarDatosHub({ gastos: [...datosHub.gastos, { id: crearId(), concepto: "", importe: 0 }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar gasto</button></div>
-                <div className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Plataformas del ecosistema HubYa</h3><table className="w-full border-collapse text-xs"><tbody>{datosHub.plataformasEcosistema.map((plataforma) => <tr key={plataforma.id}><td className="border p-1">{inputTexto(plataforma.nombre, (valor) => actualizarPlataformaEcosistema(plataforma.id, { nombre: valor }), "min-w-28")}</td><td className="border p-1">{inputTexto(plataforma.detalle, (valor) => actualizarPlataformaEcosistema(plataforma.id, { detalle: valor }), "min-w-44")}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ plataformasEcosistema: datosHub.plataformasEcosistema.filter((fila) => fila.id !== plataforma.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table><button onClick={() => actualizarDatosHub({ plataformasEcosistema: [...datosHub.plataformasEcosistema, { id: crearId(), nombre: "", detalle: "" }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar plataforma</button></div>
+                <div className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Movimientos asociados del ecosistema</h3><p className="mb-2 text-[11px] font-semibold text-[#66745c]">Complemento manual del servicio principal de jardinería.</p><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Plataforma</th><th className="border p-1">Cliente relacionado</th><th className="border p-1">Tipo</th><th className="border p-1">Detalle</th><th className="border p-1">Importe opcional</th><th className="border p-1"></th></tr></thead><tbody>{datosHub.plataformasEcosistema.map((plataforma) => <tr key={plataforma.id}><td className="border p-1">{inputTexto(plataforma.plataforma, (valor) => actualizarPlataformaEcosistema(plataforma.id, { plataforma: valor }), "min-w-28")}</td><td className="border p-1">{inputTexto(plataforma.clienteRelacionado, (valor) => actualizarPlataformaEcosistema(plataforma.id, { clienteRelacionado: valor }), "min-w-36")}</td><td className="border p-1">{inputTexto(plataforma.tipoMovimiento, (valor) => actualizarPlataformaEcosistema(plataforma.id, { tipoMovimiento: valor }), "min-w-36")}</td><td className="border p-1">{inputTexto(plataforma.detalle, (valor) => actualizarPlataformaEcosistema(plataforma.id, { detalle: valor }), "min-w-40")}</td><td className="border p-1">{inputNumero(plataforma.importe, (valor) => actualizarPlataformaEcosistema(plataforma.id, { importe: valor }))}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ plataformasEcosistema: datosHub.plataformasEcosistema.filter((fila) => fila.id !== plataforma.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div><button onClick={() => actualizarDatosHub({ plataformasEcosistema: [...datosHub.plataformasEcosistema, { id: crearId(), plataforma: "", clienteRelacionado: "general de la jornada", tipoMovimiento: "", detalle: "", importe: "" }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar movimiento</button></div>
               </div>
               <div className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Actores del equipo</h3><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Actor</th><th className="border p-1">Activo</th><th className="border p-1">Participación</th><th className="border p-1">Ajuste manual</th><th className="border p-1">Importe calculado</th><th className="border p-1"></th></tr></thead><tbody>{distribucionCalculada.map((actor) => <tr key={actor.id}><td className="border p-1">{inputTexto(actor.nombre, (valor) => actualizarActor(actor.id, { nombre: valor }), "min-w-32")}</td><td className="border p-1 text-center"><input type="checkbox" checked={actor.activo} onChange={(e) => actualizarActor(actor.id, { activo: e.target.checked })} /></td><td className="border p-1">{inputNumero(actor.participacion, (valor) => actualizarActor(actor.id, { participacion: valor }))}</td><td className="border p-1">{inputNumero(actor.ajusteManual, (valor) => actualizarActor(actor.id, { ajusteManual: valor }))}</td><td className="border p-1 text-right font-black">{formatoMoneda(actor.importeFinal)}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ actores: datosHub.actores.filter((item) => item.id !== actor.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div><button onClick={() => actualizarDatosHub({ actores: [...datosHub.actores, { id: crearId(), nombre: "", activo: true, participacion: 1, ajusteManual: 0 }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar actor</button></div>
             </section>
@@ -388,7 +416,9 @@ export default function Home() {
                     {datosHub.gastos.map((gasto) => <tr key={gasto.id}><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{gasto.concepto || "Sin concepto"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(gasto.importe)}</td></tr>)}
                     <tr className="font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total gastos</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalGastos)}</td></tr>
                     <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Plataformas del ecosistema HubYa</th></tr>
-                    {datosHub.plataformasEcosistema.map((plataforma) => <tr key={plataforma.id}><td colSpan={3} className="border border-[#d8dfd1] p-1.5"><span className="font-black">{plataforma.nombre || "Sin plataforma"}:</span> {plataforma.detalle || "Sin detalle"}</td></tr>)}
+                    <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th className="border border-[#d8dfd1] p-1.5 text-left">Cliente vinculado</th><th className="border border-[#d8dfd1] p-1.5 text-left">Movimiento</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
+                    {datosHub.plataformasEcosistema.map((plataforma) => <tr key={plataforma.id}><td className="border border-[#d8dfd1] p-1.5">{clienteRelacionadoPrivado(plataforma.clienteRelacionado)}</td><td className="border border-[#d8dfd1] p-1.5"><span className="font-black">{plataforma.plataforma || "Sin plataforma"}</span> · {plataforma.tipoMovimiento || "Sin tipo"} · {plataforma.detalle || "Sin detalle"}<br /><span className="text-[10px] font-semibold text-[#66745c]">{detalleMovimientoPrivado(plataforma)}</span></td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(plataforma.importe) || "Sin monto"}</td></tr>)}
+                    <tr><td colSpan={3} className="border border-[#d8dfd1] bg-[#f8faf5] p-2 text-[10px] font-semibold text-[#66745c]">{leyendaEcosistema}</td></tr>
                     <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total a distribuir</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalADistribuir)}</td></tr>
                     <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Distribución automática por actor</th></tr>
                     <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th className="border border-[#d8dfd1] p-1.5 text-left">Actor</th><th className="border border-[#d8dfd1] p-1.5 text-center">Participación / activo</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
