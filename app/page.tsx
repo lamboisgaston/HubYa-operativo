@@ -55,6 +55,12 @@ const HUBS_DISPONIBLES = [
 const trabajoRealizadoInicial = "Mantenimiento integral de espacios verdes, corte, bordes y limpieza general.";
 const trabajoPendienteInicial = "Validación final con cada cliente y próximos repasos programados.";
 const observacionGeneralInicial = "Resumen cargado manualmente. Sin cálculos automáticos obligatorios.";
+const sobreHubYaLineas = [
+  "HubYa es una tecnología salteña que agrupa demanda para coordinar mejor la oferta disponible.",
+  "La lógica es simple: una demanda agrupada permite organizar mejor horarios, tareas, personal, traslados y recursos. Por eso un Hub es más eficiente que clientes aislados y dispersos.",
+  "En JardinerosYa hablamos de usuarios del sistema. En HubYa hablamos de clientes, porque el Hub se construye desde la demanda.",
+  "Filosofía HubYa: el agrupamiento de la demanda mejora el agrupamiento de la oferta, y el agrupamiento de la oferta mejora la capacidad de abastecer la demanda.",
+];
 const clientesBasePorHub: Record<HubDisponible, string[]> = {
   "Hub Tipal": ["Carolina Yobi", "Gabriela Aguiar", "Fleming"],
   "Hub Punto": [],
@@ -254,6 +260,9 @@ export default function Home() {
     `Tiempo efectivo: ${datosHub.resumen.tiempoEfectivo || "Sin cargar"}`,
     `Estado operativo: ${datosHub.resumen.estadoOperativo || "Sin cargar"}`,
     `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
+    "",
+    "SOBRE HUBYA",
+    ...sobreHubYaLineas,
   ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
 
   const asuntoReporte = `Reporte diario HubYa — ${jornada.hub} — ${fechaFormateada}`;
@@ -487,9 +496,7 @@ export default function Home() {
 
                 <section className="mt-3 border border-[#9aa78f] p-3 text-xs leading-5">
                   <h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Sobre HubYa</h4>
-                  <p>HubYa agrupa demanda y organiza oferta para ejecutar procesos específicos con trazabilidad operativa.</p>
-                  <p className="mt-2">El reporte actual corresponde únicamente a JardinerosYa / servicio de jardinería y se emite como respaldo de transparencia operativa.</p>
-                  <p className="mt-2">No es necesario leer todo el detalle para validar el servicio; la información queda disponible para trazabilidad, control y mejora del proceso.</p>
+                  {sobreHubYaLineas.map((linea) => <p key={linea} className="mt-2 first:mt-0">{linea}</p>)}
                 </section>
               </div>
             </article>
