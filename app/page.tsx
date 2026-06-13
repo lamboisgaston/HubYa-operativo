@@ -2,20 +2,9 @@
 
 import { useMemo, useState } from "react";
 
-type Cliente = {
-  id: number;
-  nombre: string;
-  email: string;
-  total: number;
-};
-
-type JornadaOperativa = {
-  hub: string;
-  fecha: string;
-  clientes: Cliente[];
-  clienteActivoId: number;
-  realizado: string;
-  pendiente: string;
+type ReporteCliente = {
+  trabajoRealizado: string;
+  trabajoPendiente: string;
   capataz: number;
   ayudante: number;
   maquinaria: number;
@@ -23,23 +12,28 @@ type JornadaOperativa = {
   combustible: number;
   informe: number;
   utilidad: number;
+  totalCobrado: number;
+};
+
+type Cliente = {
+  id: number;
+  nombre: string;
+  email: string;
+  reporte: ReporteCliente;
+};
+
+type JornadaOperativa = {
+  hub: string;
+  fecha: string;
+  clientes: Cliente[];
+  clienteActivoId: number;
 };
 
 const LOCAL_STORAGE_KEY = "hubya-jornada-operativa-actual";
 
-const clientesIniciales: Cliente[] = [
-  { id: 1, nombre: "Carolina Yovi", email: "carolina@email.com", total: 45000 },
-  { id: 2, nombre: "Gabriela Aguiar", email: "gabriela@email.com", total: 38000 },
-  { id: 3, nombre: "Fleming", email: "fleming@email.com", total: 52000 },
-];
-
-const jornadaInicial: JornadaOperativa = {
-  hub: "Hub Tipal",
-  fecha: "2026-06-13",
-  clientes: clientesIniciales,
-  clienteActivoId: 1,
-  realizado: "Se realizó corte de césped, limpieza general, bordeado y soplado final.",
-  pendiente:
+const reporteInicial: ReporteCliente = {
+  trabajoRealizado: "Se realizó corte de césped, limpieza general, bordeado y soplado final.",
+  trabajoPendiente:
     "No se realizó poda alta por falta de tiempo operativo. Se recomienda programarla para próxima visita.",
   capataz: 15000,
   ayudante: 10000,
@@ -48,86 +42,131 @@ const jornadaInicial: JornadaOperativa = {
   combustible: 2000,
   informe: 2500,
   utilidad: 8500,
+  totalCobrado: 45000,
 };
 
-export default function Home() {
-  const [hub, setHub] = useState(jornadaInicial.hub);
-  const [fecha, setFecha] = useState(jornadaInicial.fecha);
-  const [clientes, setClientes] = useState<Cliente[]>(jornadaInicial.clientes);
-  const [clienteActivoId, setClienteActivoId] = useState(jornadaInicial.clienteActivoId);
+const clientesIniciales: Cliente[] = [
+  {
+    id: 1,
+    nombre: "Carolina Yovi",
+    email: "carolina@email.com",
+    reporte: reporteInicial,
+  },
+  {
+    id: 2,
+    nombre: "Gabriela Aguiar",
+    email: "gabriela@email.com",
+    reporte: {
+      ...reporteInicial,
+      trabajoRealizado: "Se realizó mantenimiento de canteros, riego manual y retiro de residuos verdes.",
+      trabajoPendiente: "Quedó pendiente reponer chips decorativos en el ingreso principal.",
+      totalCobrado: 38000,
+      utilidad: 6000,
+    },
+  },
+  {
+    id: 3,
+    nombre: "Fleming",
+    email: "fleming@email.com",
+    reporte: {
+      ...reporteInicial,
+      trabajoRealizado: "Se realizó desmalezado, limpieza de perímetro y control visual del sistema de riego.",
+      trabajoPendiente: "Quedó pendiente revisar una pérdida menor en el sector del fondo.",
+      totalCobrado: 52000,
+      capataz: 18000,
+      ayudante: 12000,
+      utilidad: 10500,
+    },
+  },
+];
 
+const jornadaInicial: JornadaOperativa = {
+  hub: "Hub Tipal",
+  fecha: "2026-06-13",
+  clientes: clientesIniciales,
+  clienteActivoId: 1,
+};
+
+const camposEconomicos: Array<[keyof ReporteCliente, string]> = [
+  ["capataz", "Capataz"],
+  ["ayudante", "Ayudante"],
+  ["maquinaria", "Maquinaria"],
+  ["traslado", "Traslado"],
+  ["combustible", "Combustible"],
+  ["informe", "Informe"],
+  ["utilidad", "Utilidad HubYa"],
+];
+
+function crearReporteVacio(totalCobrado: number): ReporteCliente {
+  return {
+    trabajoRealizado: "",
+    trabajoPendiente: "",
+    capataz: 0,
+    ayudante: 0,
+    maquinaria: 0,
+    traslado: 0,
+    combustible: 0,
+    informe: 0,
+    utilidad: 0,
+    totalCobrado,
+  };
+}
+
+function normalizarJornada(jornada: JornadaOperativa): JornadaOperativa {
+  const clientes = jornada.clientes.map((cliente) => ({
+    ...cliente,
+    reporte: {
+      ...crearReporteVacio(0),
+      ...cliente.reporte,
+    },
+  }));
+
+  return {
+    hub: jornada.hub,
+    fecha: jornada.fecha,
+    clientes,
+    clienteActivoId: clientes.some((cliente) => cliente.id === jornada.clienteActivoId)
+      ? jornada.clienteActivoId
+      : clientes[0]?.id || 0,
+  };
+}
+
+export default function Home() {
+  const [jornada, setJornada] = useState<JornadaOperativa>(jornadaInicial);
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [emailNuevo, setEmailNuevo] = useState("");
   const [totalNuevo, setTotalNuevo] = useState("");
-
-  const [realizado, setRealizado] = useState(jornadaInicial.realizado);
-
-  const [pendiente, setPendiente] = useState(jornadaInicial.pendiente);
-
-  const [capataz, setCapataz] = useState(jornadaInicial.capataz);
-  const [ayudante, setAyudante] = useState(jornadaInicial.ayudante);
-  const [maquinaria, setMaquinaria] = useState(jornadaInicial.maquinaria);
-  const [traslado, setTraslado] = useState(jornadaInicial.traslado);
-  const [combustible, setCombustible] = useState(jornadaInicial.combustible);
-  const [informe, setInforme] = useState(jornadaInicial.informe);
-  const [utilidad, setUtilidad] = useState(jornadaInicial.utilidad);
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
 
-  const clienteActivo = clientes.find((c) => c.id === clienteActivoId) || clientes[0];
+  const clienteActivo =
+    jornada.clientes.find((cliente) => cliente.id === jornada.clienteActivoId) || jornada.clientes[0];
+  const reporteActivo = clienteActivo?.reporte || crearReporteVacio(0);
 
   const totalDistribuido = useMemo(() => {
-    return capataz + ayudante + maquinaria + traslado + combustible + informe + utilidad;
-  }, [capataz, ayudante, maquinaria, traslado, combustible, informe, utilidad]);
-  const jornadaActual = useMemo<JornadaOperativa>(() => {
-    return {
-      hub,
-      fecha,
-      clientes,
-      clienteActivoId,
-      realizado,
-      pendiente,
-      capataz,
-      ayudante,
-      maquinaria,
-      traslado,
-      combustible,
-      informe,
-      utilidad,
-    };
-  }, [
-    hub,
-    fecha,
-    clientes,
-    clienteActivoId,
-    realizado,
-    pendiente,
-    capataz,
-    ayudante,
-    maquinaria,
-    traslado,
-    combustible,
-    informe,
-    utilidad,
-  ]);
+    return camposEconomicos.reduce((total, [campo]) => total + Number(reporteActivo[campo] || 0), 0);
+  }, [reporteActivo]);
 
-  function aplicarJornada(jornada: JornadaOperativa) {
-    setHub(jornada.hub);
-    setFecha(jornada.fecha);
-    setClientes(jornada.clientes);
-    setClienteActivoId(jornada.clienteActivoId);
-    setRealizado(jornada.realizado);
-    setPendiente(jornada.pendiente);
-    setCapataz(jornada.capataz);
-    setAyudante(jornada.ayudante);
-    setMaquinaria(jornada.maquinaria);
-    setTraslado(jornada.traslado);
-    setCombustible(jornada.combustible);
-    setInforme(jornada.informe);
-    setUtilidad(jornada.utilidad);
+  function actualizarJornada(cambios: Partial<Pick<JornadaOperativa, "hub" | "fecha" | "clienteActivoId">>) {
+    setJornada((jornadaActual) => ({ ...jornadaActual, ...cambios }));
+  }
+
+  function actualizarReporteActivo(cambios: Partial<ReporteCliente>) {
+    setJornada((jornadaActual) => ({
+      ...jornadaActual,
+      clientes: jornadaActual.clientes.map((cliente) =>
+        cliente.id === jornadaActual.clienteActivoId
+          ? { ...cliente, reporte: { ...cliente.reporte, ...cambios } }
+          : cliente,
+      ),
+    }));
+  }
+
+  function aplicarJornada(jornadaNueva: JornadaOperativa) {
+    setJornada(normalizarJornada(jornadaNueva));
   }
 
   function guardarJornada() {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(jornadaActual));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(jornada));
     setMensajeGuardado(`Jornada guardada localmente: ${new Date().toLocaleTimeString("es-AR")}`);
   }
 
@@ -159,17 +198,21 @@ export default function Home() {
       id: Date.now(),
       nombre: nombreNuevo,
       email: emailNuevo,
-      total: Number(totalNuevo || 0),
+      reporte: crearReporteVacio(Number(totalNuevo || 0)),
     };
 
-    setClientes([...clientes, nuevoCliente]);
+    setJornada((jornadaActual) => ({
+      ...jornadaActual,
+      clientes: [...jornadaActual.clientes, nuevoCliente],
+      clienteActivoId: nuevoCliente.id,
+    }));
     setNombreNuevo("");
     setEmailNuevo("");
     setTotalNuevo("");
   }
 
   function participantesPrivados() {
-    return clientes.map((cliente, index) => {
+    return jornada.clientes.map((cliente, index) => {
       if (cliente.id === clienteActivo.id) {
         return cliente.nombre;
       }
@@ -223,8 +266,8 @@ export default function Home() {
                 <label className="grid gap-2 text-sm font-semibold">
                   Hub
                   <input
-                    value={hub}
-                    onChange={(e) => setHub(e.target.value)}
+                    value={jornada.hub}
+                    onChange={(e) => actualizarJornada({ hub: e.target.value })}
                     className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none"
                   />
                 </label>
@@ -233,8 +276,8 @@ export default function Home() {
                   Fecha
                   <input
                     type="date"
-                    value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
+                    value={jornada.fecha}
+                    onChange={(e) => actualizarJornada({ fecha: e.target.value })}
                     className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none"
                   />
                 </label>
@@ -245,19 +288,21 @@ export default function Home() {
               <h2 className="text-2xl font-bold">2. Clientes del Hub</h2>
 
               <div className="mt-5 space-y-3">
-                {clientes.map((cliente) => (
+                {jornada.clientes.map((cliente) => (
                   <button
                     key={cliente.id}
-                    onClick={() => setClienteActivoId(cliente.id)}
+                    onClick={() => actualizarJornada({ clienteActivoId: cliente.id })}
                     className={`w-full rounded-2xl border p-4 text-left ${
-                      cliente.id === clienteActivoId
+                      cliente.id === jornada.clienteActivoId
                         ? "border-[#1f2a1d] bg-[#eef4ea]"
                         : "border-[#d5ddcf] bg-white"
                     }`}
                   >
                     <p className="font-bold">{cliente.nombre}</p>
                     <p className="text-sm text-[#62705b]">{cliente.email}</p>
-                    <p className="mt-1 text-sm font-semibold">${cliente.total.toLocaleString("es-AR")}</p>
+                    <p className="mt-1 text-sm font-semibold">
+                      ${cliente.reporte.totalCobrado.toLocaleString("es-AR")}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -279,6 +324,7 @@ export default function Home() {
 
                 <input
                   placeholder="Total cobrado"
+                  type="number"
                   value={totalNuevo}
                   onChange={(e) => setTotalNuevo(e.target.value)}
                   className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none"
@@ -300,19 +346,19 @@ export default function Home() {
 
               <div className="mt-5 grid gap-4">
                 <label className="grid gap-2 text-sm font-semibold">
-                  Qué se hizo
+                  Trabajo realizado
                   <textarea
-                    value={realizado}
-                    onChange={(e) => setRealizado(e.target.value)}
+                    value={reporteActivo.trabajoRealizado}
+                    onChange={(e) => actualizarReporteActivo({ trabajoRealizado: e.target.value })}
                     className="min-h-24 rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none"
                   />
                 </label>
 
                 <label className="grid gap-2 text-sm font-semibold">
-                  Qué no se hizo / pendiente
+                  Trabajo pendiente
                   <textarea
-                    value={pendiente}
-                    onChange={(e) => setPendiente(e.target.value)}
+                    value={reporteActivo.trabajoPendiente}
+                    onChange={(e) => actualizarReporteActivo({ trabajoPendiente: e.target.value })}
                     className="min-h-24 rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none"
                   />
                 </label>
@@ -323,25 +369,27 @@ export default function Home() {
               <h2 className="text-2xl font-bold">4. Distribución económica</h2>
 
               <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {[
-                  ["Capataz", capataz, setCapataz],
-                  ["Ayudante", ayudante, setAyudante],
-                  ["Maquinaria", maquinaria, setMaquinaria],
-                  ["Traslado", traslado, setTraslado],
-                  ["Combustible", combustible, setCombustible],
-                  ["Informe", informe, setInforme],
-                  ["Utilidad HubYa", utilidad, setUtilidad],
-                ].map(([label, value, setter]) => (
-                  <label key={label as string} className="grid gap-2 text-sm font-semibold">
-                    {label as string}
+                {camposEconomicos.map(([campo, label]) => (
+                  <label key={campo} className="grid gap-2 text-sm font-semibold">
+                    {label}
                     <input
                       type="number"
-                      value={value as number}
-                      onChange={(e) => (setter as (value: number) => void)(Number(e.target.value))}
+                      value={reporteActivo[campo]}
+                      onChange={(e) => actualizarReporteActivo({ [campo]: Number(e.target.value) })}
                       className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none"
                     />
                   </label>
                 ))}
+
+                <label className="grid gap-2 text-sm font-semibold md:col-span-2">
+                  Total cobrado
+                  <input
+                    type="number"
+                    value={reporteActivo.totalCobrado}
+                    onChange={(e) => actualizarReporteActivo({ totalCobrado: Number(e.target.value) })}
+                    className="rounded-xl border border-[#d5ddcf] px-4 py-3 outline-none"
+                  />
+                </label>
               </div>
 
               <div className="mt-5 rounded-2xl bg-[#f4f6f1] p-5">
@@ -352,7 +400,7 @@ export default function Home() {
 
                 <div className="mt-2 flex justify-between text-sm text-[#61705a]">
                   <span>Total cobrado al cliente</span>
-                  <span>${clienteActivo.total.toLocaleString("es-AR")}</span>
+                  <span>${reporteActivo.totalCobrado.toLocaleString("es-AR")}</span>
                 </div>
               </div>
             </div>
@@ -361,45 +409,44 @@ export default function Home() {
               <h2 className="text-2xl font-bold">Vista previa del email privado</h2>
 
               <div className="mt-5 rounded-2xl bg-white/10 p-5 text-sm leading-7">
-                <p>Asunto: Reporte de jornada — {hub} — {fecha}</p>
+                <p>Asunto: Reporte de jornada — {jornada.hub} — {jornada.fecha}</p>
 
                 <p className="mt-4">Hola {clienteActivo.nombre},</p>
 
                 <p className="mt-4">
-                  Te enviamos el reporte correspondiente a la jornada operativa de {hub}.
+                  Te enviamos el reporte correspondiente a la jornada operativa de {jornada.hub}.
                   Durante esta jornada se trabajaron varios espacios verdes del Hub. Por privacidad,
                   los demás participantes se muestran de forma anónima.
                 </p>
 
                 <p className="mt-4 font-bold">Trabajo realizado:</p>
-                <p>{realizado}</p>
+                <p>{reporteActivo.trabajoRealizado}</p>
 
                 <p className="mt-4 font-bold">Trabajo pendiente:</p>
-                <p>{pendiente}</p>
+                <p>{reporteActivo.trabajoPendiente}</p>
 
                 <p className="mt-4 font-bold">Detalle económico:</p>
                 <div className="mt-2 space-y-1">
-                  <div className="flex justify-between"><span>Capataz</span><span>${capataz.toLocaleString("es-AR")}</span></div>
-                  <div className="flex justify-between"><span>Ayudante</span><span>${ayudante.toLocaleString("es-AR")}</span></div>
-                  <div className="flex justify-between"><span>Maquinaria</span><span>${maquinaria.toLocaleString("es-AR")}</span></div>
-                  <div className="flex justify-between"><span>Traslado</span><span>${traslado.toLocaleString("es-AR")}</span></div>
-                  <div className="flex justify-between"><span>Combustible</span><span>${combustible.toLocaleString("es-AR")}</span></div>
-                  <div className="flex justify-between"><span>Informe</span><span>${informe.toLocaleString("es-AR")}</span></div>
-                  <div className="flex justify-between"><span>Utilidad HubYa</span><span>${utilidad.toLocaleString("es-AR")}</span></div>
+                  {camposEconomicos.map(([campo, label]) => (
+                    <div key={campo} className="flex justify-between">
+                      <span>{label}</span>
+                      <span>${reporteActivo[campo].toLocaleString("es-AR")}</span>
+                    </div>
+                  ))}
                 </div>
 
                 <p className="mt-4 font-bold">Resumen privado del Hub:</p>
                 <div className="mt-2 space-y-1">
-                  {clientes.map((cliente, index) => (
+                  {jornada.clientes.map((cliente, index) => (
                     <div key={cliente.id} className="flex justify-between">
                       <span>{participantesPrivados()[index]}</span>
-                      <span>${cliente.total.toLocaleString("es-AR")}</span>
+                      <span>${cliente.reporte.totalCobrado.toLocaleString("es-AR")}</span>
                     </div>
                   ))}
                 </div>
 
                 <p className="mt-4 font-bold">
-                  Total cobrado: ${clienteActivo.total.toLocaleString("es-AR")}
+                  Total cobrado: ${reporteActivo.totalCobrado.toLocaleString("es-AR")}
                 </p>
 
                 <p className="mt-4">Saludos,</p>
