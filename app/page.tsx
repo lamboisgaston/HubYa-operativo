@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type CampoNumerico = number | "";
 
@@ -39,7 +39,15 @@ type JornadaOperativa = {
   datosPorHub: DatosPorHub;
 };
 
+type DestinatarioSeleccionado = {
+  id: number;
+  nombre: string;
+  email: string;
+  incluido: boolean;
+};
+
 const LOCAL_STORAGE_KEY = "hubya-jornada-operativa-actual";
+const INFORMACION_STORAGE_KEY = "hubya-envio-informacion-borrador";
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -144,6 +152,19 @@ const jornadaInicial: JornadaOperativa = {
   datosPorHub: datosInicialesPorHub,
 };
 
+function leerBorradorInformacion() {
+  if (typeof window === "undefined") return { asunto: "", mensaje: "", nota: "" };
+  const borrador = window.localStorage.getItem(INFORMACION_STORAGE_KEY);
+  if (!borrador) return { asunto: "", mensaje: "", nota: "" };
+  try {
+    const datos = JSON.parse(borrador) as { asunto?: string; mensaje?: string; nota?: string };
+    return { asunto: datos.asunto || "", mensaje: datos.mensaje || "", nota: datos.nota || "" };
+  } catch {
+    window.localStorage.removeItem(INFORMACION_STORAGE_KEY);
+    return { asunto: "", mensaje: "", nota: "" };
+  }
+}
+
 function normalizarCliente(cliente: Partial<FilaClienteIngreso>): FilaClienteIngreso {
   return {
     id: cliente.id || crearId(),
@@ -193,6 +214,15 @@ export default function Home() {
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
   const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
+  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion">("reporte");
+  const [hubInformacion, setHubInformacion] = useState<HubDisponible | "">("");
+  const [borradorInformacion] = useState(leerBorradorInformacion);
+  const [asuntoInformacion, setAsuntoInformacion] = useState(borradorInformacion.asunto);
+  const [mensajeInformacion, setMensajeInformacion] = useState(borradorInformacion.mensaje);
+  const [notaInformacion, setNotaInformacion] = useState(borradorInformacion.nota);
+  const [destinatariosInformacion, setDestinatariosInformacion] = useState<DestinatarioSeleccionado[]>([]);
+  const [estadoInformacion, setEstadoInformacion] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
+  const [mensajeEstadoInformacion, setMensajeEstadoInformacion] = useState("Listo para enviar información individual.");
   const reporteVisualRef = useRef<HTMLElement>(null);
 
   const datosHub = jornada.datosPorHub[jornada.hub];
@@ -236,6 +266,73 @@ export default function Home() {
   }
 
   const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : `Cliente ${index + 1}`, [clienteActivo?.id]);
+  const destinatariosSeleccionados = destinatariosInformacion.filter((destinatario) => destinatario.incluido);
+  const destinatariosSinEmailSeleccionados = destinatariosSeleccionados.filter((destinatario) => !destinatario.email.trim());
+
+  useEffect(() => {
+    localStorage.setItem(INFORMACION_STORAGE_KEY, JSON.stringify({ asunto: asuntoInformacion, mensaje: mensajeInformacion, nota: notaInformacion }));
+  }, [asuntoInformacion, mensajeInformacion, notaInformacion]);
+
+  function seleccionarHubInformacion(hub: HubDisponible) {
+    setHubInformacion(hub);
+    setAsuntoInformacion((actual) => actual || `Información HubYa — ${hub}`);
+    setMensajeInformacion((actual) => actual || `Hola, te compartimos información correspondiente al ${hub}.`);
+    setDestinatariosInformacion(jornada.datosPorHub[hub].clientesIngresos.map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, email: cliente.email, incluido: Boolean(cliente.email.trim()) })));
+    setEstadoInformacion("idle");
+    setMensajeEstadoInformacion("Seleccioná destinatarios, asunto y mensaje para enviar.");
+  }
+
+  function actualizarDestinatarioInformacion(id: number, incluido: boolean) {
+    setDestinatariosInformacion((actuales) => actuales.map((destinatario) => destinatario.id === id ? { ...destinatario, incluido } : destinatario));
+  }
+
+  function marcarTodosDestinatarios(incluido: boolean) {
+    setDestinatariosInformacion((actuales) => actuales.map((destinatario) => ({ ...destinatario, incluido: incluido && Boolean(destinatario.email.trim()) })));
+  }
+
+  async function enviarInformacion() {
+    if (!hubInformacion) {
+      setEstadoInformacion("error");
+      setMensajeEstadoInformacion("Error: debe seleccionar un Hub.");
+      return;
+    }
+    if (destinatariosSeleccionados.length === 0) {
+      setEstadoInformacion("error");
+      setMensajeEstadoInformacion("Error: debe seleccionar al menos un destinatario.");
+      return;
+    }
+    if (destinatariosSinEmailSeleccionados.length > 0) {
+      setEstadoInformacion("error");
+      setMensajeEstadoInformacion("Error: no se puede enviar a clientes sin email.");
+      return;
+    }
+    if (!asuntoInformacion.trim()) {
+      setEstadoInformacion("error");
+      setMensajeEstadoInformacion("Error: falta el asunto.");
+      return;
+    }
+    if (!mensajeInformacion.trim()) {
+      setEstadoInformacion("error");
+      setMensajeEstadoInformacion("Error: falta el mensaje principal.");
+      return;
+    }
+
+    setEstadoInformacion("enviando");
+    setMensajeEstadoInformacion("Enviando...");
+    const respuesta = await fetch("/api/enviar-informacion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hub: hubInformacion, asunto: asuntoInformacion, mensaje: mensajeInformacion, nota: notaInformacion, destinatarios: destinatariosSeleccionados.map(({ nombre, email }) => ({ nombre, email })) }),
+    });
+    const data = await respuesta.json().catch(() => ({}));
+    if (!respuesta.ok) {
+      setEstadoInformacion("error");
+      setMensajeEstadoInformacion(`Error al enviar: ${data?.error || "no se pudo enviar la información."}`);
+      return;
+    }
+    setEstadoInformacion("enviado");
+    setMensajeEstadoInformacion(`Enviados correctamente: ${data?.enviados || destinatariosSeleccionados.length}`);
+  }
 
 
   const reporteTexto = useMemo(() => [
@@ -442,9 +539,32 @@ export default function Home() {
             <div className="flex flex-wrap gap-1.5 xl:justify-end"><button onClick={guardarJornada} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar</button><button onClick={cargarJornada} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cargar</button><button onClick={limpiarJornada} className="h-8 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-3 text-xs font-black text-[#743c3c]">Limpiar</button></div>
           </div>
           <p className="mt-1 text-[11px] font-semibold text-[#66745c]">{mensajeGuardado} · Carga principal editable con sumas y distribución automáticas.</p>
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-[#d8dfd1] pt-3">
+            <button onClick={() => setSeccionActiva("reporte")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "reporte" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Reporte diario</button>
+            <button onClick={() => setSeccionActiva("informacion")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "informacion" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Envío de información</button>
+          </div>
         </header>
 
-        <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
+        {seccionActiva === "informacion" && <section className="mb-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Módulo independiente</p><h2 className="text-lg font-black">Envío de información</h2><p className="text-xs font-semibold text-[#66745c]">No modifica el reporte económico ni la jornada actual. Cada cliente recibe su propio mail individual, sin CC ni BCC grupal.</p></div>
+            <p className={`rounded-lg border px-3 py-2 text-xs font-black ${estadoInformacion === "error" ? "border-[#d6b7b7] bg-[#fff7f7] text-[#743c3c]" : estadoInformacion === "enviado" ? "border-[#b7d6ba] bg-[#f2fff4] text-[#2f6d32]" : "border-[#cfd8c6] bg-[#f8faf5] text-[#66745c]"}`}>{mensajeEstadoInformacion}</p>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[280px_1fr]">
+            <div className="space-y-2">
+              <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub<select value={hubInformacion} onChange={(e) => e.target.value ? seleccionarHubInformacion(e.target.value as HubDisponible) : setHubInformacion("")} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold outline-none"><option value="">Seleccionar Hub</option>{HUBS_DISPONIBLES.map((hub) => <option key={hub} value={hub}>{hub}</option>)}</select></label>
+              <div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#66745c]">Destinatarios seleccionados: <span className="text-[#1f2a1d]">{destinatariosSeleccionados.length}</span></div>
+              <div className="flex flex-wrap gap-2"><button onClick={() => marcarTodosDestinatarios(true)} className="h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Seleccionar todos</button><button onClick={() => marcarTodosDestinatarios(false)} className="h-7 rounded-md border border-[#cfd8c6] px-3 text-xs font-black">Desmarcar todos</button></div>
+            </div>
+            <div className="space-y-3">
+              <div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Incluido</th><th className="border p-1">Nombre</th><th className="border p-1">Email</th></tr></thead><tbody>{destinatariosInformacion.length === 0 ? <tr><td colSpan={3} className="border p-3 text-center font-bold text-[#66745c]">Seleccioná un Hub para ver sus clientes.</td></tr> : destinatariosInformacion.map((destinatario) => <tr key={destinatario.id} className={destinatario.incluido ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={destinatario.incluido} disabled={!destinatario.email.trim()} onChange={(e) => actualizarDestinatarioInformacion(destinatario.id, e.target.checked)} /></td><td className="border border-[#e1e6dc] p-1 font-semibold">{destinatario.nombre || "Sin nombre"}</td><td className={`border border-[#e1e6dc] p-1 ${destinatario.email.trim() ? "" : "font-black text-[#743c3c]"}`}>{destinatario.email.trim() || "Sin email: no disponible para envío"}</td></tr>)}</tbody></table></div>
+              <div className="grid gap-2"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Asunto<input value={asuntoInformacion} onChange={(e) => setAsuntoInformacion(e.target.value)} placeholder={hubInformacion ? `Información HubYa — ${hubInformacion}` : "Información HubYa — [Hub seleccionado]"} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Mensaje principal<textarea value={mensajeInformacion} onChange={(e) => setMensajeInformacion(e.target.value)} placeholder={hubInformacion ? `Hola, te compartimos información correspondiente al ${hubInformacion}.` : "Hola, te compartimos información correspondiente al [Hub seleccionado]."} className="min-h-24 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nota opcional<textarea value={notaInformacion} onChange={(e) => setNotaInformacion(e.target.value)} className="min-h-16 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label></div>
+              <button onClick={enviarInformacion} disabled={estadoInformacion === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar información</button>
+            </div>
+          </div>
+        </section>}
+
+        {seccionActiva === "reporte" && <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-3">
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black uppercase tracking-wide">Zona A · Carga operativa</h2><span className="text-xs font-bold text-[#66745c]">Planilla compacta</span></div>
               <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Clientes / ingresos</h3><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Origen / sistema</th><th className="border p-1">Cliente</th><th className="border p-1">Email privado</th><th className="border p-1">Importe manual</th><th className="border p-1">Email</th><th className="border p-1"></th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente) => <tr key={cliente.id} className={cliente.id === datosHub.clienteActivoId ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1"><span className="block min-w-32 px-1 font-semibold">JardinerosYa</span></td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.email, (valor) => actualizarCliente(cliente.id, { email: valor }), "min-w-48")}</td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className="border border-[#e1e6dc] p-1 text-center"><input type="radio" name="clienteActivo" checked={cliente.id === datosHub.clienteActivoId} onChange={() => actualizarDatosHub({ clienteActivoId: cliente.id })} /></td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => actualizarDatosHub({ clientesIngresos: datosHub.clientesIngresos.filter((fila) => fila.id !== cliente.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div><button onClick={() => actualizarDatosHub({ clientesIngresos: [...datosHub.clientesIngresos, { ...clienteIngresoInicial(""), id: crearId() }] })} className="mt-2 h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Agregar cliente</button>
@@ -537,7 +657,7 @@ export default function Home() {
 
           <details className="rounded-xl border border-[#1f2a1d] bg-[#1f2a1d] p-3 text-white shadow-sm"><summary className="cursor-pointer text-sm font-black uppercase tracking-wide">Mail corto para enviar con el documento</summary><div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]"><select value={datosHub.clienteActivoId} onChange={(e) => actualizarDatosHub({ clienteActivoId: Number(e.target.value) })} className="h-8 rounded-lg bg-white px-2 text-sm font-semibold text-[#182018]">{datosHub.clientesIngresos.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre || "Sin cliente"}</option>)}</select><button onClick={() => copiarTexto(emailPrivado, "Email privado")} className="h-8 rounded-lg bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar texto del mail</button></div><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/10 p-3 text-xs leading-5">{emailPrivado}</pre></details>
         </aside>
-        </section>
+        </section>}
       </section>
     </main>
   );
