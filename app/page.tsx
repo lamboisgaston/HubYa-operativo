@@ -275,28 +275,60 @@ export default function Home() {
     "HubYa",
   ].join("\n"), [clienteActivo?.nombre, fechaFormateada, jornada.hub]);
 
+  const filasClientesHtml = datosHub.clientesIngresos.map((cliente, index) => `
+                    <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(cliente.origen || "Sin origen")}</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(nombrePrivado(cliente, index) || "Sin cliente")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(cliente.importe))}</td></tr>`).join("");
+  const filasGastosHtml = datosHub.gastos.map((gasto) => `
+                    <tr><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(gasto.concepto || "Sin concepto")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(gasto.importe))}</td></tr>`).join("");
+  const filasActoresHtml = distribucionCalculada.map((actor) => `
+                    <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(actor.nombre || "Sin actor")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:center;">${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoMoneda(actor.importeFinal))}</td></tr>`).join("");
+  const sobreHubYaHtml = sobreHubYaLineas.map((linea) => `<p style="margin:8px 0 0;">${escaparHtml(linea)}</p>`).join("");
+
   const reporteHtml = useMemo(() => `
-    <section style="border:1px solid #6f7968;background:#fff;color:#182018;font-family:Arial,Helvetica,sans-serif;max-width:760px;">
+    <article style="width:100%;max-width:760px;border:1px solid #6f7968;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;">
       <header style="border-bottom:2px solid #1f2a1d;padding:16px;">
-        <p style="margin:0;color:#66745c;font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;">HubYa</p>
-        <h1 style="margin:4px 0 0;font-size:20px;text-transform:uppercase;">Reporte administrativo del Hub</h1>
+        <p style="margin:0;color:#66745c;font-size:10px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;">HubYa</p>
+        <h1 style="margin:4px 0 0;font-size:20px;line-height:1.2;font-weight:900;text-transform:uppercase;">Reporte administrativo del Hub</h1>
         <p style="margin:4px 0 0;color:#66745c;font-size:12px;font-weight:700;">Documento emitido por sistema</p>
       </header>
-      <div style="padding:16px;">
-        <h2 style="font-size:12px;text-transform:uppercase;">Resumen rápido para el cliente</h2>
+
+      <section style="border-bottom:1px solid #9aa78f;padding:16px;">
+        <h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Resumen rápido para el cliente</h2>
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <tbody>
-            <tr><td style="border:1px solid #d8dfd1;padding:6px;background:#f6f8f3;font-weight:800;text-transform:uppercase;">Cliente seleccionado</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(clienteActivo?.nombre || "Sin cliente seleccionado")}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;padding:6px;background:#f6f8f3;font-weight:800;text-transform:uppercase;">Hub</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(jornada.hub)}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;padding:6px;background:#f6f8f3;font-weight:800;text-transform:uppercase;">Fecha</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(fechaFormateada)}</td></tr>
-            <tr><td style="border:1px solid #1f2a1d;padding:8px;background:#eef2e8;font-weight:800;text-transform:uppercase;">Importe correspondiente a su espacio verde</td><td style="border:1px solid #1f2a1d;padding:8px;background:#eef2e8;font-size:18px;font-weight:800;">${escaparHtml(formatoPlano(clienteActivo?.importe) || formatoMoneda(0))}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;padding:6px;background:#f6f8f3;font-weight:800;text-transform:uppercase;">Estado operativo</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(datosHub.resumen.estadoOperativo || "Sin cargar")}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Cliente seleccionado</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(clienteActivo?.nombre || "Sin cliente seleccionado")}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Hub</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(jornada.hub)}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Fecha</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(fechaFormateada)}</td></tr>
+            <tr><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;font-weight:900;text-transform:uppercase;">Importe correspondiente a su espacio verde</td><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;color:#1f2a1d;font-size:18px;font-weight:900;">${escaparHtml(formatoPlano(clienteActivo?.importe) || formatoMoneda(0))}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Estado operativo</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(datosHub.resumen.estadoOperativo || "Sin cargar")}</td></tr>
           </tbody>
         </table>
-        <pre style="white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;border:1px solid #d8dfd1;background:#fbfcf9;padding:12px;">${escaparHtml(reporteTexto)}</pre>
-        <p style="border:1px solid #d8dfd1;background:#f8faf5;padding:8px;color:#66745c;font-size:10px;font-weight:700;">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados como Cliente 2, Cliente 3, Cliente 4, etc. y no se incluyen emails.</p>
+      </section>
+
+      <div style="padding:16px;">
+        <table style="width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;">
+          <tbody>
+            <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Clientes / ingresos</th></tr>
+            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Origen / sistema</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Nombre cliente</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasClientesHtml}
+            <tr style="background:#fbfcf9;font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total facturado al Hub</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalFacturadoHub))}</td></tr>
+            <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Gastos</th></tr>
+            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th colspan="2" style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Concepto</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasGastosHtml}
+            <tr style="font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total gastos</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalGastos))}</td></tr>
+            <tr style="background:#fbfcf9;font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total a distribuir</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalADistribuir))}</td></tr>
+            <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Distribución automática por actor</th></tr>
+            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Actor</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:center;">Participación / activo</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasActoresHtml}
+            <tr style="background:#fbfcf9;font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total distribuido</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalDistribuido))}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f8faf5;padding:6px;font-weight:900;">Tiempo efectivo</td><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f8faf5;padding:6px;font-weight:900;">Estado operativo</td><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(datosHub.resumen.estadoOperativo || "Sin cargar")}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f8faf5;padding:6px;font-weight:900;">Observación</td><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(datosHub.resumen.observacionGeneral || "Sin cargar")}</td></tr>
+          </tbody>
+        </table>
+        <p style="margin:8px 0 0;border:1px solid #d8dfd1;background:#f8faf5;padding:8px;color:#66745c;font-size:10px;font-weight:700;">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados como Cliente 2, Cliente 3, Cliente 4, etc. y no se incluyen emails.</p>
+        <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;">
+          <h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Sobre HubYa</h2>
+          ${sobreHubYaHtml}
+        </section>
       </div>
-    </section>`, [clienteActivo?.importe, clienteActivo?.nombre, datosHub.resumen.estadoOperativo, fechaFormateada, jornada.hub, reporteTexto]);
+    </article>`, [clienteActivo?.importe, clienteActivo?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
 
 
   async function enviarReporteClienteSeleccionado() {
