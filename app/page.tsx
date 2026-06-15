@@ -74,9 +74,31 @@ type DestinatarioSeleccionado = {
   incluido: boolean;
 };
 
+
+type RolContactoImportado = "CLIENTE" | "JARDINERO" | "MANOVERDE" | "USUARIO" | "OTRO";
+type HubImportacion = HubDisponible | "Sin Hub asignado";
+type TipoDestinoImportacion = "cliente" | "actor" | "auxiliar" | "ignorar";
+
+type ContactoImportado = {
+  id: number;
+  incluir: boolean;
+  rol: RolContactoImportado;
+  nombre: string;
+  referencia: string;
+  whatsapp: string;
+  email: string;
+  fechaRegistro: string;
+  pinAcceso: string;
+  hub: HubImportacion;
+  tipoDestino: TipoDestinoImportacion;
+};
+
+type ContactoSinHub = Omit<ContactoImportado, "incluir"> & { guardadoEn: string };
+
 const LOCAL_STORAGE_KEY = "hubya-jornada-operativa-actual";
 const HISTORIAL_RESUMENES_STORAGE_KEY = "hubya-historial-resumenes";
 const INFORMACION_STORAGE_KEY = "hubya-envio-informacion-borrador";
+const CONTACTOS_SIN_HUB_STORAGE_KEY = "hubya-contactos-sin-hub";
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -289,6 +311,89 @@ function leerHistorialResumenes() {
   }
 }
 
+
+function normalizarTextoBusqueda(valor: string) {
+  return valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function detectarRol(linea: string): RolContactoImportado {
+  const texto = normalizarTextoBusqueda(linea);
+  if (/\bcliente\b/.test(texto)) return "CLIENTE";
+  if (/\bjardinero\b/.test(texto)) return "JARDINERO";
+  if (/\bmanoverde\b/.test(texto)) return "MANOVERDE";
+  if (/\busuario\b/.test(texto)) return "USUARIO";
+  return "OTRO";
+}
+
+function detectarHub(linea: string): HubImportacion {
+  const texto = normalizarTextoBusqueda(linea);
+  if (texto.includes("tipal")) return "Hub Tipal";
+  if (texto.includes("pradera") || texto.includes("praderas")) return "Hub Praderas";
+  if (texto.includes("prado")) return "Hub Prado";
+  if (texto.includes("punto") || texto.includes("shopping")) return "Hub Punto";
+  if (texto.includes("chacras")) return "Hub Chacras de Santa María";
+  if (texto.includes("aguada")) return "Hub La Aguada";
+  if (texto.includes("reserva")) return "Hub La Reserva";
+  if (texto.includes("valle escondido")) return "Hub Valle Escondido";
+  return "Sin Hub asignado";
+}
+
+function tipoDestinoPorRol(rol: RolContactoImportado): TipoDestinoImportacion {
+  if (rol === "CLIENTE") return "cliente";
+  if (rol === "JARDINERO") return "actor";
+  if (rol === "MANOVERDE" || rol === "USUARIO") return "auxiliar";
+  return "ignorar";
+}
+
+function extraerCampo(linea: string, etiquetas: string[]) {
+  for (const etiqueta of etiquetas) {
+    const patron = new RegExp(`${etiqueta}\\s*:?\\s*([^,;|\\t]+)`, "i");
+    const encontrado = linea.match(patron)?.[1]?.trim();
+    if (encontrado) return encontrado;
+  }
+  return "";
+}
+
+function procesarLineaContacto(linea: string, index: number): ContactoImportado | null {
+  const limpia = linea.trim();
+  if (!limpia) return null;
+  const partes = limpia.split(/[;,|\t]/).map((parte) => parte.trim()).filter(Boolean);
+  const rol = detectarRol(limpia);
+  const email = limpia.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  const whatsapp = extraerCampo(limpia, ["whatsapp", "telefono", "tel", "celular"]) || limpia.match(/(?:\+?54\s?)?(?:\d[\d\s().-]{7,}\d)/)?.[0]?.trim() || "";
+  const fechaRegistro = extraerCampo(limpia, ["fecha registro", "fecha", "registro"]) || limpia.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/)?.[0] || "";
+  const pinAcceso = extraerCampo(limpia, ["pin acceso", "pin"]);
+  const sinEtiquetas = partes.map((parte) => parte.replace(/^(rol|nombre|apellido|referencia|whatsapp|telefono|tel|celular|email|fecha registro|fecha|registro|pin acceso|pin)\s*:?\s*/i, ""));
+  const candidatosNombre = sinEtiquetas.filter((parte) => parte && !normalizarTextoBusqueda(parte).includes(normalizarTextoBusqueda(rol)) && parte !== email && parte !== whatsapp && parte !== fechaRegistro && parte !== pinAcceso);
+  const nombre = extraerCampo(limpia, ["nombre"]) || candidatosNombre[0] || "";
+  const referencia = extraerCampo(limpia, ["apellido", "referencia"]) || candidatosNombre.slice(1).join(" · ");
+  return {
+    id: crearId() + index,
+    incluir: rol !== "OTRO",
+    rol,
+    nombre,
+    referencia,
+    whatsapp,
+    email,
+    fechaRegistro,
+    pinAcceso,
+    hub: detectarHub(limpia),
+    tipoDestino: tipoDestinoPorRol(rol),
+  };
+}
+
+function leerContactosSinHub() {
+  if (typeof window === "undefined") return [] as ContactoSinHub[];
+  const guardados = window.localStorage.getItem(CONTACTOS_SIN_HUB_STORAGE_KEY);
+  if (!guardados) return [] as ContactoSinHub[];
+  try {
+    return JSON.parse(guardados) as ContactoSinHub[];
+  } catch {
+    window.localStorage.removeItem(CONTACTOS_SIN_HUB_STORAGE_KEY);
+    return [] as ContactoSinHub[];
+  }
+}
+
 function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientesPorHub?: Record<string, unknown[]>; resumenesPorHub?: Record<string, Partial<ResumenHubManual>> }): JornadaOperativa {
   const hub = HUBS_DISPONIBLES.includes(jornada.hub as HubDisponible) ? (jornada.hub as HubDisponible) : jornadaInicial.hub;
   const datosPorHub = Object.fromEntries(HUBS_DISPONIBLES.map((hubDisponible) => [hubDisponible, normalizarDatosHub(jornada.datosPorHub?.[hubDisponible], hubDisponible)])) as DatosPorHub;
@@ -302,7 +407,7 @@ export default function Home() {
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
   const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
-  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion">("reporte");
+  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar">("reporte");
   const [hubInformacion, setHubInformacion] = useState<HubDisponible | "">("");
   const [borradorInformacion] = useState(leerBorradorInformacion);
   const [asuntoInformacion, setAsuntoInformacion] = useState(borradorInformacion.asunto);
@@ -311,11 +416,19 @@ export default function Home() {
   const [destinatariosInformacion, setDestinatariosInformacion] = useState<DestinatarioSeleccionado[]>([]);
   const [estadoInformacion, setEstadoInformacion] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEstadoInformacion, setMensajeEstadoInformacion] = useState("Listo para enviar información individual.");
+  const [baseContactosCruda, setBaseContactosCruda] = useState("");
+  const [contactosImportados, setContactosImportados] = useState<ContactoImportado[]>([]);
+  const [contactosSinHub, setContactosSinHub] = useState<ContactoSinHub[]>(leerContactosSinHub);
+  const [mensajeImportacion, setMensajeImportacion] = useState("Pegá la base cruda de JardinerosYa para comenzar.");
   const reporteVisualRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     localStorage.setItem(HISTORIAL_RESUMENES_STORAGE_KEY, JSON.stringify(historialResumenes));
   }, [historialResumenes]);
+
+  useEffect(() => {
+    localStorage.setItem(CONTACTOS_SIN_HUB_STORAGE_KEY, JSON.stringify(contactosSinHub));
+  }, [contactosSinHub]);
 
   const datosHub = jornada.datosPorHub[jornada.hub];
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
@@ -683,6 +796,57 @@ export default function Home() {
     setMensajeGuardado(`${etiqueta} copiado: ${new Date().toLocaleTimeString("es-AR")}`);
   }
 
+
+  function procesarContactos() {
+    const filas = baseContactosCruda.split(/\r?\n/).map(procesarLineaContacto).filter((fila): fila is ContactoImportado => Boolean(fila));
+    setContactosImportados(filas);
+    setMensajeImportacion(filas.length ? `Contactos procesados: ${filas.length}. Revisá, editá y guardá solo los seleccionados.` : "No se detectaron contactos para revisar.");
+  }
+
+  function actualizarContactoImportado(id: number, cambios: Partial<ContactoImportado>) {
+    setContactosImportados((actuales) => actuales.map((contacto) => contacto.id === id ? { ...contacto, ...cambios } : contacto));
+  }
+
+  function guardarContactosSeleccionados() {
+    const seleccionados = contactosImportados.filter((contacto) => contacto.incluir && contacto.tipoDestino !== "ignorar");
+    let clientesGuardados = 0;
+    let actoresGuardados = 0;
+    let auxiliaresGuardados = 0;
+    let sinHubGuardados = 0;
+    const nuevosSinHub: ContactoSinHub[] = [];
+
+    setJornada((actual) => {
+      const datosPorHubActualizados = { ...actual.datosPorHub };
+      for (const contacto of seleccionados) {
+        if (contacto.hub === "Sin Hub asignado") {
+          nuevosSinHub.push({ ...contacto, guardadoEn: new Date().toISOString() });
+          sinHubGuardados += 1;
+          continue;
+        }
+        const hub = contacto.hub;
+        const datos = datosPorHubActualizados[hub];
+        if (contacto.tipoDestino === "cliente") {
+          const existente = contacto.email ? datos.clientesIngresos.find((cliente) => cliente.email.trim().toLowerCase() === contacto.email.trim().toLowerCase()) : undefined;
+          const datosCliente = { nombre: contacto.nombre, email: contacto.email, telefono: contacto.whatsapp, origen: "JardinerosYa" };
+          datosPorHubActualizados[hub] = { ...datos, clientesIngresos: existente ? datos.clientesIngresos.map((cliente) => cliente.id === existente.id ? { ...cliente, ...datosCliente } : cliente) : [...datos.clientesIngresos, { ...clienteIngresoInicial(contacto.nombre), id: crearId(), ...datosCliente }] };
+          clientesGuardados += 1;
+        } else if (contacto.tipoDestino === "actor") {
+          const existente = datos.actores.find((actor) => actor.nombre.trim().toLowerCase() === contacto.nombre.trim().toLowerCase());
+          datosPorHubActualizados[hub] = { ...datos, actores: existente ? datos.actores.map((actor) => actor.id === existente.id ? { ...actor, nombre: contacto.nombre || actor.nombre } : actor) : [...datos.actores, { id: crearId(), nombre: contacto.nombre, activo: true, participacion: 1, ajusteManual: 0 }] };
+          actoresGuardados += 1;
+        } else {
+          nuevosSinHub.push({ ...contacto, guardadoEn: new Date().toISOString() });
+          auxiliaresGuardados += 1;
+        }
+      }
+      return { ...actual, datosPorHub: datosPorHubActualizados };
+    });
+
+    if (nuevosSinHub.length > 0) setContactosSinHub((actuales) => [...nuevosSinHub, ...actuales]);
+    setContactosImportados((actuales) => actuales.map((contacto) => seleccionados.some((seleccionado) => seleccionado.id === contacto.id) ? { ...contacto, incluir: false } : contacto));
+    setMensajeImportacion(`Guardado local: ${clientesGuardados} clientes, ${actoresGuardados} actores, ${auxiliaresGuardados} auxiliares y ${sinHubGuardados} sin Hub asignado.`);
+  }
+
   const inputNumero = (valor: CampoNumerico, onChange: (valor: CampoNumerico) => void) => <input type="number" step="0.25" value={valor} onChange={(e) => onChange(normalizarNumero(e.target.value))} className="h-7 w-28 bg-transparent px-1 text-right outline-none" />;
   const inputTexto = (valor: string, onChange: (valor: string) => void, ancho = "min-w-40") => <input value={valor} onChange={(e) => onChange(e.target.value)} className={`h-7 ${ancho} bg-transparent px-1 outline-none`} />;
 
@@ -718,6 +882,7 @@ export default function Home() {
           <div className="mt-3 flex flex-wrap gap-2 border-t border-[#d8dfd1] pt-3">
             <button onClick={() => setSeccionActiva("reporte")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "reporte" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Reporte diario</button>
             <button onClick={() => setSeccionActiva("informacion")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "informacion" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Envío por WhatsApp</button>
+            <button onClick={() => setSeccionActiva("importar")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "importar" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Importar contactos</button>
           </div>
         </header>
 
@@ -738,6 +903,18 @@ export default function Home() {
               <button onClick={enviarInformacion} disabled={estadoInformacion === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar WhatsApp individuales</button>
             </div>
           </div>
+        </section>}
+
+
+        {seccionActiva === "importar" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Base JardinerosYa</p><h2 className="text-lg font-black">Importar contactos</h2><p className="text-xs font-semibold text-[#66745c]">Pegá líneas con Rol, Nombre, Apellido/Referencia, Whatsapp, Email, Fecha Registro y PIN ACCESO. El guardado queda en localStorage y no envía mails.</p></div>
+            <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-3 py-2 text-xs font-black text-[#66745c]">{mensajeImportacion}</p>
+          </div>
+          <textarea value={baseContactosCruda} onChange={(e) => setBaseContactosCruda(e.target.value)} placeholder="CLIENTE, Ana, Tipal lote 12, 387..., ana@email.com, 12/06/2026, 1234" className="min-h-56 w-full rounded-xl border border-[#cfd8c6] p-3 text-sm outline-none" />
+          <div className="flex flex-wrap gap-2"><button onClick={procesarContactos} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Procesar contactos</button><button onClick={guardarContactosSeleccionados} disabled={!contactosImportados.some((contacto) => contacto.incluir && contacto.tipoDestino !== "ignorar")} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white disabled:opacity-50">Guardar contactos seleccionados</button></div>
+          <div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Incluir</th><th className="border p-1">Rol</th><th className="border p-1">Nombre</th><th className="border p-1">Referencia</th><th className="border p-1">Whatsapp</th><th className="border p-1">Email</th><th className="border p-1">Hub sugerido</th><th className="border p-1">Tipo destino</th></tr></thead><tbody>{contactosImportados.length === 0 ? <tr><td colSpan={8} className="border p-3 text-center font-bold text-[#66745c]">Procesá una base para revisar contactos.</td></tr> : contactosImportados.map((contacto) => <tr key={contacto.id} className={contacto.incluir ? "bg-[#eef4ea]" : "bg-white opacity-70"}><td className="border p-1 text-center"><input type="checkbox" checked={contacto.incluir} onChange={(e) => actualizarContactoImportado(contacto.id, { incluir: e.target.checked })} /></td><td className="border p-1 font-black">{contacto.rol}</td><td className="border p-1">{inputTexto(contacto.nombre, (valor) => actualizarContactoImportado(contacto.id, { nombre: valor }), "min-w-36")}</td><td className="border p-1">{inputTexto(contacto.referencia, (valor) => actualizarContactoImportado(contacto.id, { referencia: valor }), "min-w-48")}</td><td className="border p-1">{inputTexto(contacto.whatsapp, (valor) => actualizarContactoImportado(contacto.id, { whatsapp: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(contacto.email, (valor) => actualizarContactoImportado(contacto.id, { email: valor }), "min-w-48")}</td><td className="border p-1"><select value={contacto.hub} onChange={(e) => actualizarContactoImportado(contacto.id, { hub: e.target.value as HubImportacion })} className="h-7 min-w-48 bg-transparent outline-none"><option>Sin Hub asignado</option>{HUBS_DISPONIBLES.map((hub) => <option key={hub}>{hub}</option>)}</select></td><td className="border p-1"><select value={contacto.tipoDestino} onChange={(e) => actualizarContactoImportado(contacto.id, { tipoDestino: e.target.value as TipoDestinoImportacion })} className="h-7 bg-transparent outline-none"><option value="cliente">cliente</option><option value="actor">actor</option><option value="auxiliar">auxiliar</option><option value="ignorar">ignorar</option></select></td></tr>)}</tbody></table></div>
+          <section className="rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3"><h3 className="text-sm font-black">Sin Hub asignado</h3><p className="text-xs font-bold text-[#66745c]">Contactos guardados como auxiliares o sin Hub para revisar después.</p><div className="mt-2 overflow-x-auto"><table className="w-full border-collapse text-xs"><tbody>{contactosSinHub.length === 0 ? <tr><td className="border p-2 text-center font-bold text-[#66745c]">No hay contactos pendientes sin Hub.</td></tr> : contactosSinHub.map((contacto) => <tr key={`${contacto.id}-${contacto.guardadoEn}`}><td className="border p-1 font-black">{contacto.rol}</td><td className="border p-1">{contacto.nombre || "Sin nombre"}</td><td className="border p-1">{contacto.referencia}</td><td className="border p-1">{contacto.whatsapp}</td><td className="border p-1">{contacto.email}</td><td className="border p-1">{contacto.tipoDestino}</td></tr>)}</tbody></table></div></section>
         </section>}
 
         {seccionActiva === "reporte" && <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
