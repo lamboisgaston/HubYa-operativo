@@ -34,9 +34,36 @@ type DatosHub = {
 };
 type DatosPorHub = Record<HubDisponible, DatosHub>;
 
+type TotalesResumenHub = {
+  totalFacturado: number;
+  totalGastos: number;
+  totalADistribuir: number;
+  totalDistribuido: number;
+};
+
+type ResumenGuardadoHub = {
+  id: string;
+  hub: HubDisponible;
+  fecha: string;
+  nombre: string;
+  guardadoEn: string;
+  datos: DatosHub;
+  gastos: FilaGasto[];
+  distribucion: (FilaActor & { importeDistribuido: number; importeFinal: number })[];
+  totales: TotalesResumenHub;
+  tiempoEfectivo: string;
+  estadoOperativo: string;
+  observacion: string;
+  notaInstitucional: string[];
+  reporteTexto: string;
+};
+
+type HistorialResumenesPorHub = Record<HubDisponible, ResumenGuardadoHub[]>;
+
 type JornadaOperativa = {
   hub: HubDisponible;
   fecha: string;
+  nombreResumen: string;
   datosPorHub: DatosPorHub;
 };
 
@@ -48,6 +75,7 @@ type DestinatarioSeleccionado = {
 };
 
 const LOCAL_STORAGE_KEY = "hubya-jornada-operativa-actual";
+const HISTORIAL_RESUMENES_STORAGE_KEY = "hubya-historial-resumenes";
 const INFORMACION_STORAGE_KEY = "hubya-envio-informacion-borrador";
 
 const HUBS_DISPONIBLES = [
@@ -148,9 +176,12 @@ function datosHubInicial(hub: HubDisponible): DatosHub {
 
 const datosInicialesPorHub = Object.fromEntries(HUBS_DISPONIBLES.map((hub) => [hub, datosHubInicial(hub)])) as DatosPorHub;
 
+const fechaInicial = new Date().toISOString().slice(0, 10);
+
 const jornadaInicial: JornadaOperativa = {
   hub: "Hub Tipal",
-  fecha: "2026-06-13",
+  fecha: fechaInicial,
+  nombreResumen: "",
   datosPorHub: datosInicialesPorHub,
 };
 
@@ -206,14 +237,68 @@ function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partia
   };
 }
 
+function historialVacio(): HistorialResumenesPorHub {
+  return Object.fromEntries(HUBS_DISPONIBLES.map((hub) => [hub, []])) as unknown as HistorialResumenesPorHub;
+}
+
+function normalizarResumenGuardado(resumen: Partial<ResumenGuardadoHub>, hub: HubDisponible): ResumenGuardadoHub {
+  const datos = normalizarDatosHub(resumen.datos, hub);
+  const totalesBase = resumen.totales || { totalFacturado: 0, totalGastos: 0, totalADistribuir: 0, totalDistribuido: 0 };
+  return {
+    id: resumen.id || String(crearId()),
+    hub,
+    fecha: resumen.fecha || fechaInicial,
+    nombre: resumen.nombre || `Jornada ${hub} — ${formatoFecha(resumen.fecha || fechaInicial)}`,
+    guardadoEn: resumen.guardadoEn || new Date().toISOString(),
+    datos,
+    gastos: (resumen.gastos || datos.gastos).map((gasto) => ({ id: gasto.id || crearId(), concepto: gasto.concepto || "", importe: gasto.importe ?? 0 })),
+    distribucion: (resumen.distribucion || []).map((actor) => ({ ...normalizarActor(actor), importeDistribuido: Number(actor.importeDistribuido || 0), importeFinal: Number(actor.importeFinal || 0) })),
+    totales: {
+      totalFacturado: Number(totalesBase.totalFacturado || 0),
+      totalGastos: Number(totalesBase.totalGastos || 0),
+      totalADistribuir: Number(totalesBase.totalADistribuir || 0),
+      totalDistribuido: Number(totalesBase.totalDistribuido || 0),
+    },
+    tiempoEfectivo: resumen.tiempoEfectivo || datos.resumen.tiempoEfectivo || "",
+    estadoOperativo: resumen.estadoOperativo || datos.resumen.estadoOperativo || "",
+    observacion: resumen.observacion || datos.resumen.observacionGeneral || "",
+    notaInstitucional: resumen.notaInstitucional || sobreHubYaLineas,
+    reporteTexto: resumen.reporteTexto || "",
+  };
+}
+
+function normalizarHistorial(valor: unknown): HistorialResumenesPorHub {
+  const historial = historialVacio();
+  if (!valor || typeof valor !== "object") return historial;
+  const parcial = valor as Partial<Record<HubDisponible, Partial<ResumenGuardadoHub>[]>>;
+  HUBS_DISPONIBLES.forEach((hub) => {
+    historial[hub] = (parcial[hub] || []).map((resumen) => normalizarResumenGuardado(resumen, hub));
+  });
+  return historial;
+}
+
+function leerHistorialResumenes() {
+  if (typeof window === "undefined") return historialVacio();
+  const guardado = window.localStorage.getItem(HISTORIAL_RESUMENES_STORAGE_KEY);
+  if (!guardado) return historialVacio();
+  try {
+    return normalizarHistorial(JSON.parse(guardado));
+  } catch {
+    window.localStorage.removeItem(HISTORIAL_RESUMENES_STORAGE_KEY);
+    return historialVacio();
+  }
+}
+
 function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientesPorHub?: Record<string, unknown[]>; resumenesPorHub?: Record<string, Partial<ResumenHubManual>> }): JornadaOperativa {
   const hub = HUBS_DISPONIBLES.includes(jornada.hub as HubDisponible) ? (jornada.hub as HubDisponible) : jornadaInicial.hub;
   const datosPorHub = Object.fromEntries(HUBS_DISPONIBLES.map((hubDisponible) => [hubDisponible, normalizarDatosHub(jornada.datosPorHub?.[hubDisponible], hubDisponible)])) as DatosPorHub;
-  return { hub, fecha: jornada.fecha || jornadaInicial.fecha, datosPorHub };
+  return { hub, fecha: jornada.fecha || jornadaInicial.fecha, nombreResumen: jornada.nombreResumen || "", datosPorHub };
 }
 
 export default function Home() {
   const [jornada, setJornada] = useState<JornadaOperativa>(jornadaInicial);
+  const [hubSeleccionado, setHubSeleccionado] = useState(false);
+  const [historialResumenes, setHistorialResumenes] = useState<HistorialResumenesPorHub>(leerHistorialResumenes);
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
   const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
@@ -227,6 +312,10 @@ export default function Home() {
   const [estadoInformacion, setEstadoInformacion] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEstadoInformacion, setMensajeEstadoInformacion] = useState("Listo para enviar información individual.");
   const reporteVisualRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem(HISTORIAL_RESUMENES_STORAGE_KEY, JSON.stringify(historialResumenes));
+  }, [historialResumenes]);
 
   const datosHub = jornada.datosPorHub[jornada.hub];
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
@@ -243,6 +332,7 @@ export default function Home() {
     return { ...actor, importeDistribuido, importeFinal };
   });
   const totalDistribuido = distribucionCalculada.reduce((total, actor) => total + actor.importeFinal, 0);
+  const resumenesDelHub = historialResumenes[jornada.hub] || [];
 
   function actualizarJornada(cambios: Partial<JornadaOperativa>) {
     setJornada((actual) => ({ ...actual, ...cambios }));
@@ -250,6 +340,17 @@ export default function Home() {
 
   function actualizarDatosHub(cambios: Partial<DatosHub>) {
     setJornada((actual) => ({ ...actual, datosPorHub: { ...actual.datosPorHub, [actual.hub]: { ...actual.datosPorHub[actual.hub], ...cambios } } }));
+  }
+
+  function seleccionarHubTrabajo(hub: HubDisponible) {
+    actualizarJornada({ hub, nombreResumen: "" });
+    setHubSeleccionado(true);
+    setMensajeGuardado(`Hub seleccionado: ${hub}`);
+  }
+
+  function cambiarHub() {
+    setHubSeleccionado(false);
+    setSeccionActiva("reporte");
   }
 
   function actualizarResumen(cambios: Partial<ResumenHubManual>) {
@@ -525,7 +626,56 @@ export default function Home() {
   function limpiarJornada() {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     setJornada(jornadaInicial);
+    setHubSeleccionado(false);
     setMensajeGuardado("Jornada local limpiada y formulario reiniciado");
+  }
+
+  function nombreResumenActual() {
+    return jornada.nombreResumen.trim() || `Jornada ${jornada.hub} — ${formatoFecha(jornada.fecha)}`;
+  }
+
+  function crearResumenGuardado(id = String(crearId()), nombre = nombreResumenActual(), fecha = jornada.fecha): ResumenGuardadoHub {
+    return {
+      id,
+      hub: jornada.hub,
+      fecha,
+      nombre,
+      guardadoEn: new Date().toISOString(),
+      datos: JSON.parse(JSON.stringify(datosHub)) as DatosHub,
+      gastos: JSON.parse(JSON.stringify(datosHub.gastos)) as FilaGasto[],
+      distribucion: JSON.parse(JSON.stringify(distribucionCalculada)) as ResumenGuardadoHub["distribucion"],
+      totales: { totalFacturado: totalFacturadoHub, totalGastos, totalADistribuir, totalDistribuido },
+      tiempoEfectivo: datosHub.resumen.tiempoEfectivo,
+      estadoOperativo: datosHub.resumen.estadoOperativo,
+      observacion: datosHub.resumen.observacionGeneral,
+      notaInstitucional: sobreHubYaLineas,
+      reporteTexto,
+    };
+  }
+
+  function guardarResumenHub() {
+    const resumen = crearResumenGuardado();
+    setHistorialResumenes((actual) => ({ ...actual, [jornada.hub]: [resumen, ...(actual[jornada.hub] || [])] }));
+    setJornada((actual) => ({ ...actual, nombreResumen: resumen.nombre }));
+    setMensajeGuardado(`Resumen guardado para ${jornada.hub}: ${resumen.nombre}`);
+  }
+
+  function abrirResumenHub(resumen: ResumenGuardadoHub) {
+    setJornada((actual) => ({ ...actual, hub: resumen.hub, fecha: resumen.fecha, nombreResumen: resumen.nombre, datosPorHub: { ...actual.datosPorHub, [resumen.hub]: normalizarDatosHub(resumen.datos, resumen.hub) } }));
+    setHubSeleccionado(true);
+    setMensajeGuardado(`Resumen abierto: ${resumen.nombre}`);
+  }
+
+  function duplicarResumenHub(resumen: ResumenGuardadoHub) {
+    const copia = normalizarResumenGuardado({ ...resumen, id: String(crearId()), nombre: `${resumen.nombre} (copia)`, guardadoEn: new Date().toISOString(), fecha: jornada.fecha }, resumen.hub);
+    setHistorialResumenes((actual) => ({ ...actual, [resumen.hub]: [copia, ...(actual[resumen.hub] || [])] }));
+    abrirResumenHub(copia);
+  }
+
+  function eliminarResumenHub(resumen: ResumenGuardadoHub) {
+    if (!window.confirm(`¿Eliminar el resumen "${resumen.nombre}"?`)) return;
+    setHistorialResumenes((actual) => ({ ...actual, [resumen.hub]: (actual[resumen.hub] || []).filter((item) => item.id !== resumen.id) }));
+    setMensajeGuardado(`Resumen eliminado: ${resumen.nombre}`);
   }
 
   async function copiarTexto(texto: string, etiqueta: string) {
@@ -536,15 +686,33 @@ export default function Home() {
   const inputNumero = (valor: CampoNumerico, onChange: (valor: CampoNumerico) => void) => <input type="number" step="0.25" value={valor} onChange={(e) => onChange(normalizarNumero(e.target.value))} className="h-7 w-28 bg-transparent px-1 text-right outline-none" />;
   const inputTexto = (valor: string, onChange: (valor: string) => void, ancho = "min-w-40") => <input value={valor} onChange={(e) => onChange(e.target.value)} className={`h-7 ${ancho} bg-transparent px-1 outline-none`} />;
 
+  if (!hubSeleccionado) {
+    return (
+      <main className="min-h-screen bg-[#eef2e8] px-4 py-8 text-[#182018]">
+        <section className="mx-auto max-w-5xl rounded-2xl border border-[#cfd8c6] bg-white p-5 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HubYa Operativo</p>
+          <h1 className="mt-2 text-2xl font-black">¿Con qué Hub vas a trabajar hoy?</h1>
+          <p className="mt-2 text-sm font-semibold text-[#66745c]">Elegí el Hub antes de cargar la jornada. Los clientes y los resúmenes guardados se muestran separados por Hub.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {HUBS_DISPONIBLES.map((hub) => <button key={hub} onClick={() => seleccionarHubTrabajo(hub)} className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-4 text-left shadow-sm transition hover:border-[#1f2a1d] hover:bg-[#eef2e8]">
+              <span className="block text-base font-black">{hub}</span>
+              <span className="mt-2 block text-xs font-bold text-[#66745c]">{(historialResumenes[hub] || []).length} resúmenes guardados</span>
+            </button>)}
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#eef2e8] text-[#182018]">
       <section className="mx-auto max-w-[1600px] px-3 py-3 sm:px-4">
         <header className="sticky top-0 z-20 mb-3 rounded-xl border border-[#cfd8c6] bg-white/95 p-3 shadow-sm backdrop-blur">
-          <div className="grid gap-2 xl:grid-cols-[1fr_280px_180px_auto] xl:items-end">
+          <div className="grid gap-2 xl:grid-cols-[1fr_220px_180px_220px_auto] xl:items-end">
             <div><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HubYa Operativo · carga manual + reporte vivo</p><h1 className="text-xl font-black leading-tight">Reporte del Hub — {jornada.hub} — {fechaFormateada}</h1></div>
-            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub<select value={jornada.hub} onChange={(e) => actualizarJornada({ hub: e.target.value as HubDisponible })} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold outline-none">{HUBS_DISPONIBLES.map((hub) => <option key={hub} value={hub}>{hub}</option>)}</select></label>
-            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Fecha<input type="date" value={jornada.fecha} onChange={(e) => actualizarJornada({ fecha: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm outline-none" /></label>
-            <div className="flex flex-wrap gap-1.5 xl:justify-end"><button onClick={guardarJornada} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar</button><button onClick={cargarJornada} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cargar</button><button onClick={limpiarJornada} className="h-8 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-3 text-xs font-black text-[#743c3c]">Limpiar</button></div>
+            <div className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]"><span>Hub seleccionado</span><div className="flex h-8 items-center rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-2 text-sm font-black normal-case text-[#1f2a1d]">{jornada.hub}</div></div>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Fecha<input type="date" value={jornada.fecha} onChange={(e) => actualizarJornada({ fecha: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nombre del resumen<input value={jornada.nombreResumen} onChange={(e) => actualizarJornada({ nombreResumen: e.target.value })} placeholder={nombreResumenActual()} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label>
+            <div className="flex flex-wrap gap-1.5 xl:justify-end"><button onClick={cambiarHub} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cambiar Hub</button><button onClick={guardarJornada} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar</button><button onClick={cargarJornada} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cargar</button><button onClick={limpiarJornada} className="h-8 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-3 text-xs font-black text-[#743c3c]">Limpiar</button></div>
           </div>
           <p className="mt-1 text-[11px] font-semibold text-[#66745c]">{mensajeGuardado} · Carga principal editable con sumas y distribución automáticas.</p>
           <div className="mt-3 flex flex-wrap gap-2 border-t border-[#d8dfd1] pt-3">
@@ -664,6 +832,19 @@ export default function Home() {
           </section>
 
           <details className="rounded-xl border border-[#1f2a1d] bg-[#1f2a1d] p-3 text-white shadow-sm"><summary className="cursor-pointer text-sm font-black uppercase tracking-wide">Mail corto para enviar con el documento</summary><div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]"><select value={datosHub.clienteActivoId} onChange={(e) => actualizarDatosHub({ clienteActivoId: Number(e.target.value) })} className="h-8 rounded-lg bg-white px-2 text-sm font-semibold text-[#182018]">{datosHub.clientesIngresos.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre || "Sin cliente"}</option>)}</select><button onClick={() => copiarTexto(emailPrivado, "Email privado")} className="h-8 rounded-lg bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar texto del mail</button></div><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/10 p-3 text-xs leading-5">{emailPrivado}</pre></details>
+          <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Historial independiente</p><h2 className="text-lg font-black">Resúmenes guardados del Hub</h2><p className="text-xs font-bold text-[#66745c]">Solo se listan resúmenes de {jornada.hub}.</p></div>
+              <button onClick={guardarResumenHub} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar resumen del Hub</button>
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-[#d8dfd1]">
+              <table className="w-full border-collapse text-xs">
+                <thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1.5">Fecha</th><th className="border p-1.5">Nombre del resumen</th><th className="border p-1.5">Estado operativo</th><th className="border p-1.5 text-right">Total facturado</th><th className="border p-1.5">Guardado</th><th className="border p-1.5">Acciones</th></tr></thead>
+                <tbody>{resumenesDelHub.length === 0 ? <tr><td colSpan={6} className="border p-3 text-center font-bold text-[#66745c]">Todavía no hay resúmenes guardados para {jornada.hub}.</td></tr> : resumenesDelHub.map((resumen) => <tr key={resumen.id}><td className="border border-[#e1e6dc] p-1.5 font-semibold">{formatoFecha(resumen.fecha)}</td><td className="border border-[#e1e6dc] p-1.5 font-bold">{resumen.nombre}</td><td className="border border-[#e1e6dc] p-1.5">{resumen.estadoOperativo || "Sin cargar"}</td><td className="border border-[#e1e6dc] p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalFacturado)}</td><td className="border border-[#e1e6dc] p-1.5">{new Date(resumen.guardadoEn).toLocaleString("es-AR")}</td><td className="border border-[#e1e6dc] p-1.5"><div className="flex flex-wrap gap-1"><button onClick={() => abrirResumenHub(resumen)} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Abrir</button><button onClick={() => duplicarResumenHub(resumen)} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Duplicar</button><button onClick={() => eliminarResumenHub(resumen)} className="h-7 rounded-md border border-[#d6b7b7] bg-[#fff7f7] px-2 text-[11px] font-black text-[#743c3c]">Eliminar</button></div></td></tr>)}</tbody>
+              </table>
+            </div>
+          </section>
+
         </aside>
         </section>}
       </section>
