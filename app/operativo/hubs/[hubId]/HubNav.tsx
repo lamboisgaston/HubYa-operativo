@@ -2,12 +2,9 @@ import Link from "next/link";
 import type { HubPublico } from "@/lib/data/hubs";
 
 const tabs = [
-  ["Ficha", "ficha", "hub"],
+  ["Ficha del Hub", "ficha", "hub"],
   ["Reportes del Hub", "reportes", "hub"],
-  ["Contactos", "contactos", "global"],
-  ["Vínculos", "vinculos", "hub"],
-  ["Postulantes", "postulantes", "global"],
-  ["Notificaciones", "notificaciones", "hub"],
+  ["Contactos del Hub", "contactos", "hub"],
   ["Web pública", "web-publica", "public"],
 ] as const;
 

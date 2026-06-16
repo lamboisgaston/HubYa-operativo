@@ -1,13 +1,8 @@
 import Link from "next/link";
-import { getHubs } from "@/lib/data/hubs";
-
-function estabilidadReferencial(vecinos: number) {
-  if (vecinos <= 0) return "Sin datos";
-  return `≈ ${Math.max(1, Math.ceil(vecinos / 12))} persona estable`;
-}
+import { getHubsOperativos } from "@/lib/data/hubs";
 
 export default async function OperativoPage() {
-  const hubs = await getHubs();
+  const hubs = await getHubsOperativos();
 
   return (
     <main className="min-h-screen bg-[#f6f7f2] px-4 py-6 text-[#1f2a1d] sm:px-6 lg:px-8">
@@ -18,8 +13,8 @@ export default async function OperativoPage() {
             <div>
               <h1 className="text-3xl font-black sm:text-4xl">Mis Hubs</h1>
               <p className="mt-2 max-w-3xl text-sm font-semibold text-[#5f6f55]">
-                El operador primero elige un Hub. Después decide si quiere mirar la ficha, cargar una jornada,
-                administrar contactos, vínculos o notificaciones.
+                Una sola fuente de verdad: la web pública y el operativo leen la misma ficha de Hub, clientes,
+                servicios y reportes disponibles en la base real.
               </p>
             </div>
             <Link href="/operativo/contactos" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-5 py-3 text-center text-sm font-black text-[#1f2a1d]">
@@ -30,11 +25,10 @@ export default async function OperativoPage() {
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {hubs.map((hub) => {
-            const serviciosActivos = hub.servicios.filter((servicio) => servicio.activo);
+            const serviciosActivos = hub.serviciosActivos;
             const resolutorPrincipal = serviciosActivos.find((servicio) => servicio.vinculoActivo)?.vinculoActivo?.oferta_nombre || hub.equipoOperativo || "Sin asignar";
-            const postulantes = serviciosActivos.reduce((total, servicio) => total + servicio.postulantes.length, 0);
             return (
-              <article key={hub.id} className="flex min-h-[430px] flex-col rounded-[2rem] border border-[#d8dfd1] bg-white p-5 shadow-sm">
+              <article key={hub.id} className="flex min-h-[390px] flex-col rounded-[2rem] border border-[#d8dfd1] bg-white p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-2xl font-black uppercase leading-tight">{hub.nombre}</h2>
@@ -44,10 +38,11 @@ export default async function OperativoPage() {
                 </div>
 
                 <dl className="mt-5 grid gap-3 rounded-2xl bg-[#f8faf5] p-4 text-sm">
-                  <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Vecinos</dt><dd className="font-black">{hub.clientesActivos}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Estabilidad</dt><dd className="font-black text-right">{estabilidadReferencial(hub.clientesActivos)}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Vecinos</dt><dd className="font-black">{hub.cantidadClientes}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Borradores</dt><dd className="font-black">{hub.cantidadReportesBorrador}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Reportes guardados</dt><dd className="font-black">{hub.cantidadReportesGuardados}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Estabilidad</dt><dd className="font-black text-right">{hub.estabilidadOperativa}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Abastece</dt><dd className="font-black text-right">{resolutorPrincipal}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Postulantes</dt><dd className="font-black">{postulantes}</dd></div>
                 </dl>
 
                 <div className="mt-5 flex-1">
@@ -58,8 +53,8 @@ export default async function OperativoPage() {
                 </div>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  <Link href={`/operativo/hubs/${hub.slug}/reportes`} className="rounded-2xl bg-[#1f2a1d] px-4 py-3 text-center text-sm font-black text-white">Reportes del Hub</Link>
-                  <Link href={`/operativo/hubs/${hub.slug}/ficha`} className="rounded-2xl border border-[#cfd8c6] bg-white px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Editar ficha</Link>
+                  <Link href={`/operativo/hubs/${hub.slug}/ficha`} className="rounded-2xl bg-[#1f2a1d] px-4 py-3 text-center text-sm font-black text-white">Entrar al Hub</Link>
+                  <Link href={`/hubs/${hub.slug}`} className="rounded-2xl border border-[#cfd8c6] bg-white px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Ver web pública</Link>
                 </div>
               </article>
             );
