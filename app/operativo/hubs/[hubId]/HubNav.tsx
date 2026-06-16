@@ -8,6 +8,7 @@ const tabs = [
   ["Vínculos", "vinculos", "hub"],
   ["Postulantes", "postulantes", "global"],
   ["Notificaciones", "notificaciones", "hub"],
+  ["Web pública", "web-publica", "public"],
 ] as const;
 
 export function HubNav({ hub, active }: { hub: HubPublico; active: string }) {
@@ -20,7 +21,7 @@ export function HubNav({ hub, active }: { hub: HubPublico; active: string }) {
       </div>
       <nav className="mt-5 flex flex-wrap gap-2">
         {tabs.map(([label, key, scope]) => {
-          const url = scope === "hub" ? `/operativo/hubs/${hub.slug}/${key}` : `/operativo/${key}`;
+          const url = scope === "hub" ? `/operativo/hubs/${hub.slug}/${key}` : scope === "public" ? `/hubs/${hub.slug}` : `/operativo/${key}`;
           return <Link key={label} href={url} className={`rounded-2xl px-4 py-3 text-sm font-black ${active === key ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-[#f8faf5] text-[#1f2a1d]"}`}>{label}</Link>;
         })}
       </nav>
