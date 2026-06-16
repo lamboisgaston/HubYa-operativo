@@ -85,6 +85,10 @@ type DestinatarioSeleccionado = {
   incluido: boolean;
 };
 
+function emailValido(valor: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor.trim());
+}
+
 
 type RolContactoImportado = "CLIENTE" | "JARDINERO" | "MANOVERDE" | "USUARIO" | "OTRO";
 type HubImportacion = HubDisponible | "Sin Hub asignado";
@@ -661,6 +665,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
   const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
+  const [clientesReporteSeleccionados, setClientesReporteSeleccionados] = useState<number[]>([]);
   const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos">(initialSection);
   const [hubInformacion, setHubInformacion] = useState<HubDisponible | "">("");
   const [asuntoInformacion, setAsuntoInformacion] = useState("");
@@ -700,6 +705,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const [mensajeFichaHub, setMensajeFichaHub] = useState("Hola, compartimos una actualización de la ficha operativa del Hub.");
   const [incluirPostulantesFicha, setIncluirPostulantesFicha] = useState(true);
   const reporteVisualRef = useRef<HTMLElement>(null);
+  const seleccionReporteInicializadaRef = useRef(false);
   const hubsOperativos = useMemo(() => fusionarNombresHubs(hubsCanonicos), [hubsCanonicos]);
   const contactosImportadosFiltrados = useMemo(() => {
     const busquedaNormalizada = normalizarContactoBusqueda(busquedaContactos);
@@ -845,6 +851,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     setClientesConsultaSeleccionados(normalizarDatosHub(jornada.datosPorHub[hubConsulta], hubConsulta).clientesIngresos.filter((cliente) => cliente.email.trim()).map((cliente) => cliente.id));
   }, [hubConsulta, isMounted, jornada.datosPorHub]);
 
+
   const equipos = Array.isArray(equiposActivos) ? equiposActivos : [];
   const vinculos = Array.isArray(hubVinculos) ? hubVinculos : [];
   const fichaHubActual = hubsCanonicos.find((hub) => hub.nombre === jornada.hub);
@@ -854,6 +861,21 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const integrantesDestinoMensaje = integrantesEquipoActivo.filter((integrante) => integrantesMensajeSeleccionados.includes(integrante.id));
   const datosHub = normalizarDatosHub(jornada.datosPorHub[jornada.hub], jornada.hub);
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
+  const clientesConEmailValidoReporte = datosHub.clientesIngresos.filter((cliente) => emailValido(cliente.email));
+  const clientesSeleccionadosReporte = datosHub.clientesIngresos.filter((cliente) => clientesReporteSeleccionados.includes(cliente.id) && emailValido(cliente.email));
+
+  useEffect(() => {
+    setClientesReporteSeleccionados((actuales) => {
+      const idsValidos = datosHub.clientesIngresos.filter((cliente) => emailValido(cliente.email)).map((cliente) => cliente.id);
+      if (!seleccionReporteInicializadaRef.current) {
+        seleccionReporteInicializadaRef.current = true;
+        return idsValidos;
+      }
+      const depurados = actuales.filter((id) => idsValidos.includes(id));
+      const nuevos = idsValidos.filter((id) => !actuales.includes(id));
+      return [...depurados, ...nuevos];
+    });
+  }, [datosHub.clientesIngresos]);
   const fechaFormateada = formatoFecha(jornada.fecha);
   const totalFacturadoHub = datosHub.clientesIngresos.reduce((total, cliente) => total + numero(cliente.importe), 0);
   const totalGastos = datosHub.gastos.reduce((total, gasto) => total + numero(gasto.importe), 0);
@@ -896,6 +918,18 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function actualizarCliente(id: number, cambios: Partial<FilaClienteIngreso>) {
     actualizarDatosHub({ clientesIngresos: datosHub.clientesIngresos.map((cliente) => cliente.id === id ? { ...cliente, ...cambios } : cliente) });
+  }
+
+  function actualizarSeleccionReporte(id: number, seleccionado: boolean) {
+    setClientesReporteSeleccionados((actuales) => seleccionado ? Array.from(new Set([...actuales, id])) : actuales.filter((clienteId) => clienteId !== id));
+  }
+
+  function marcarTodosClientesReporte() {
+    setClientesReporteSeleccionados(clientesConEmailValidoReporte.map((cliente) => cliente.id));
+  }
+
+  function desmarcarTodosClientesReporte() {
+    setClientesReporteSeleccionados([]);
   }
 
   function actualizarGasto(id: number, cambios: Partial<FilaGasto>) {
@@ -1011,6 +1045,37 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     ...sobreHubYaLineas,
   ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre]);
 
+  function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
+    return [
+      "HubYa — Reporte administrativo del Hub",
+      `Sistema: JardinerosYa / servicio de jardinería`,
+      `Hub: ${jornada.hub}`,
+      `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
+      `Fecha: ${fechaFormateada}`,
+      `Cliente seleccionado: ${clienteObjetivo.nombre || "Sin cliente seleccionado"}`,
+      "",
+      "CLIENTES / INGRESOS",
+      ...datosHub.clientesIngresos.map((cliente, index) => `${cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : `Cliente ${index + 1}`} · JardinerosYa · ${formatoPlano(cliente.importe) || formatoMoneda(0)}`),
+      `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
+      "",
+      "GASTOS",
+      ...datosHub.gastos.map((gasto) => `${gasto.concepto || "Sin concepto"}: ${formatoPlano(gasto.importe) || formatoMoneda(0)}`),
+      `Total gastos: ${formatoMoneda(totalGastos)}`,
+      `Total a distribuir: ${formatoMoneda(totalADistribuir)}`,
+      "",
+      "DISTRIBUCIÓN AUTOMÁTICA POR ACTOR",
+      ...distribucionCalculada.map((actor) => `${actor.nombre || "Sin actor"}: ${formatoMoneda(actor.importeFinal)} (${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"})`),
+      `Total distribuido: ${formatoMoneda(totalDistribuido)}`,
+      "",
+      `Tiempo efectivo: ${datosHub.resumen.tiempoEfectivo || "Sin cargar"}`,
+      `Estado operativo: ${datosHub.resumen.estadoOperativo || "Sin cargar"}`,
+      `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
+      "",
+      "SOBRE HUBYA",
+      ...sobreHubYaLineas,
+    ].join("\n");
+  }
+
   const asuntoReporte = `Reporte diario HubYa — ${jornada.hub} — ${fechaFormateada}`;
   const firmaDatosHub = JSON.stringify(datosHub);
 
@@ -1087,40 +1152,54 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     </article>`, [clienteActivoReporte?.importe, clienteActivoReporte?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre]);
 
 
-  async function enviarReporteClienteSeleccionado() {
-    if (!clienteActivo?.email.trim()) {
+  async function enviarReporteASeleccionados() {
+    if (clientesSeleccionadosReporte.length === 0) {
       setEstadoEnvio("error");
-      setMensajeEnvio("Error al enviar: el cliente seleccionado no tiene email.");
+      setMensajeEnvio("Error al enviar: seleccioná al menos un cliente con email válido.");
       return;
     }
 
+    const confirmar = window.confirm(`Vas a enviar este reporte a ${clientesSeleccionadosReporte.length} clientes. ¿Confirmar envío?`);
+    if (!confirmar) return;
+
     setEstadoEnvio("enviando");
-    setMensajeEnvio("Enviando...");
+    setMensajeEnvio(`Enviando reporte a ${clientesSeleccionadosReporte.length} clientes...`);
 
-    const respuesta = await fetch("/api/enviar-reporte", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        emailDestino: clienteActivo.email,
-        nombreCliente: clienteActivo.nombre,
-        hub: jornada.hub,
-        fecha: fechaFormateada,
-        asunto: asuntoReporte,
-        cuerpoMail: emailPrivado,
-        reporteHtml,
-        reporteTexto,
-      }),
-    });
-    const data = await respuesta.json().catch(() => ({}));
+    const resultados = [];
+    for (const cliente of clientesSeleccionadosReporte) {
+      const cuerpoMail = [
+        `Hola ${cliente.nombre || "cliente"}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}. Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.`,
+        "",
+        "Saludos,",
+        "HubYa",
+      ].join("\n");
+      const respuesta = await fetch("/api/enviar-reporte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailDestino: cliente.email,
+          nombreCliente: cliente.nombre,
+          hub: jornada.hub,
+          fecha: fechaFormateada,
+          asunto: asuntoReporte,
+          cuerpoMail,
+          reporteHtml: "",
+          reporteTexto: reporteTextoParaCliente(cliente),
+        }),
+      });
+      const data = await respuesta.json().catch(() => ({}));
+      resultados.push({ ok: respuesta.ok, nombre: cliente.nombre, error: data?.error });
+    }
 
-    if (!respuesta.ok) {
+    const errores = resultados.filter((resultado) => !resultado.ok);
+    if (errores.length > 0) {
       setEstadoEnvio("error");
-      setMensajeEnvio(`Error al enviar: ${data?.error || "no se pudo enviar el reporte."}`);
+      setMensajeEnvio(`Resultado: enviados ${resultados.length - errores.length} de ${resultados.length}. Errores: ${errores.map((error) => error.nombre || "cliente").join(", ")}`);
       return;
     }
 
     setEstadoEnvio("enviado");
-    setMensajeEnvio("Enviado correctamente");
+    setMensajeEnvio(`Resultado: reporte enviado a ${resultados.length} clientes seleccionados.`);
   }
 
   async function descargarImagenReporte() {
@@ -1789,7 +1868,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         {seccionActiva === "reporte" && <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-3">
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black uppercase tracking-wide">Zona A · Carga operativa</h2><span className="text-xs font-bold text-[#66745c]">Planilla compacta</span></div>
-              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Clientes / ingresos</h3><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Origen / sistema</th><th className="border p-1">Cliente</th><th className="border p-1">Email privado</th><th className="border p-1">Teléfono WhatsApp</th><th className="border p-1">Importe manual</th><th className="border p-1">Email</th><th className="border p-1"></th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente, index) => <tr key={`cliente-edit-${cliente.id}-${index}`} className={cliente.id === datosHub.clienteActivoId ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1"><span className="block min-w-32 px-1 font-semibold">JardinerosYa</span></td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.email, (valor) => actualizarCliente(cliente.id, { email: valor }), "min-w-48")}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.telefono, (valor) => actualizarCliente(cliente.id, { telefono: valor }), "min-w-36")}</td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className="border border-[#e1e6dc] p-1 text-center"><input type="radio" name="clienteActivo" checked={cliente.id === datosHub.clienteActivoId} onChange={() => actualizarDatosHub({ clienteActivoId: cliente.id })} /></td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => actualizarDatosHub({ clientesIngresos: datosHub.clientesIngresos.filter((fila) => fila.id !== cliente.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div><button onClick={() => actualizarDatosHub({ clientesIngresos: [...datosHub.clientesIngresos, { ...clienteIngresoInicial(""), id: crearId() }] })} className="mt-2 h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Agregar cliente</button>
+              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Clientes / ingresos</h3><div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs"><span className="font-black">Clientes seleccionados: {clientesSeleccionadosReporte.length} de {clientesConEmailValidoReporte.length}</span><button onClick={marcarTodosClientesReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Marcar todos</button><button onClick={desmarcarTodosClientesReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Desmarcar todos</button><button onClick={enviarReporteASeleccionados} disabled={estadoEnvio === "enviando" || clientesSeleccionadosReporte.length === 0} className="h-7 rounded-md bg-[#1f2a1d] px-2 font-black text-white disabled:opacity-50">Enviar a seleccionados</button></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1 text-center">✓</th><th className="border p-1">Origen / sistema</th><th className="border p-1">Cliente</th><th className="border p-1">Email privado</th><th className="border p-1">Teléfono WhatsApp</th><th className="border p-1">Importe manual</th><th className="border p-1">Email</th><th className="border p-1"></th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente, index) => { const tieneEmailValido = emailValido(cliente.email); const seleccionadoReporte = clientesReporteSeleccionados.includes(cliente.id) && tieneEmailValido; return <tr key={`cliente-edit-${cliente.id}-${index}`} className={seleccionadoReporte ? "bg-[#eef4ea]" : cliente.id === datosHub.clienteActivoId ? "bg-[#fffdf2]" : "bg-white"}><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={seleccionadoReporte} disabled={!tieneEmailValido} onChange={(e) => actualizarSeleccionReporte(cliente.id, e.target.checked)} /></td><td className="border border-[#e1e6dc] p-1"><span className="block min-w-32 px-1 font-semibold">JardinerosYa</span></td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.email, (valor) => actualizarCliente(cliente.id, { email: valor }), "min-w-48")}{!tieneEmailValido && <p className="px-1 text-[10px] font-black text-[#743c3c]">Sin email cargado</p>}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.telefono, (valor) => actualizarCliente(cliente.id, { telefono: valor }), "min-w-36")}</td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className="border border-[#e1e6dc] p-1 text-center"><input type="radio" name="clienteActivo" checked={cliente.id === datosHub.clienteActivoId} onChange={() => actualizarDatosHub({ clienteActivoId: cliente.id })} /></td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => actualizarDatosHub({ clientesIngresos: datosHub.clientesIngresos.filter((fila) => fila.id !== cliente.id) })} className="font-black text-[#743c3c]">×</button></td></tr>; })}</tbody></table></div><button onClick={() => actualizarDatosHub({ clientesIngresos: [...datosHub.clientesIngresos, { ...clienteIngresoInicial(""), id: crearId() }] })} className="mt-2 h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Agregar cliente</button>
             </section>
 
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
@@ -1823,7 +1902,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                 <p className="text-xs font-bold text-[#66745c]">La imagen generada usa exactamente este formato de factura / presupuesto / reporte.</p>
                 <p className={`mt-1 text-xs font-black ${estadoEnvio === "error" ? "text-[#743c3c]" : estadoEnvio === "enviado" ? "text-[#2f6d32]" : "text-[#66745c]"}`}>{mensajeEnvio}</p>
               </div>
-              <div className="flex flex-wrap gap-2"><button onClick={() => copiarTexto(reporteTexto, "Reporte")} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar reporte</button><button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar imagen del reporte</button><button onClick={enviarReporteClienteSeleccionado} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar reporte al cliente seleccionado</button></div>
+              <div className="flex flex-wrap gap-2"><button onClick={() => copiarTexto(reporteTexto, "Reporte")} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar reporte</button><button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar imagen del reporte</button><button onClick={enviarReporteASeleccionados} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar reporte a seleccionados</button></div>
             </div>
 
             <article ref={reporteVisualRef} className="w-full max-w-[760px] border border-[#6f7968] bg-white p-0 font-sans text-[#182018] shadow-none">
