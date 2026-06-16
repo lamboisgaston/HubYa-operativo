@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { EQUIPOS_ACTIVOS_STORAGE_KEY, ESTADOS_EQUIPO_ACTIVO, ESTADOS_INTEGRANTE, ROLES_INTEGRANTE, SOLICITUDES_OFERTA_STORAGE_KEY, TIPOS_EQUIPO_ACTIVO, createEquipoActivo, equiposActivosIniciales, slugEquipo, type ConsultaEquipoActivo, type EquipoActivo, type IntegranteEquipoActivo, type MensajeEquipoActivo, type SolicitudOferta } from "@/lib/data/equiposActivos";
 
 type CampoNumerico = number | "";
 
@@ -589,7 +590,7 @@ export default function Home() {
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
   const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
-  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar" | "consultas">("reporte");
+  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar" | "consultas" | "equipos">("reporte");
   const [hubInformacion, setHubInformacion] = useState<HubDisponible | "">("");
   const [asuntoInformacion, setAsuntoInformacion] = useState("");
   const [mensajeInformacion, setMensajeInformacion] = useState("");
@@ -610,6 +611,12 @@ export default function Home() {
   const [clientesConsultaSeleccionados, setClientesConsultaSeleccionados] = useState<number[]>([]);
   const [consultaActivaId, setConsultaActivaId] = useState("");
   const [pasoConsulta, setPasoConsulta] = useState<"seleccionar" | "crear" | "enviar" | "resultados">("seleccionar");
+
+  const [equiposActivos, setEquiposActivos] = useState<EquipoActivo[]>(equiposActivosIniciales);
+  const [equipoActivoId, setEquipoActivoId] = useState(equiposActivosIniciales[0]?.id || "");
+  const [solicitudesOferta, setSolicitudesOferta] = useState<SolicitudOferta[]>([]);
+  const [mensajeEquipo, setMensajeEquipo] = useState({ asunto: "", mensaje: "" });
+  const [preguntaEquipo, setPreguntaEquipo] = useState("¿Estás disponible para trabajar la próxima semana?");
   const reporteVisualRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -618,6 +625,8 @@ export default function Home() {
     setContactosSinHub(leerContactosSinHub());
     setContactosImportados(leerContactosTrabajo());
     setAuxiliares(leerAuxiliares());
+    try { setEquiposActivos(JSON.parse(localStorage.getItem(EQUIPOS_ACTIVOS_STORAGE_KEY) || "null") || equiposActivosIniciales); } catch { setEquiposActivos(equiposActivosIniciales); }
+    try { setSolicitudesOferta(JSON.parse(localStorage.getItem(SOLICITUDES_OFERTA_STORAGE_KEY) || "[]")); } catch { setSolicitudesOferta([]); }
     const consultasGuardadas = leerConsultasHub();
     setConsultasHub(consultasGuardadas);
     setConsultaActivaId("");
@@ -662,6 +671,16 @@ export default function Home() {
 
   useEffect(() => {
     if (!isMounted) return;
+    localStorage.setItem(EQUIPOS_ACTIVOS_STORAGE_KEY, JSON.stringify(equiposActivos));
+  }, [equiposActivos, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    localStorage.setItem(SOLICITUDES_OFERTA_STORAGE_KEY, JSON.stringify(solicitudesOferta));
+  }, [solicitudesOferta, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted) return;
     const sincronizarConsultas = () => {
       const locales = leerConsultasHub();
       setConsultasHub(locales);
@@ -692,6 +711,8 @@ export default function Home() {
     setClientesConsultaSeleccionados(jornada.datosPorHub[hubConsulta].clientesIngresos.filter((cliente) => cliente.email.trim()).map((cliente) => cliente.id));
   }, [hubConsulta, isMounted, jornada.datosPorHub]);
 
+  const equipoVinculadoAlHub = equiposActivos.find((equipo) => equipo.hubsDemandaVinculados.includes(jornada.hub));
+  const equipoActivo = equiposActivos.find((equipo) => equipo.id === equipoActivoId) || equiposActivos[0];
   const datosHub = jornada.datosPorHub[jornada.hub];
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
   const fechaFormateada = formatoFecha(jornada.fecha);
@@ -824,6 +845,7 @@ export default function Home() {
     "HubYa — Reporte administrativo del Hub",
     `Sistema: JardinerosYa / servicio de jardinería`,
     `Hub: ${jornada.hub}`,
+    `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
     `Fecha: ${fechaFormateada}`,
     `Cliente seleccionado: ${clienteActivo?.nombre || "Sin cliente seleccionado"}`,
     "",
@@ -846,7 +868,7 @@ export default function Home() {
     "",
     "SOBRE HUBYA",
     ...sobreHubYaLineas,
-  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
+  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre]);
 
   const asuntoReporte = `Reporte diario HubYa — ${jornada.hub} — ${fechaFormateada}`;
 
@@ -881,7 +903,8 @@ export default function Home() {
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <tbody>
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Cliente seleccionado</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(clienteActivoReporte?.nombre || "Sin cliente seleccionado")}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Hub</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(jornada.hub)}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Hub de demanda</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(jornada.hub)}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Equipo activo vinculado</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(equipoVinculadoAlHub?.nombre || "Sin equipo vinculado")}</td></tr>
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Fecha</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(fechaFormateada)}</td></tr>
             <tr><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;font-weight:900;text-transform:uppercase;">Importe correspondiente a su espacio verde</td><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;color:#1f2a1d;font-size:18px;font-weight:900;">${escaparHtml(formatoPlano(clienteActivoReporte?.importe) || formatoMoneda(0))}</td></tr>
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Estado operativo</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(datosHub.resumen.estadoOperativo || "Sin cargar")}</td></tr>
@@ -913,7 +936,7 @@ export default function Home() {
           ${sobreHubYaHtml}
         </section>
       </div>
-    </article>`, [clienteActivoReporte?.importe, clienteActivoReporte?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
+    </article>`, [clienteActivoReporte?.importe, clienteActivoReporte?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre]);
 
 
   async function enviarReporteClienteSeleccionado() {
@@ -1250,6 +1273,49 @@ export default function Home() {
   }
 
   const conteoSinHub = contactosSinHub.length;
+  function actualizarEquipoActivo(id: string, cambios: Partial<EquipoActivo>) {
+    setEquiposActivos((actuales) => actuales.map((equipo) => equipo.id === id ? { ...equipo, ...cambios, slug: cambios.nombre ? slugEquipo(cambios.nombre) : equipo.slug } : equipo));
+  }
+
+  function crearEquipoDesdePanel() {
+    const nuevo = createEquipoActivo({ nombre: `Equipo en formación ${equiposActivos.length + 1}` });
+    setEquiposActivos((actuales) => [nuevo, ...actuales]);
+    setEquipoActivoId(nuevo.id);
+  }
+
+  function agregarIntegranteEquipo() {
+    if (!equipoActivo) return;
+    const nuevo: IntegranteEquipoActivo = { id: `integrante-${Date.now()}`, nombre: "Nuevo integrante", rol: "operario", email: "", whatsapp: "", estado: "en evaluación", observacion: "" };
+    actualizarEquipoActivo(equipoActivo.id, { integrantes: [nuevo, ...equipoActivo.integrantes] });
+  }
+
+  function actualizarIntegranteEquipo(integranteId: string, cambios: Partial<IntegranteEquipoActivo>) {
+    if (!equipoActivo) return;
+    actualizarEquipoActivo(equipoActivo.id, { integrantes: equipoActivo.integrantes.map((integrante) => integrante.id === integranteId ? { ...integrante, ...cambios } : integrante) });
+  }
+
+  function enviarMensajeEquipo() {
+    if (!equipoActivo || !mensajeEquipo.mensaje.trim()) return setMensajeGuardado("Escribí un mensaje para el equipo activo.");
+    const mensaje: MensajeEquipoActivo = { id: `mensaje-equipo-${Date.now()}`, asunto: mensajeEquipo.asunto || `Mensaje HubYa — ${equipoActivo.nombre}`, mensaje: mensajeEquipo.mensaje, fecha: new Date().toISOString(), destinatarios: equipoActivo.integrantes.map((integrante) => integrante.id), canal: "whatsapp preparado" };
+    actualizarEquipoActivo(equipoActivo.id, { mensajesEnviados: [mensaje, ...equipoActivo.mensajesEnviados] });
+    setMensajeGuardado(`Mensaje preparado individualmente para ${equipoActivo.integrantes.length} integrantes de ${equipoActivo.nombre}.`);
+  }
+
+  function crearConsultaEquipo() {
+    if (!equipoActivo || !preguntaEquipo.trim()) return;
+    const consulta: ConsultaEquipoActivo = { id: `consulta-equipo-${Date.now()}`, pregunta: preguntaEquipo, opciones: ["Sí", "No", "Puede ser"], fecha: new Date().toISOString(), respuestas: [] };
+    actualizarEquipoActivo(equipoActivo.id, { consultasEnviadas: [consulta, ...equipoActivo.consultasEnviadas] });
+    setMensajeGuardado(`Consulta al equipo creada para ${equipoActivo.nombre}.`);
+  }
+
+  function aprobarSolicitudOferta(id: string) {
+    const solicitud = solicitudesOferta.find((item) => item.id === id);
+    if (!solicitud) return;
+    setSolicitudesOferta((actuales) => actuales.map((item) => item.id === id ? { ...item, estado: "aprobada" } : item));
+    const equipo = equiposActivos.find((item) => item.nombre === solicitud.equipoInteres) || equipoActivo;
+    if (equipo) actualizarEquipoActivo(equipo.id, { integrantes: [{ id: `integrante-${Date.now()}`, nombre: solicitud.nombre, rol: "operario", email: solicitud.email, whatsapp: solicitud.whatsapp, estado: "en evaluación", observacion: `${solicitud.rubroInteres} · ${solicitud.experiencia}` }, ...equipo.integrantes] });
+  }
+
   const inputNumero = (valor: CampoNumerico, onChange: (valor: CampoNumerico) => void) => <input type="number" step="0.25" value={valor} onChange={(e) => onChange(normalizarNumero(e.target.value))} className="h-7 w-28 bg-transparent px-1 text-right outline-none" />;
   const inputTexto = (valor: string, onChange: (valor: string) => void, ancho = "min-w-40") => <input value={valor} onChange={(e) => onChange(e.target.value)} className={`h-7 ${ancho} bg-transparent px-1 outline-none`} />;
 
@@ -1282,14 +1348,42 @@ export default function Home() {
             <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Fecha<input type="date" value={jornada.fecha} onChange={(e) => actualizarJornada({ fecha: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nombre del resumen<input value={jornada.nombreResumen} onChange={(e) => actualizarJornada({ nombreResumen: e.target.value })} placeholder={nombreResumenActual()} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label>
             <div className="flex flex-wrap gap-1.5 xl:justify-end"><button onClick={cambiarHub} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cambiar Hub</button><button onClick={guardarJornada} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar</button><button onClick={cargarJornada} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cargar</button><button onClick={limpiarJornada} className="h-8 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-3 text-xs font-black text-[#743c3c]">Limpiar</button></div>
           </div>
-          <p className="mt-1 text-[11px] font-semibold text-[#66745c]">{mensajeGuardado} · Carga principal editable con sumas y distribución automáticas.</p>
+          <p className="mt-1 text-[11px] font-semibold text-[#66745c]">{mensajeGuardado} · Carga principal editable con sumas y distribución automáticas. · Equipo activo vinculado: <span className="font-black text-[#1f2a1d]">{equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}</span></p>
           <div className="mt-3 flex flex-wrap gap-2 border-t border-[#d8dfd1] pt-3">
             <button onClick={() => setSeccionActiva("reporte")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "reporte" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Reporte diario</button>
             <button onClick={() => setSeccionActiva("informacion")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "informacion" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Envío por WhatsApp</button>
             <button onClick={() => setSeccionActiva("importar")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "importar" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Importar contactos</button>
-            <a href="/operativo/solicitudes" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Solicitudes de ingreso</a><button onClick={() => setSeccionActiva("consultas")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "consultas" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Consultas del Hub</button><a href="/web-publica" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Web pública</a>
+            <a href="/operativo/solicitudes" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Solicitudes de ingreso</a><button onClick={() => setSeccionActiva("consultas")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "consultas" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Consultas del Hub</button><a href="/web-publica" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Web pública</a><button onClick={() => setSeccionActiva("equipos")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "equipos" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Equipos activos</button>
           </div>
         </header>
+
+        {seccionActiva === "equipos" && equipoActivo && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">OFERTA · Equipo activo</p><h2 className="text-lg font-black">Equipos activos</h2><p className="text-xs font-semibold text-[#66745c]">Hubs de oferta separados de la demanda: integrantes, consultas al equipo, mensajes al equipo y vínculo con Hubs de demanda.</p></div>
+            <button onClick={crearEquipoDesdePanel} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Crear equipo activo</button>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[280px_1fr]">
+            <aside className="space-y-2 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3">
+              {equiposActivos.map((equipo) => <button key={equipo.id} onClick={() => setEquipoActivoId(equipo.id)} className={`w-full rounded-lg border p-3 text-left text-xs ${equipoActivo.id === equipo.id ? "border-[#1f2a1d] bg-white" : "border-[#cfd8c6] bg-[#fbfcf9]"}`}><span className="block font-black">{equipo.nombre}</span><span className="block font-bold text-[#66745c]">{equipo.estado} · {equipo.tipo}</span><span className="block font-bold text-[#66745c]">{equipo.integrantes.length} integrantes · {equipo.hubsDemandaVinculados.length} Hubs vinculados</span></button>)}
+            </aside>
+            <div className="space-y-3">
+              <div className="grid gap-2 rounded-xl border border-[#d8dfd1] bg-white p-3 md:grid-cols-4">
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nombre<input value={equipoActivo.nombre} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { nombre: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Estado<select value={equipoActivo.estado} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { estado: e.target.value as EquipoActivo["estado"] })} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm normal-case">{ESTADOS_EQUIPO_ACTIVO.map((estado) => <option key={estado} value={estado}>{estado}</option>)}</select></label>
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Tipo<select value={equipoActivo.tipo} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { tipo: e.target.value as EquipoActivo["tipo"] })} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm normal-case">{TIPOS_EQUIPO_ACTIVO.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}</select></label>
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Responsable<input value={equipoActivo.responsable} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { responsable: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] md:col-span-2">Zona base<input value={equipoActivo.zonaBase} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { zonaBase: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] md:col-span-2">Observaciones<input value={equipoActivo.observaciones} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { observaciones: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] md:col-span-4">Descripción<textarea value={equipoActivo.descripcion} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { descripcion: e.target.value })} className="min-h-16 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case" /></label>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3"><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Integrantes</p><p className="text-2xl font-black">{equipoActivo.integrantes.length}</p></div><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Mensajes enviados</p><p className="text-2xl font-black">{equipoActivo.mensajesEnviados.length}</p></div><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Consultas al equipo</p><p className="text-2xl font-black">{equipoActivo.consultasEnviadas.length}</p></div></div>
+              <div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Hubs de demanda vinculados</h3><div className="mt-2 flex flex-wrap gap-2">{HUBS_DISPONIBLES.map((hub) => <label key={`vinculo-${hub}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-2 py-1 text-xs font-bold"><input type="checkbox" checked={equipoActivo.hubsDemandaVinculados.includes(hub)} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { hubsDemandaVinculados: e.target.checked ? [...equipoActivo.hubsDemandaVinculados, hub] : equipoActivo.hubsDemandaVinculados.filter((item) => item !== hub) })} className="mr-1" />{hub}</label>)}</div></div>
+              <div className="rounded-xl border border-[#d8dfd1] p-3"><div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-black">Integrantes</h3><button onClick={agregarIntegranteEquipo} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-xs font-black text-white">Agregar integrante</button></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Nombre</th><th className="border p-2">Rol</th><th className="border p-2">Email</th><th className="border p-2">WhatsApp</th><th className="border p-2">Estado</th><th className="border p-2">Observación</th><th className="border p-2"></th></tr></thead><tbody>{equipoActivo.integrantes.map((integrante) => <tr key={integrante.id}><td className="border p-1"><input value={integrante.nombre} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { nombre: e.target.value })} className="h-7 min-w-40 bg-transparent px-1" /></td><td className="border p-1"><select value={integrante.rol} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { rol: e.target.value as IntegranteEquipoActivo["rol"] })} className="h-7 bg-transparent">{ROLES_INTEGRANTE.map((rol) => <option key={rol} value={rol}>{rol}</option>)}</select></td><td className="border p-1"><input value={integrante.email} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { email: e.target.value })} className="h-7 min-w-44 bg-transparent px-1" /></td><td className="border p-1"><input value={integrante.whatsapp} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { whatsapp: e.target.value })} className="h-7 min-w-32 bg-transparent px-1" /></td><td className="border p-1"><select value={integrante.estado} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { estado: e.target.value as IntegranteEquipoActivo["estado"] })} className="h-7 bg-transparent">{ESTADOS_INTEGRANTE.map((estado) => <option key={estado} value={estado}>{estado}</option>)}</select></td><td className="border p-1"><input value={integrante.observacion} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { observacion: e.target.value })} className="h-7 min-w-44 bg-transparent px-1" /></td><td className="border p-1"><button onClick={() => actualizarEquipoActivo(equipoActivo.id, { integrantes: equipoActivo.integrantes.filter((item) => item.id !== integrante.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div></div>
+              <div className="grid gap-3 lg:grid-cols-2"><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Enviar mensaje al equipo</h3><p className="text-xs font-semibold text-[#66745c]">Se prepara individualmente para no exponer datos de otros integrantes.</p><input value={mensajeEquipo.asunto} onChange={(e) => setMensajeEquipo((actual) => ({ ...actual, asunto: e.target.value }))} placeholder="Asunto" className="mt-2 h-8 w-full rounded-lg border border-[#cfd8c6] px-2 text-sm"/><textarea value={mensajeEquipo.mensaje} onChange={(e) => setMensajeEquipo((actual) => ({ ...actual, mensaje: e.target.value }))} placeholder="Mensaje" className="mt-2 min-h-20 w-full rounded-lg border border-[#cfd8c6] p-2 text-sm"/><button onClick={enviarMensajeEquipo} className="mt-2 h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Preparar envío</button></div><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Crear consulta al equipo</h3><input value={preguntaEquipo} onChange={(e) => setPreguntaEquipo(e.target.value)} className="mt-2 h-8 w-full rounded-lg border border-[#cfd8c6] px-2 text-sm"/><button onClick={crearConsultaEquipo} className="mt-2 h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Crear consulta</button><div className="mt-3 space-y-2">{equipoActivo.consultasEnviadas.map((consulta) => <div key={consulta.id} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs"><p className="font-black">{consulta.pregunta}</p><p>Sí: {consulta.respuestas.filter((r) => r.opcion === "Sí").length} · No: {consulta.respuestas.filter((r) => r.opcion === "No").length} · Puede ser: {consulta.respuestas.filter((r) => r.opcion === "Puede ser").length} · Sin responder: {Math.max(equipoActivo.integrantes.length - consulta.respuestas.length, 0)} · Total integrantes: {equipoActivo.integrantes.length}</p></div>)}</div></div></div>
+              <div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Solicitudes de oferta</h3><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Nombre</th><th className="border p-2">WhatsApp</th><th className="border p-2">Email</th><th className="border p-2">Rubro</th><th className="border p-2">Equipo solicitado</th><th className="border p-2">Estado</th><th className="border p-2">Fecha</th><th className="border p-2">Acciones</th></tr></thead><tbody>{solicitudesOferta.length === 0 ? <tr><td colSpan={8} className="border p-4 text-center font-bold text-[#66745c]">Sin solicitudes de ingreso al equipo.</td></tr> : solicitudesOferta.map((solicitud) => <tr key={solicitud.id}><td className="border p-2 font-semibold">{solicitud.nombre}</td><td className="border p-2">{solicitud.whatsapp}</td><td className="border p-2">{solicitud.email}</td><td className="border p-2">{solicitud.rubroInteres}</td><td className="border p-2">{solicitud.equipoInteres}</td><td className="border p-2 font-black">{solicitud.estado}</td><td className="border p-2">{formatoFecha(solicitud.fecha.slice(0, 10))}</td><td className="border p-2"><button onClick={() => aprobarSolicitudOferta(solicitud.id)} className="mr-2 font-black text-[#2f6d32]">Aprobar/convertir</button><button onClick={() => setSolicitudesOferta((actuales) => actuales.map((item) => item.id === solicitud.id ? { ...item, estado: "rechazada" } : item))} className="font-black text-[#743c3c]">Rechazar</button></td></tr>)}</tbody></table></div></div>
+            </div>
+          </div>
+        </section>}
 
         {seccionActiva === "informacion" && <section className="mb-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
