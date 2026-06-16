@@ -24,9 +24,8 @@ const servicioBasePorHub = [
 const seedServicios: HubServicio[] = seedHubs.flatMap((hub) => servicioBasePorHub.map((servicio, index) => ({ id: `servicio-${hub.slug}-${index + 1}`, hub_id: hub.id, nombre_servicio: servicio.nombre, descripcion: servicio.descripcion, activo: true })));
 const seedVinculosPorServicio: Record<string, Array<{ oferta_nombre: string; estado: EstadoHubServicioVinculo; responsable: string; observaciones: string }>> = {
   "servicio-prado-1": [
-    { oferta_nombre: "Cristian / El Prado", estado: "ACTIVO", responsable: "Cristian", observaciones: "Resolutor actual del mantenimiento del Hub Prado." },
+    { oferta_nombre: "Cristian El Prado", estado: "ACTIVO", responsable: "Cristian", observaciones: "Resolutor actual del mantenimiento del Hub Prado." },
     { oferta_nombre: "JardinerosYa02", estado: "POSTULANTE", responsable: "JardinerosYa02", observaciones: "Disponible para tomar demanda incremental." },
-    { oferta_nombre: "Jardineros Norte", estado: "POSTULANTE", responsable: "Jardineros Norte", observaciones: "Interesado para cobertura zonal." },
   ],
   "servicio-prado-2": [
     { oferta_nombre: "FumigadoresYa01", estado: "ACTIVO", responsable: "FumigadoresYa01", observaciones: "Resuelve la demanda vigente de control de plagas." },
@@ -45,8 +44,17 @@ const seedHubServicioVinculos: HubServicioVinculo[] = seedServicios.flatMap((ser
 });
 export const MODELOS_SUGERIDOS = "Producción real: usar PostgreSQL con Prisma, Supabase, Neon o la base elegida. Modelos sugeridos: Hub, Cliente, hub_servicios y hub_servicio_vinculos. Regla: el vínculo pertenece siempre a una demanda/servicio dentro de un Hub, no a un Hub abstracto.";
 
+function mergeById<T extends { id: string }>(actuales: T[] | undefined, semillas: T[]): T[] {
+  const idsActuales = new Set((actuales || []).map((item) => item.id));
+  return [...(actuales || []), ...semillas.filter((semilla) => !idsActuales.has(semilla.id))];
+}
+
 function normalizeStore(store: Partial<Store>): Store {
-  return { hubs: store.hubs || seedHubs, clientes: store.clientes || seedClientes, solicitudes: store.solicitudes || [], hub_servicios: store.hub_servicios || seedServicios, hub_servicio_vinculos: store.hub_servicio_vinculos || seedHubServicioVinculos };
+  const hubs = mergeById(store.hubs, seedHubs);
+  const hub_servicios = mergeById(store.hub_servicios, seedServicios);
+  const hub_servicio_vinculos = mergeById(store.hub_servicio_vinculos, seedHubServicioVinculos);
+
+  return { hubs, clientes: store.clientes || seedClientes, solicitudes: store.solicitudes || [], hub_servicios, hub_servicio_vinculos };
 }
 async function readStore(): Promise<Store> { try { return normalizeStore(JSON.parse(await readFile(DATA_FILE, "utf8"))); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; const store = normalizeStore({}); await writeStore(store); return store; } }
 async function writeStore(store: Store) { await mkdir(path.dirname(DATA_FILE), { recursive: true }); await writeFile(DATA_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf8"); }

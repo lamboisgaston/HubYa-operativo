@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { HubCard } from "@/components/public/HubCard";
 import { PublicFooter } from "@/components/public/PublicFooter";
 import { PublicHeader } from "@/components/public/PublicHeader";
