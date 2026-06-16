@@ -1,3 +1,4 @@
+import { mensajeErrorResend, obtenerRemitenteResend, obtenerReplyToResend } from "@/lib/email/resend";
 import { getPublicStore, updatePublicStore, type Cliente } from "./hubs";
 
 export type EstadoSolicitudHub = "pendiente" | "aprobada" | "rechazada";
@@ -98,17 +99,18 @@ async function enviarMailSolicitud(solicitud: SolicitudHub, decision: DecisionSo
   if (!email) return { enviado: false, error: ADVERTENCIA_SIN_EMAIL, advertencia: ADVERTENCIA_SIN_EMAIL };
 
   const resendApiKey = process.env.RESEND_API_KEY;
-  const mailFrom = process.env.MAIL_FROM;
-  if (!resendApiKey || !mailFrom) return { enviado: false, error: ADVERTENCIA_CONFIG_EMAIL, advertencia: ADVERTENCIA_CONFIG_EMAIL };
+  const mailFrom = obtenerRemitenteResend();
+  const replyTo = obtenerReplyToResend();
+  if (!resendApiKey) return { enviado: false, error: ADVERTENCIA_CONFIG_EMAIL, advertencia: ADVERTENCIA_CONFIG_EMAIL };
 
   const mail = contenidoMail(solicitud, decision, mensajeOpcional);
   const respuesta = await fetch(RESEND_API_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: mailFrom, to: [email], subject: mail.subject, html: mail.html, text: mail.text }),
+    body: JSON.stringify({ from: mailFrom, reply_to: replyTo, to: [email], subject: mail.subject, html: mail.html, text: mail.text }),
   });
   const data = await respuesta.json().catch(() => null);
-  if (!respuesta.ok) return { enviado: false, error: typeof data?.message === "string" ? data.message : "Resend rechazó el envío." };
+  if (!respuesta.ok) return { enviado: false, error: mensajeErrorResend(data) };
   return { enviado: true, error: undefined };
 }
 
