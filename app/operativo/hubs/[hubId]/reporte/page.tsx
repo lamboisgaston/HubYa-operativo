@@ -12,7 +12,7 @@ export default async function ReportePage({ params }: { params: Promise<{ hubId:
     <main className="min-h-screen bg-[#f6f7f2] px-4 py-6 text-[#1f2a1d]">
       <div className="mx-auto grid max-w-7xl gap-5">
         <HubNav hub={hub} active="reporte" />
-        <OperativoLegacy initialSection="reporte" initialHubName={hub.nombre} initialClientes={clientes} />
+        <OperativoLegacy initialSection="reporte" initialHubName={hub.nombre} initialClientes={clientes} simpleMode />
       </div>
     </main>
   );
