@@ -1,3 +1,5 @@
+import { mensajeErrorResend, obtenerRemitenteResend, obtenerReplyToResend } from "@/lib/email/resend";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 type DestinatarioConsulta = {
@@ -41,10 +43,10 @@ function armarTexto(nombre: string, hub: string, pregunta: string, links: Record
 
 export async function POST(request: Request) {
   const resendApiKey = process.env.RESEND_API_KEY;
-  const mailFrom = process.env.MAIL_FROM;
+  const mailFrom = obtenerRemitenteResend();
+  const replyTo = obtenerReplyToResend();
 
   if (!resendApiKey) return Response.json({ error: "Falta configurar RESEND_API_KEY." }, { status: 500 });
-  if (!mailFrom) return Response.json({ error: "Falta configurar MAIL_FROM." }, { status: 500 });
 
   let payload: EnviarConsultaPayload;
   try {
@@ -68,10 +70,10 @@ export async function POST(request: Request) {
     const respuesta = await fetch(RESEND_API_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: mailFrom, to: [email], subject: `Consulta HubYa — ${hub}`, html: armarHtml(nombre, hub, pregunta, links), text: armarTexto(nombre, hub, pregunta, links) }),
+      body: JSON.stringify({ from: mailFrom, reply_to: replyTo, to: [email], subject: `Consulta HubYa — ${hub}`, html: armarHtml(nombre, hub, pregunta, links), text: armarTexto(nombre, hub, pregunta, links) }),
     });
     const data = await respuesta.json().catch(() => null);
-    resultados.push({ email, ok: respuesta.ok, id: data?.id ?? null, error: respuesta.ok ? null : (typeof data?.message === "string" ? data.message : "Resend rechazó el envío.") });
+    resultados.push({ email, ok: respuesta.ok, id: data?.id ?? null, error: respuesta.ok ? null : mensajeErrorResend(data) });
   }
 
   const errores = resultados.filter((resultado) => !resultado.ok);

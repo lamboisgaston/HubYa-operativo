@@ -1,3 +1,5 @@
+import { mensajeErrorResend, obtenerRemitenteResend, obtenerReplyToResend } from "@/lib/email/resend";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 type EnviarReportePayload = {
@@ -32,14 +34,11 @@ function armarHtml(cuerpoMail: string, reporteHtml: string, reporteTexto: string
 
 export async function POST(request: Request) {
   const resendApiKey = process.env.RESEND_API_KEY;
-  const mailFrom = process.env.MAIL_FROM;
+  const mailFrom = obtenerRemitenteResend();
+  const replyTo = obtenerReplyToResend();
 
   if (!resendApiKey) {
     return Response.json({ error: "Falta configurar RESEND_API_KEY." }, { status: 500 });
-  }
-
-  if (!mailFrom) {
-    return Response.json({ error: "Falta configurar MAIL_FROM." }, { status: 500 });
   }
 
   let payload: EnviarReportePayload;
@@ -74,6 +73,7 @@ export async function POST(request: Request) {
     },
     body: JSON.stringify({
       from: mailFrom,
+      reply_to: replyTo,
       to: [emailDestino],
       subject: asunto,
       html: armarHtml(cuerpoMail, reporteHtml, reporteTexto),
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   const data = await respuesta.json().catch(() => null);
 
   if (!respuesta.ok) {
-    const error = typeof data?.message === "string" ? data.message : "Resend rechazó el envío.";
+    const error = mensajeErrorResend(data);
     return Response.json({ error }, { status: respuesta.status });
   }
 
