@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EQUIPOS_ACTIVOS_STORAGE_KEY, ESTADOS_EQUIPO_ACTIVO, ESTADOS_INTEGRANTE, ROLES_INTEGRANTE, SOLICITUDES_OFERTA_STORAGE_KEY, TIPOS_EQUIPO_ACTIVO, createEquipoActivo, equiposActivosIniciales, slugEquipo, type ConsultaEquipoActivo, type EquipoActivo, type IntegranteEquipoActivo, type MensajeEquipoActivo, type SolicitudOferta } from "@/lib/data/equiposActivos";
 import { SOLICITUDES_NUEVO_HUB_STORAGE_KEY, type SolicitudNuevoHub } from "@/components/public/RequestHubForm";
 import { ESTADOS_HUB_VINCULO, HUB_VINCULOS_STORAGE_KEY, type EstadoHubVinculo, type HubVinculo } from "@/lib/data/hubVinculosTypes";
-import type { HubPublico } from "@/lib/data/hubs";
+import type { Cliente, HubPublico } from "@/lib/data/hubs";
 
 type CampoNumerico = number | "";
 
@@ -226,6 +226,27 @@ function clienteIngresoInicial(nombre: string, index = 0, baseId = 1000): FilaCl
     trabajoRealizado: trabajoRealizadoInicial,
     trabajoPendiente: trabajoPendienteInicial,
   };
+}
+
+
+function clientePublicoAIngreso(cliente: Cliente, index = 0): FilaClienteIngreso {
+  return {
+    id: idNumericoEstable(cliente.id || `${cliente.nombre}-${index}`),
+    origen: "HubYa",
+    nombre: cliente.nombre || `Cliente ${index + 1}`,
+    referencia: cliente.referencia || "Cliente real del Hub",
+    email: cliente.email || "",
+    telefono: cliente.whatsapp || "",
+    importe: 0,
+    trabajoRealizado: trabajoRealizadoInicial,
+    trabajoPendiente: trabajoPendienteInicial,
+  };
+}
+
+function aplicarClientesIniciales(datos: DatosHub, clientesIniciales: Cliente[] | undefined): DatosHub {
+  if (!clientesIniciales?.length || datos.clientesIngresos.length > 0) return datos;
+  const clientesIngresos = clientesIniciales.map(clientePublicoAIngreso);
+  return { ...datos, clientesIngresos, clienteActivoId: clientesIngresos[0]?.id || 0 };
 }
 
 function datosHubInicial(hub: HubDisponible): DatosHub {
@@ -620,9 +641,9 @@ function leerJornadaInicial(): JornadaOperativa {
   return { ...base, datosPorHub: aplicarClientesPorHub(base.datosPorHub, leerClientesPorHub()) };
 }
 
-export default function OperativoLegacy({ initialSection = "reporte", initialHubName }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string }) {
+export default function OperativoLegacy({ initialSection = "reporte", initialHubName, initialClientes = [] }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string; initialClientes?: Cliente[] }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [jornada, setJornada] = useState<JornadaOperativa>(() => initialHubName ? { ...jornadaInicial, hub: initialHubName, datosPorHub: { ...jornadaInicial.datosPorHub, [initialHubName]: datosHubInicial(initialHubName) } } : jornadaInicial);
+  const [jornada, setJornada] = useState<JornadaOperativa>(() => initialHubName ? { ...jornadaInicial, hub: initialHubName, datosPorHub: { ...jornadaInicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosHubInicial(initialHubName), initialClientes) } } : jornadaInicial);
   const [hubsCanonicos, setHubsCanonicos] = useState<HubPublico[]>([]);
   const [hubSeleccionado, setHubSeleccionado] = useState(Boolean(initialHubName));
   const [historialResumenes, setHistorialResumenes] = useState<HistorialResumenesPorHub>(historialVacio);
@@ -689,7 +710,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   }, [busquedaContactos, contactosImportados]);
 
   useEffect(() => {
-    setJornada((actual) => initialHubName ? { ...leerJornadaInicial(), hub: initialHubName, datosPorHub: { ...leerJornadaInicial().datosPorHub, [initialHubName]: actual.datosPorHub[initialHubName] || datosHubInicial(initialHubName) } } : leerJornadaInicial());
+    setJornada((actual) => {
+      if (!initialHubName) return leerJornadaInicial();
+      const inicial = leerJornadaInicial();
+      const datosActuales = actual.datosPorHub[initialHubName] || inicial.datosPorHub[initialHubName] || datosHubInicial(initialHubName);
+      return { ...inicial, hub: initialHubName, datosPorHub: { ...inicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosActuales, initialClientes) } };
+    });
     setHistorialResumenes(leerHistorialResumenes());
     setContactosSinHub(leerContactosSinHub());
     setContactosImportados(leerContactosTrabajo());
@@ -715,10 +741,14 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       if (!Array.isArray(hubs)) return;
       setHubsCanonicos(hubs);
       const nombres = fusionarNombresHubs(hubs);
-      setJornada((actual) => ({ ...actual, hub: initialHubName || actual.hub, datosPorHub: crearDatosParaHubs(actual.datosPorHub, initialHubName ? Array.from(new Set([...nombres, initialHubName])) : nombres) }));
+      setJornada((actual) => {
+        const datosPorHub = crearDatosParaHubs(actual.datosPorHub, initialHubName ? Array.from(new Set([...nombres, initialHubName])) : nombres);
+        if (initialHubName) datosPorHub[initialHubName] = aplicarClientesIniciales(datosPorHub[initialHubName], initialClientes);
+        return { ...actual, hub: initialHubName || actual.hub, datosPorHub };
+      });
     }).catch(() => undefined);
     setIsMounted(true);
-  }, [initialHubName]);
+  }, [initialHubName, initialClientes]);
 
   useEffect(() => {
     if (!isMounted) return;
