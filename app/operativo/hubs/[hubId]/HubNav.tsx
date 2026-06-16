@@ -3,7 +3,7 @@ import type { HubPublico } from "@/lib/data/hubs";
 
 const tabs = [
   ["Ficha", "ficha", "hub"],
-  ["Reporte diario", "reporte", "hub"],
+  ["Reportes del Hub", "reportes", "hub"],
   ["Contactos", "contactos", "global"],
   ["Vínculos", "vinculos", "hub"],
   ["Postulantes", "postulantes", "global"],
