@@ -229,8 +229,9 @@ function clienteIngresoInicial(nombre: string, index = 0, baseId = 1000): FilaCl
 }
 
 function datosHubInicial(hub: HubDisponible): DatosHub {
-  const hubIndex = HUBS_DISPONIBLES.indexOf(hub) + 1;
-  const clientesIngresos = clientesBasePorHub[hub].map((nombre, index) => clienteIngresoInicial(nombre, index, hubIndex * 1000));
+  const hubIndex = HUBS_DISPONIBLES.indexOf(hub) + 1 || idNumericoEstable(hub);
+  const clientesDelHub = clientesBasePorHub[hub] ?? [];
+  const clientesIngresos = clientesDelHub.map((nombre, index) => clienteIngresoInicial(nombre, index, hubIndex * 1000));
   return {
     clientesIngresos,
     gastos: ["Nafta", "Maquinaria", "JardinerosYa", "Tanza"].map((concepto, index) => ({ id: hubIndex * 10000 + index, concepto, importe: 0 })),
@@ -241,8 +242,8 @@ function datosHubInicial(hub: HubDisponible): DatosHub {
 }
 
 const datosInicialesPorHub = Object.fromEntries(HUBS_DISPONIBLES.map((hub) => [hub, datosHubInicial(hub)])) as DatosPorHub;
-function crearDatosParaHubs(datosPorHub: DatosPorHub, hubs: HubDisponible[]): DatosPorHub {
-  return Object.fromEntries(hubs.map((hub) => [hub, datosPorHub[hub] || datosHubInicial(hub)])) as DatosPorHub;
+function crearDatosParaHubs(datosPorHub: Partial<DatosPorHub> | undefined, hubs: HubDisponible[]): DatosPorHub {
+  return Object.fromEntries(hubs.map((hub) => [hub, normalizarDatosHub(datosPorHub?.[hub], hub)])) as DatosPorHub;
 }
 
 function nombresHubsCanonicos(hubs: HubPublico[]) {
@@ -306,11 +307,14 @@ function numero(valor: CampoNumerico | undefined) {
 
 function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partial<FilaActor> & { actor?: string; importe?: CampoNumerico })[] }) | undefined, hub: HubDisponible): DatosHub {
   const base = datosHubInicial(hub);
-  const clientesIngresos = (datos?.clientesIngresos || base.clientesIngresos).map(normalizarCliente);
+  const clientesFuente = Array.isArray(datos?.clientesIngresos) ? datos.clientesIngresos : base.clientesIngresos;
+  const gastosFuente = Array.isArray(datos?.gastos) ? datos.gastos : base.gastos;
+  const actoresFuente = Array.isArray(datos?.actores) ? datos.actores : Array.isArray(datos?.distribucion) ? datos.distribucion : base.actores;
+  const clientesIngresos = clientesFuente.map(normalizarCliente);
   return {
     clientesIngresos,
-    gastos: (datos?.gastos || base.gastos).map((gasto) => ({ id: gasto.id || crearId(), concepto: gasto.concepto || "", importe: gasto.importe ?? 0 })),
-    actores: (datos?.actores || datos?.distribucion || base.actores).map(normalizarActor),
+    gastos: gastosFuente.map((gasto) => ({ id: gasto.id || crearId(), concepto: gasto.concepto || "", importe: gasto.importe ?? 0 })),
+    actores: actoresFuente.map(normalizarActor),
     resumen: { ...resumenInicial(), ...datos?.resumen },
     clienteActivoId: clientesIngresos.some((cliente) => cliente.id === datos?.clienteActivoId) ? Number(datos?.clienteActivoId) : clientesIngresos[0]?.id || 0,
   };
@@ -508,9 +512,10 @@ function leerContactosSinHub() {
 function normalizarClientesPorHub(valor: unknown): Record<HubDisponible, FilaClienteIngreso[]> {
   const clientesPorHub = Object.fromEntries(HUBS_DISPONIBLES.map((hub) => [hub, []])) as unknown as Record<HubDisponible, FilaClienteIngreso[]>;
   if (!valor || typeof valor !== "object") return clientesPorHub;
-  const parcial = valor as Partial<Record<HubDisponible, Partial<FilaClienteIngreso>[]>>;
-  HUBS_DISPONIBLES.forEach((hub) => {
-    clientesPorHub[hub] = (parcial[hub] || []).map(normalizarCliente);
+  const parcial = valor as Partial<Record<HubDisponible, unknown>>;
+  Array.from(new Set([...HUBS_DISPONIBLES, ...Object.keys(parcial)])).forEach((hub) => {
+    const clientes = parcial[hub];
+    clientesPorHub[hub] = Array.isArray(clientes) ? clientes.map((cliente) => normalizarCliente(cliente as Partial<FilaClienteIngreso>)) : [];
   });
   return clientesPorHub;
 }
@@ -528,9 +533,11 @@ function leerClientesPorHub() {
 }
 
 function aplicarClientesPorHub(datosPorHub: DatosPorHub, clientesPorHub: Record<HubDisponible, FilaClienteIngreso[]>): DatosPorHub {
-  return Object.fromEntries(HUBS_DISPONIBLES.map((hub) => {
-    const clientesIngresos = clientesPorHub[hub] || [];
-    return [hub, { ...datosPorHub[hub], clientesIngresos, clienteActivoId: clientesIngresos[0]?.id || 0 }];
+  const hubs = Array.from(new Set([...HUBS_DISPONIBLES, ...Object.keys(datosPorHub), ...Object.keys(clientesPorHub)]));
+  return Object.fromEntries(hubs.map((hub) => {
+    const datos = normalizarDatosHub(datosPorHub[hub], hub);
+    const clientesIngresos = clientesPorHub[hub] ?? datos.clientesIngresos ?? [];
+    return [hub, { ...datos, clientesIngresos, clienteActivoId: clientesIngresos[0]?.id || 0 }];
   })) as DatosPorHub;
 }
 
@@ -587,8 +594,9 @@ async function guardarConsultaServidor(consulta: ConsultaHub) {
 }
 
 function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientesPorHub?: Record<string, unknown[]>; resumenesPorHub?: Record<string, Partial<ResumenHubManual>> }): JornadaOperativa {
-  const hub = HUBS_DISPONIBLES.includes(jornada.hub as HubDisponible) ? (jornada.hub as HubDisponible) : jornadaInicial.hub;
-  const datosPorHub = Object.fromEntries(HUBS_DISPONIBLES.map((hubDisponible) => [hubDisponible, normalizarDatosHub(jornada.datosPorHub?.[hubDisponible], hubDisponible)])) as DatosPorHub;
+  const hub = jornada.hub || jornadaInicial.hub;
+  const hubs = Array.from(new Set([...HUBS_DISPONIBLES, hub, ...Object.keys(jornada.datosPorHub || {})]));
+  const datosPorHub = Object.fromEntries(hubs.map((hubDisponible) => [hubDisponible, normalizarDatosHub(jornada.datosPorHub?.[hubDisponible], hubDisponible)])) as DatosPorHub;
   return { hub, fecha: jornada.fecha || jornadaInicial.fecha, nombreResumen: jornada.nombreResumen || "", datosPorHub };
 }
 
@@ -663,10 +671,10 @@ export default function Home() {
     setContactosSinHub(leerContactosSinHub());
     setContactosImportados(leerContactosTrabajo());
     setAuxiliares(leerAuxiliares());
-    try { setEquiposActivos(JSON.parse(localStorage.getItem(EQUIPOS_ACTIVOS_STORAGE_KEY) || "null") || equiposActivosIniciales); } catch { setEquiposActivos(equiposActivosIniciales); }
-    try { setSolicitudesOferta(JSON.parse(localStorage.getItem(SOLICITUDES_OFERTA_STORAGE_KEY) || "[]")); } catch { setSolicitudesOferta([]); }
-    try { setSolicitudesNuevoHub(JSON.parse(localStorage.getItem(SOLICITUDES_NUEVO_HUB_STORAGE_KEY) || "[]")); } catch { setSolicitudesNuevoHub([]); }
-    try { setHubVinculos(JSON.parse(localStorage.getItem(HUB_VINCULOS_STORAGE_KEY) || "null") || vinculosIniciales()); } catch { setHubVinculos(vinculosIniciales()); }
+    try { const guardados = JSON.parse(localStorage.getItem(EQUIPOS_ACTIVOS_STORAGE_KEY) || "null"); setEquiposActivos(Array.isArray(guardados) ? guardados : equiposActivosIniciales); } catch { setEquiposActivos(equiposActivosIniciales); }
+    try { const guardadas = JSON.parse(localStorage.getItem(SOLICITUDES_OFERTA_STORAGE_KEY) || "[]"); setSolicitudesOferta(Array.isArray(guardadas) ? guardadas : []); } catch { setSolicitudesOferta([]); }
+    try { const guardadas = JSON.parse(localStorage.getItem(SOLICITUDES_NUEVO_HUB_STORAGE_KEY) || "[]"); setSolicitudesNuevoHub(Array.isArray(guardadas) ? guardadas : []); } catch { setSolicitudesNuevoHub([]); }
+    try { const guardados = JSON.parse(localStorage.getItem(HUB_VINCULOS_STORAGE_KEY) || "null"); setHubVinculos(Array.isArray(guardados) ? guardados : vinculosIniciales()); } catch { setHubVinculos(vinculosIniciales()); }
     const consultasGuardadas = leerConsultasHub();
     setConsultasHub(consultasGuardadas);
     setConsultaActivaId("");
@@ -752,26 +760,29 @@ export default function Home() {
 
   useEffect(() => {
     if (!isMounted) return;
-    const actoresEquipo = Object.fromEntries(hubsOperativos.map((hub) => [hub, (jornada.datosPorHub[hub] || datosHubInicial(hub)).actores]));
+    const actoresEquipo = Object.fromEntries(hubsOperativos.map((hub) => [hub, normalizarDatosHub(jornada.datosPorHub[hub], hub).actores]));
     localStorage.setItem(ACTORES_EQUIPO_STORAGE_KEY, JSON.stringify(actoresEquipo));
   }, [jornada.datosPorHub, isMounted, hubsOperativos]);
 
   useEffect(() => {
     if (!isMounted) return;
-    const clientesPorHub = Object.fromEntries(hubsOperativos.map((hub) => [hub, (jornada.datosPorHub[hub] || datosHubInicial(hub)).clientesIngresos]));
+    const clientesPorHub = Object.fromEntries(hubsOperativos.map((hub) => [hub, normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos]));
     localStorage.setItem(CLIENTES_POR_HUB_STORAGE_KEY, JSON.stringify(clientesPorHub));
   }, [jornada.datosPorHub, isMounted, hubsOperativos]);
 
   useEffect(() => {
     if (!isMounted) return;
-    setClientesConsultaSeleccionados((jornada.datosPorHub[hubConsulta] || datosHubInicial(hubConsulta)).clientesIngresos.filter((cliente) => cliente.email.trim()).map((cliente) => cliente.id));
+    setClientesConsultaSeleccionados(normalizarDatosHub(jornada.datosPorHub[hubConsulta], hubConsulta).clientesIngresos.filter((cliente) => cliente.email.trim()).map((cliente) => cliente.id));
   }, [hubConsulta, isMounted, jornada.datosPorHub]);
 
+  const equipos = Array.isArray(equiposActivos) ? equiposActivos : [];
+  const vinculos = Array.isArray(hubVinculos) ? hubVinculos : [];
   const fichaHubActual = hubsCanonicos.find((hub) => hub.nombre === jornada.hub);
-  const equipoVinculadoAlHub = equiposActivos.find((equipo) => equipo.hubsDemandaVinculados.includes(jornada.hub));
-  const equipoActivo = equiposActivos.find((equipo) => equipo.id === equipoActivoId) || equiposActivos[0];
-  const integrantesDestinoMensaje = equipoActivo?.integrantes.filter((integrante) => integrantesMensajeSeleccionados.includes(integrante.id)) || [];
-  const datosHub = jornada.datosPorHub[jornada.hub] || datosHubInicial(jornada.hub);
+  const equipoVinculadoAlHub = equipos.find((equipo) => (equipo.hubsDemandaVinculados ?? []).includes(jornada.hub));
+  const equipoActivo = equipos.find((equipo) => equipo.id === equipoActivoId) || equipos[0];
+  const integrantesEquipoActivo = equipoActivo?.integrantes ?? [];
+  const integrantesDestinoMensaje = integrantesEquipoActivo.filter((integrante) => integrantesMensajeSeleccionados.includes(integrante.id));
+  const datosHub = normalizarDatosHub(jornada.datosPorHub[jornada.hub], jornada.hub);
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
   const fechaFormateada = formatoFecha(jornada.fecha);
   const totalFacturadoHub = datosHub.clientesIngresos.reduce((total, cliente) => total + numero(cliente.importe), 0);
@@ -793,7 +804,7 @@ export default function Home() {
   }
 
   function actualizarDatosHub(cambios: Partial<DatosHub>) {
-    setJornada((actual) => ({ ...actual, datosPorHub: { ...actual.datosPorHub, [actual.hub]: { ...actual.datosPorHub[actual.hub], ...cambios } } }));
+    setJornada((actual) => ({ ...actual, datosPorHub: { ...actual.datosPorHub, [actual.hub]: { ...normalizarDatosHub(actual.datosPorHub[actual.hub], actual.hub), ...cambios } } }));
   }
 
   function seleccionarHubTrabajo(hub: HubDisponible) {
@@ -836,7 +847,7 @@ export default function Home() {
     setHubInformacion(hub);
     setAsuntoInformacion((actual) => actual || `WhatsApp HubYa — ${hub}`);
     setMensajeInformacion((actual) => actual || `Hola, te compartimos información correspondiente al ${hub}.`);
-    setDestinatariosInformacion((jornada.datosPorHub[hub] || datosHubInicial(hub)).clientesIngresos.map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email, incluido: Boolean(cliente.telefono.trim()) })));
+    setDestinatariosInformacion(normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos.map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email, incluido: Boolean(cliente.telefono.trim()) })));
     setEstadoInformacion("idle");
     setMensajeEstadoInformacion("Seleccioná destinatarios, referencia interna y mensaje para enviar.");
   }
@@ -1207,8 +1218,9 @@ export default function Home() {
     const clavesClientes = new Set(clientes.map(claveCliente));
 
     setJornada((actual) => {
-      const datosPorHubActualizados = Object.fromEntries(HUBS_DISPONIBLES.map((hub) => {
-        const datos = actual.datosPorHub[hub];
+      const hubsContactos = Array.from(new Set([...hubsOperativos, ...Object.keys(actual.datosPorHub), ...clientesConHub.map((contacto) => contacto.hub).filter((hub): hub is HubDisponible => hub !== "Sin Hub asignado")]));
+      const datosPorHubActualizados = Object.fromEntries(hubsContactos.map((hub) => {
+        const datos = normalizarDatosHub(actual.datosPorHub[hub], hub);
         const clientesSinDuplicadosNiMovidos = datos.clientesIngresos.filter((cliente) => !clavesClientes.has(claveCliente(cliente)));
         const clientesDelHub = clientesConHub.filter((contacto) => contacto.hub === hub).map(clienteDesdeContacto);
         const actoresDelHub = actoresNuevos.filter((contacto) => contacto.hub === hub || (contacto.hub === "Sin Hub asignado" && hub === actual.hub)).map(actorDesdeContacto);
@@ -1229,7 +1241,7 @@ export default function Home() {
 
   const consultasDelHubSeleccionado = consultasHub.filter((consulta) => consulta.hub === hubConsulta).sort((a, b) => new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime());
   const consultaActiva = consultasHub.find((consulta) => consulta.id === consultaActivaId && consulta.hub === hubConsulta);
-  const clientesDisponiblesConsulta = (jornada.datosPorHub[hubConsulta] || datosHubInicial(hubConsulta)).clientesIngresos;
+  const clientesDisponiblesConsulta = normalizarDatosHub(jornada.datosPorHub[hubConsulta], hubConsulta).clientesIngresos;
   const respuestasPorCliente = new Map((consultaActiva?.respuestas || []).map((respuesta) => [respuesta.clienteId, respuesta]));
   const opcionesVisiblesConsulta = consultaActiva?.opciones || opcionesConsulta;
   const conteosConsulta = opcionesVisiblesConsulta.map((opcion) => ({ opcion, cantidad: (consultaActiva?.respuestas || []).filter((respuesta) => respuesta.opcion === opcion).length }));
@@ -1242,7 +1254,7 @@ export default function Home() {
   function seleccionarHubConsulta(hub: HubDisponible) {
     setHubConsulta(hub);
     setPreguntaConsulta(`¿Vas a seguir formando parte del ${hub} el próximo año?`);
-    setClientesConsultaSeleccionados((jornada.datosPorHub[hub] || datosHubInicial(hub)).clientesIngresos.filter((cliente) => cliente.email.trim()).map((cliente) => cliente.id));
+    setClientesConsultaSeleccionados(normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos.filter((cliente) => cliente.email.trim()).map((cliente) => cliente.id));
     setConsultaActivaId("");
     setPasoConsulta("seleccionar");
   }
@@ -1376,12 +1388,12 @@ export default function Home() {
   function agregarIntegranteEquipo() {
     if (!equipoActivo) return;
     const nuevo: IntegranteEquipoActivo = { id: `integrante-${Date.now()}`, nombre: "Nuevo integrante", rol: "operario", email: "", whatsapp: "", estado: "en evaluación", observacion: "" };
-    actualizarEquipoActivo(equipoActivo.id, { integrantes: [nuevo, ...equipoActivo.integrantes] });
+    actualizarEquipoActivo(equipoActivo.id, { integrantes: [nuevo, ...integrantesEquipoActivo] });
   }
 
   function actualizarIntegranteEquipo(integranteId: string, cambios: Partial<IntegranteEquipoActivo>) {
     if (!equipoActivo) return;
-    actualizarEquipoActivo(equipoActivo.id, { integrantes: equipoActivo.integrantes.map((integrante) => integrante.id === integranteId ? { ...integrante, ...cambios } : integrante) });
+    actualizarEquipoActivo(equipoActivo.id, { integrantes: integrantesEquipoActivo.map((integrante) => integrante.id === integranteId ? { ...integrante, ...cambios } : integrante) });
   }
 
   function enviarMensajeEquipo() {
@@ -1403,12 +1415,12 @@ export default function Home() {
     const solicitud = solicitudesOferta.find((item) => item.id === id);
     if (!solicitud) return;
     setSolicitudesOferta((actuales) => actuales.map((item) => item.id === id ? { ...item, estado: "aprobada" } : item));
-    const equipo = equiposActivos.find((item) => item.nombre === solicitud.equipoInteres) || equipoActivo;
-    if (equipo) actualizarEquipoActivo(equipo.id, { integrantes: [{ id: `integrante-${Date.now()}`, nombre: solicitud.nombre, rol: "operario", email: solicitud.email, whatsapp: solicitud.whatsapp, estado: "en evaluación", observacion: `${solicitud.rubroInteres} · ${solicitud.experiencia}` }, ...equipo.integrantes] });
+    const equipo = equipos.find((item) => item.nombre === solicitud.equipoInteres) || equipoActivo;
+    if (equipo) actualizarEquipoActivo(equipo.id, { integrantes: [{ id: `integrante-${Date.now()}`, nombre: solicitud.nombre, rol: "operario", email: solicitud.email, whatsapp: solicitud.whatsapp, estado: "en evaluación", observacion: `${solicitud.rubroInteres} · ${solicitud.experiencia}` }, ...(equipo.integrantes ?? [])] });
   }
 
   function nombreOferta(ofertaId: string) {
-    return equiposActivos.find((equipo) => equipo.id === ofertaId)?.nombre || ofertaId || "Oferta sin seleccionar";
+    return equipos.find((equipo) => equipo.id === ofertaId)?.nombre || ofertaId || "Oferta sin seleccionar";
   }
 
   function crearVinculoDesdePanel() {
@@ -1441,12 +1453,12 @@ export default function Home() {
   }
 
   function equipoPorId(ofertaId: string) {
-    return equiposActivos.find((equipo) => equipo.id === ofertaId) || null;
+    return equipos.find((equipo) => equipo.id === ofertaId) || null;
   }
 
   function emailsVinculo(vinculo: HubVinculo) {
     const equipo = equipoPorId(vinculo.oferta_id);
-    return equipo?.integrantes.filter((integrante) => integrante.email.trim()).map((integrante) => ({ nombre: integrante.nombre, email: integrante.email.trim() })) || [];
+    return (equipo?.integrantes ?? []).filter((integrante) => integrante.email.trim()).map((integrante) => ({ nombre: integrante.nombre, email: integrante.email.trim() }));
   }
 
   function emailPrincipalVinculo(vinculo: HubVinculo) {
@@ -1479,7 +1491,7 @@ export default function Home() {
     void notificarDestinatariosFicha(destinatarios, `${jornada.hub}${incluirPostulantesFicha ? " con postulantes" : " sin postulantes"}`);
   }
 
-  const vinculosHubActual = hubVinculos.filter((vinculo) => vinculo.hub_id === jornada.hub && vinculo.estado !== "FINALIZADO");
+  const vinculosHubActual = vinculos.filter((vinculo) => vinculo.hub_id === jornada.hub && vinculo.estado !== "FINALIZADO");
   const resolutoresActivosHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO" && !/paisaj|viver/i.test(`${nombreOferta(vinculo.oferta_id)} ${vinculo.rol} ${vinculo.capacidad}`));
   const paisajistasHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO" && /paisaj/i.test(`${nombreOferta(vinculo.oferta_id)} ${vinculo.rol} ${vinculo.capacidad}`));
   const viverosHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO" && /viver/i.test(`${nombreOferta(vinculo.oferta_id)} ${vinculo.rol} ${vinculo.capacidad}`));
@@ -1500,7 +1512,7 @@ export default function Home() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {hubsOperativos.map((hub) => <button key={hub} onClick={() => seleccionarHubTrabajo(hub)} className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-4 text-left shadow-sm transition hover:border-[#1f2a1d] hover:bg-[#eef2e8]">
               <span className="block text-base font-black">{hub}</span>
-              <span className="mt-2 block text-xs font-bold text-[#66745c]">{isMounted ? (jornada.datosPorHub[hub] || datosHubInicial(hub)).clientesIngresos.length : "—"} clientes</span>
+              <span className="mt-2 block text-xs font-bold text-[#66745c]">{isMounted ? normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos.length : "—"} clientes</span>
               <span className="mt-1 block text-xs font-bold text-[#66745c]">{isMounted ? (historialResumenes[hub] || []).length : "—"} resúmenes guardados</span>
             </button>)}
           </div>
@@ -1548,7 +1560,7 @@ export default function Home() {
 
         {seccionActiva === "vinculos" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Gestión de Vínculos</p><h2 className="text-lg font-black">Demanda agrupada ←→ oferta / resolutor</h2><p className="text-xs font-semibold text-[#66745c]">{estadoVinculos}</p></div><p className="max-w-xl rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#66745c]">El vínculo no une Hub con Hub. Une la demanda agrupada de un Hub con ofertas, equipos resolutores o postulantes.</p></div>
-          <div className="grid gap-3 xl:grid-cols-[0.8fr_1.2fr]"><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Nuevo vínculo</h3><div className="mt-3 grid gap-2"><select value={nuevoVinculoForm.hub_id} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, hub_id: e.target.value as HubDisponible }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold">{hubsOperativos.map((hub) => <option key={`nuevo-vinculo-${hub}`} value={hub}>{hub}</option>)}</select><select value={nuevoVinculoForm.oferta_id} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, oferta_id: e.target.value }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold"><option value="">Seleccionar oferta/equipo</option>{equiposActivos.map((equipo) => <option key={`oferta-${equipo.id}`} value={equipo.id}>{equipo.nombre}</option>)}</select><select value={nuevoVinculoForm.estado} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, estado: e.target.value as EstadoHubVinculo }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold">{ESTADOS_HUB_VINCULO.map((estado) => <option key={estado} value={estado}>{estado}</option>)}</select>{inputTexto(nuevoVinculoForm.rol, (valor) => setNuevoVinculoForm((actual) => ({ ...actual, rol: valor })), "min-w-full rounded-lg border border-[#cfd8c6]")}{inputTexto(nuevoVinculoForm.capacidad, (valor) => setNuevoVinculoForm((actual) => ({ ...actual, capacidad: valor })), "min-w-full rounded-lg border border-[#cfd8c6]")}<textarea value={nuevoVinculoForm.observaciones} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, observaciones: e.target.value }))} placeholder="Observaciones" className="min-h-20 rounded-lg border border-[#cfd8c6] p-2 text-xs font-semibold outline-none" /><button onClick={crearVinculoDesdePanel} className="h-9 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Crear vínculo</button></div></div><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Listado de vínculos</h3><div className="mt-2 overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Hub</th><th className="border p-2">Oferta / resolutor</th><th className="border p-2">Estado</th><th className="border p-2">Rol</th><th className="border p-2">Capacidad</th><th className="border p-2">Observaciones</th><th className="border p-2"></th></tr></thead><tbody>{hubVinculos.length === 0 ? <tr><td colSpan={7} className="border p-4 text-center font-bold text-[#66745c]">Sin vínculos cargados.</td></tr> : hubVinculos.map((vinculo) => <tr key={vinculo.id}><td className="border p-1 font-black">{vinculo.hub_id}</td><td className="border p-1">{nombreOferta(vinculo.oferta_id)}</td><td className="border p-1"><select value={vinculo.estado} onChange={(e) => actualizarVinculo(vinculo.id, { estado: e.target.value as EstadoHubVinculo })} className="h-7 bg-transparent font-black">{ESTADOS_HUB_VINCULO.map((estado) => <option key={`${vinculo.id}-${estado}`} value={estado}>{estado}</option>)}</select></td><td className="border p-1">{inputTexto(vinculo.rol, (valor) => actualizarVinculo(vinculo.id, { rol: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(vinculo.capacidad, (valor) => actualizarVinculo(vinculo.id, { capacidad: valor }), "min-w-40")}</td><td className="border p-1">{inputTexto(vinculo.observaciones, (valor) => actualizarVinculo(vinculo.id, { observaciones: valor }), "min-w-56")}</td><td className="border p-1 text-center"><button onClick={() => eliminarVinculo(vinculo.id)} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div></div></div>
+          <div className="grid gap-3 xl:grid-cols-[0.8fr_1.2fr]"><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Nuevo vínculo</h3><div className="mt-3 grid gap-2"><select value={nuevoVinculoForm.hub_id} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, hub_id: e.target.value as HubDisponible }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold">{hubsOperativos.map((hub) => <option key={`nuevo-vinculo-${hub}`} value={hub}>{hub}</option>)}</select><select value={nuevoVinculoForm.oferta_id} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, oferta_id: e.target.value }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold"><option value="">Seleccionar oferta/equipo</option>{equipos.map((equipo) => <option key={`oferta-${equipo.id}`} value={equipo.id}>{equipo.nombre}</option>)}</select><select value={nuevoVinculoForm.estado} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, estado: e.target.value as EstadoHubVinculo }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold">{ESTADOS_HUB_VINCULO.map((estado) => <option key={estado} value={estado}>{estado}</option>)}</select>{inputTexto(nuevoVinculoForm.rol, (valor) => setNuevoVinculoForm((actual) => ({ ...actual, rol: valor })), "min-w-full rounded-lg border border-[#cfd8c6]")}{inputTexto(nuevoVinculoForm.capacidad, (valor) => setNuevoVinculoForm((actual) => ({ ...actual, capacidad: valor })), "min-w-full rounded-lg border border-[#cfd8c6]")}<textarea value={nuevoVinculoForm.observaciones} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, observaciones: e.target.value }))} placeholder="Observaciones" className="min-h-20 rounded-lg border border-[#cfd8c6] p-2 text-xs font-semibold outline-none" /><button onClick={crearVinculoDesdePanel} className="h-9 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Crear vínculo</button></div></div><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Listado de vínculos</h3><div className="mt-2 overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Hub</th><th className="border p-2">Oferta / resolutor</th><th className="border p-2">Estado</th><th className="border p-2">Rol</th><th className="border p-2">Capacidad</th><th className="border p-2">Observaciones</th><th className="border p-2"></th></tr></thead><tbody>{vinculos.length === 0 ? <tr><td colSpan={7} className="border p-4 text-center font-bold text-[#66745c]">Sin vínculos cargados.</td></tr> : vinculos.map((vinculo) => <tr key={vinculo.id}><td className="border p-1 font-black">{vinculo.hub_id}</td><td className="border p-1">{nombreOferta(vinculo.oferta_id)}</td><td className="border p-1"><select value={vinculo.estado} onChange={(e) => actualizarVinculo(vinculo.id, { estado: e.target.value as EstadoHubVinculo })} className="h-7 bg-transparent font-black">{ESTADOS_HUB_VINCULO.map((estado) => <option key={`${vinculo.id}-${estado}`} value={estado}>{estado}</option>)}</select></td><td className="border p-1">{inputTexto(vinculo.rol, (valor) => actualizarVinculo(vinculo.id, { rol: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(vinculo.capacidad, (valor) => actualizarVinculo(vinculo.id, { capacidad: valor }), "min-w-40")}</td><td className="border p-1">{inputTexto(vinculo.observaciones, (valor) => actualizarVinculo(vinculo.id, { observaciones: valor }), "min-w-56")}</td><td className="border p-1 text-center"><button onClick={() => eliminarVinculo(vinculo.id)} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div></div></div>
           <div className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Ficha editable del Hub · misma fuente que la web pública</p><h3 className="text-2xl font-black uppercase">{jornada.hub}</h3><p className="text-sm font-bold text-[#66745c]">{fichaHubActual?.zona || "Zona operativa"} · Vecinos: {fichaHubActual?.clientesActivos ?? datosHub.clientesIngresos.length} · Hs anuales: {datosHub.clientesIngresos.reduce((total, cliente) => total + Number(cliente.importe || 0), 0).toLocaleString("es-AR")}</p><p className="mt-1 text-xs font-semibold text-[#66745c]">{fichaHubActual?.descripcionPublica || "Ficha operativa local pendiente de sincronizar con la ficha pública."}</p></div>
@@ -1566,7 +1578,7 @@ export default function Home() {
           </div>
           <div className="grid gap-3 lg:grid-cols-[280px_1fr]">
             <aside className="space-y-2 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3">
-              {equiposActivos.map((equipo) => <button key={equipo.id} onClick={() => { setEquipoActivoId(equipo.id); setIntegrantesMensajeSeleccionados(equipo.integrantes.map((integrante) => integrante.id)); }} className={`w-full rounded-lg border p-3 text-left text-xs ${equipoActivo.id === equipo.id ? "border-[#1f2a1d] bg-white" : "border-[#cfd8c6] bg-[#fbfcf9]"}`}><span className="block font-black">{equipo.nombre}</span><span className="block font-bold text-[#66745c]">{equipo.estado} · {equipo.tipo}</span><span className="block font-bold text-[#66745c]">{equipo.integrantes.length} integrantes · {equipo.hubsDemandaVinculados.length} Hubs vinculados</span></button>)}
+              {equipos.map((equipo) => <button key={equipo.id} onClick={() => { setEquipoActivoId(equipo.id); setIntegrantesMensajeSeleccionados((equipo.integrantes ?? []).map((integrante) => integrante.id)); }} className={`w-full rounded-lg border p-3 text-left text-xs ${equipoActivo.id === equipo.id ? "border-[#1f2a1d] bg-white" : "border-[#cfd8c6] bg-[#fbfcf9]"}`}><span className="block font-black">{equipo.nombre}</span><span className="block font-bold text-[#66745c]">{equipo.estado} · {equipo.tipo}</span><span className="block font-bold text-[#66745c]">{(equipo.integrantes ?? []).length} integrantes · {(equipo.hubsDemandaVinculados ?? []).length} Hubs vinculados</span></button>)}
             </aside>
             <div className="space-y-3">
               <div className="grid gap-2 rounded-xl border border-[#d8dfd1] bg-white p-3 md:grid-cols-4">
@@ -1578,10 +1590,10 @@ export default function Home() {
                 <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] md:col-span-2">Observaciones<input value={equipoActivo.observaciones} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { observaciones: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
                 <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] md:col-span-4">Descripción<textarea value={equipoActivo.descripcion} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { descripcion: e.target.value })} className="min-h-16 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case" /></label>
               </div>
-              <div className="grid gap-3 md:grid-cols-3"><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Integrantes</p><p className="text-2xl font-black">{equipoActivo.integrantes.length}</p></div><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Mensajes enviados</p><p className="text-2xl font-black">{equipoActivo.mensajesEnviados.length}</p></div><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Consultas al equipo</p><p className="text-2xl font-black">{equipoActivo.consultasEnviadas.length}</p></div></div>
-              <div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Hubs de demanda vinculados</h3><div className="mt-2 flex flex-wrap gap-2">{hubsOperativos.map((hub) => <label key={`vinculo-${hub}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-2 py-1 text-xs font-bold"><input type="checkbox" checked={equipoActivo.hubsDemandaVinculados.includes(hub)} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { hubsDemandaVinculados: e.target.checked ? [...equipoActivo.hubsDemandaVinculados, hub] : equipoActivo.hubsDemandaVinculados.filter((item) => item !== hub) })} className="mr-1" />{hub}</label>)}</div></div>
-              <div className="rounded-xl border border-[#d8dfd1] p-3"><div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-black">Integrantes</h3><button onClick={agregarIntegranteEquipo} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-xs font-black text-white">Agregar integrante</button></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Nombre</th><th className="border p-2">Rol</th><th className="border p-2">Email</th><th className="border p-2">WhatsApp</th><th className="border p-2">Estado</th><th className="border p-2">Observación</th><th className="border p-2"></th></tr></thead><tbody>{equipoActivo.integrantes.map((integrante) => <tr key={integrante.id}><td className="border p-1"><input value={integrante.nombre} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { nombre: e.target.value })} className="h-7 min-w-40 bg-transparent px-1" /></td><td className="border p-1"><select value={integrante.rol} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { rol: e.target.value as IntegranteEquipoActivo["rol"] })} className="h-7 bg-transparent">{ROLES_INTEGRANTE.map((rol) => <option key={rol} value={rol}>{rol}</option>)}</select></td><td className="border p-1"><input value={integrante.email} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { email: e.target.value })} className="h-7 min-w-44 bg-transparent px-1" /></td><td className="border p-1"><input value={integrante.whatsapp} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { whatsapp: e.target.value })} className="h-7 min-w-32 bg-transparent px-1" /></td><td className="border p-1"><select value={integrante.estado} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { estado: e.target.value as IntegranteEquipoActivo["estado"] })} className="h-7 bg-transparent">{ESTADOS_INTEGRANTE.map((estado) => <option key={estado} value={estado}>{estado}</option>)}</select></td><td className="border p-1"><input value={integrante.observacion} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { observacion: e.target.value })} className="h-7 min-w-44 bg-transparent px-1" /></td><td className="border p-1"><button onClick={() => actualizarEquipoActivo(equipoActivo.id, { integrantes: equipoActivo.integrantes.filter((item) => item.id !== integrante.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div></div>
-              <div className="grid gap-3 lg:grid-cols-2"><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Enviar mensaje al equipo</h3><p className="text-xs font-semibold text-[#66745c]">Seleccioná integrantes; el envío se prepara individualmente para no exponer datos de otros integrantes.</p><div className="mt-2 flex flex-wrap gap-2">{equipoActivo.integrantes.map((integrante) => <label key={`mensaje-${integrante.id}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-2 py-1 text-xs font-bold"><input type="checkbox" checked={integrantesMensajeSeleccionados.includes(integrante.id)} onChange={(e) => setIntegrantesMensajeSeleccionados((actuales) => e.target.checked ? [...actuales, integrante.id] : actuales.filter((id) => id !== integrante.id))} className="mr-1" />{integrante.nombre}</label>)}</div><button onClick={() => setIntegrantesMensajeSeleccionados(equipoActivo.integrantes.map((integrante) => integrante.id))} className="mt-2 h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Seleccionar todos</button><input value={mensajeEquipo.asunto} onChange={(e) => setMensajeEquipo((actual) => ({ ...actual, asunto: e.target.value }))} placeholder="Asunto" className="mt-2 h-8 w-full rounded-lg border border-[#cfd8c6] px-2 text-sm"/><textarea value={mensajeEquipo.mensaje} onChange={(e) => setMensajeEquipo((actual) => ({ ...actual, mensaje: e.target.value }))} placeholder="Mensaje" className="mt-2 min-h-20 w-full rounded-lg border border-[#cfd8c6] p-2 text-sm"/><button onClick={enviarMensajeEquipo} className="mt-2 h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Preparar envío ({integrantesDestinoMensaje.length})</button></div><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Crear consulta al equipo</h3><input value={preguntaEquipo} onChange={(e) => setPreguntaEquipo(e.target.value)} className="mt-2 h-8 w-full rounded-lg border border-[#cfd8c6] px-2 text-sm"/><button onClick={crearConsultaEquipo} className="mt-2 h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Crear consulta</button><div className="mt-3 space-y-2">{equipoActivo.consultasEnviadas.map((consulta) => <div key={consulta.id} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs"><p className="font-black">{consulta.pregunta}</p><p>Sí: {consulta.respuestas.filter((r) => r.opcion === "Sí").length} · No: {consulta.respuestas.filter((r) => r.opcion === "No").length} · Puede ser: {consulta.respuestas.filter((r) => r.opcion === "Puede ser").length} · Sin responder: {Math.max(equipoActivo.integrantes.length - consulta.respuestas.length, 0)} · Total integrantes: {equipoActivo.integrantes.length}</p></div>)}</div></div></div>
+              <div className="grid gap-3 md:grid-cols-3"><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Integrantes</p><p className="text-2xl font-black">{integrantesEquipoActivo.length}</p></div><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Mensajes enviados</p><p className="text-2xl font-black">{(equipoActivo.mensajesEnviados ?? []).length}</p></div><div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Consultas al equipo</p><p className="text-2xl font-black">{(equipoActivo.consultasEnviadas ?? []).length}</p></div></div>
+              <div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Hubs de demanda vinculados</h3><div className="mt-2 flex flex-wrap gap-2">{hubsOperativos.map((hub) => <label key={`vinculo-${hub}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-2 py-1 text-xs font-bold"><input type="checkbox" checked={(equipoActivo.hubsDemandaVinculados ?? []).includes(hub)} onChange={(e) => actualizarEquipoActivo(equipoActivo.id, { hubsDemandaVinculados: e.target.checked ? [...(equipoActivo.hubsDemandaVinculados ?? []), hub] : (equipoActivo.hubsDemandaVinculados ?? []).filter((item) => item !== hub) })} className="mr-1" />{hub}</label>)}</div></div>
+              <div className="rounded-xl border border-[#d8dfd1] p-3"><div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-black">Integrantes</h3><button onClick={agregarIntegranteEquipo} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-xs font-black text-white">Agregar integrante</button></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Nombre</th><th className="border p-2">Rol</th><th className="border p-2">Email</th><th className="border p-2">WhatsApp</th><th className="border p-2">Estado</th><th className="border p-2">Observación</th><th className="border p-2"></th></tr></thead><tbody>{integrantesEquipoActivo.map((integrante) => <tr key={integrante.id}><td className="border p-1"><input value={integrante.nombre} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { nombre: e.target.value })} className="h-7 min-w-40 bg-transparent px-1" /></td><td className="border p-1"><select value={integrante.rol} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { rol: e.target.value as IntegranteEquipoActivo["rol"] })} className="h-7 bg-transparent">{ROLES_INTEGRANTE.map((rol) => <option key={rol} value={rol}>{rol}</option>)}</select></td><td className="border p-1"><input value={integrante.email} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { email: e.target.value })} className="h-7 min-w-44 bg-transparent px-1" /></td><td className="border p-1"><input value={integrante.whatsapp} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { whatsapp: e.target.value })} className="h-7 min-w-32 bg-transparent px-1" /></td><td className="border p-1"><select value={integrante.estado} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { estado: e.target.value as IntegranteEquipoActivo["estado"] })} className="h-7 bg-transparent">{ESTADOS_INTEGRANTE.map((estado) => <option key={estado} value={estado}>{estado}</option>)}</select></td><td className="border p-1"><input value={integrante.observacion} onChange={(e) => actualizarIntegranteEquipo(integrante.id, { observacion: e.target.value })} className="h-7 min-w-44 bg-transparent px-1" /></td><td className="border p-1"><button onClick={() => actualizarEquipoActivo(equipoActivo.id, { integrantes: integrantesEquipoActivo.filter((item) => item.id !== integrante.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div></div>
+              <div className="grid gap-3 lg:grid-cols-2"><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Enviar mensaje al equipo</h3><p className="text-xs font-semibold text-[#66745c]">Seleccioná integrantes; el envío se prepara individualmente para no exponer datos de otros integrantes.</p><div className="mt-2 flex flex-wrap gap-2">{integrantesEquipoActivo.map((integrante) => <label key={`mensaje-${integrante.id}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-2 py-1 text-xs font-bold"><input type="checkbox" checked={integrantesMensajeSeleccionados.includes(integrante.id)} onChange={(e) => setIntegrantesMensajeSeleccionados((actuales) => e.target.checked ? [...actuales, integrante.id] : actuales.filter((id) => id !== integrante.id))} className="mr-1" />{integrante.nombre}</label>)}</div><button onClick={() => setIntegrantesMensajeSeleccionados(integrantesEquipoActivo.map((integrante) => integrante.id))} className="mt-2 h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Seleccionar todos</button><input value={mensajeEquipo.asunto} onChange={(e) => setMensajeEquipo((actual) => ({ ...actual, asunto: e.target.value }))} placeholder="Asunto" className="mt-2 h-8 w-full rounded-lg border border-[#cfd8c6] px-2 text-sm"/><textarea value={mensajeEquipo.mensaje} onChange={(e) => setMensajeEquipo((actual) => ({ ...actual, mensaje: e.target.value }))} placeholder="Mensaje" className="mt-2 min-h-20 w-full rounded-lg border border-[#cfd8c6] p-2 text-sm"/><button onClick={enviarMensajeEquipo} className="mt-2 h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Preparar envío ({integrantesDestinoMensaje.length})</button></div><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Crear consulta al equipo</h3><input value={preguntaEquipo} onChange={(e) => setPreguntaEquipo(e.target.value)} className="mt-2 h-8 w-full rounded-lg border border-[#cfd8c6] px-2 text-sm"/><button onClick={crearConsultaEquipo} className="mt-2 h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Crear consulta</button><div className="mt-3 space-y-2">{(equipoActivo.consultasEnviadas ?? []).map((consulta) => <div key={consulta.id} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs"><p className="font-black">{consulta.pregunta}</p><p>Sí: {(consulta.respuestas ?? []).filter((r) => r.opcion === "Sí").length} · No: {(consulta.respuestas ?? []).filter((r) => r.opcion === "No").length} · Puede ser: {(consulta.respuestas ?? []).filter((r) => r.opcion === "Puede ser").length} · Sin responder: {Math.max(integrantesEquipoActivo.length - (consulta.respuestas ?? []).length, 0)} · Total integrantes: {integrantesEquipoActivo.length}</p></div>)}</div></div></div>
               <div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Solicitudes de oferta</h3><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Nombre</th><th className="border p-2">WhatsApp</th><th className="border p-2">Email</th><th className="border p-2">Rubro</th><th className="border p-2">Equipo solicitado</th><th className="border p-2">Estado</th><th className="border p-2">Fecha</th><th className="border p-2">Acciones</th></tr></thead><tbody>{solicitudesOferta.length === 0 ? <tr><td colSpan={8} className="border p-4 text-center font-bold text-[#66745c]">Sin solicitudes de ingreso al equipo.</td></tr> : solicitudesOferta.map((solicitud) => <tr key={solicitud.id}><td className="border p-2 font-semibold">{solicitud.nombre}</td><td className="border p-2">{solicitud.whatsapp}</td><td className="border p-2">{solicitud.email}</td><td className="border p-2">{solicitud.rubroInteres}</td><td className="border p-2">{solicitud.equipoInteres}</td><td className="border p-2 font-black">{solicitud.estado}</td><td className="border p-2">{formatoFecha(solicitud.fecha.slice(0, 10))}</td><td className="border p-2"><button onClick={() => aprobarSolicitudOferta(solicitud.id)} className="mr-2 font-black text-[#2f6d32]">Aprobar/convertir</button><button onClick={() => setSolicitudesOferta((actuales) => actuales.map((item) => item.id === solicitud.id ? { ...item, estado: "rechazada" } : item))} className="font-black text-[#743c3c]">Rechazar</button></td></tr>)}</tbody></table></div></div>
             </div>
           </div>
@@ -1625,7 +1637,7 @@ export default function Home() {
             <div className="rounded-lg border border-[#cfd8c6] bg-white p-2 text-xs font-bold text-[#66745c]">Total clientes del Hub: <span className="text-[#1f2a1d]">{totalClientesHubConsulta}</span></div>
             <section>
               <p className="mb-2 text-[11px] font-black uppercase text-[#66745c]">Historial de encuestas del Hub</p>
-              <div className="space-y-2">{consultasDelHubSeleccionado.length === 0 ? <p className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-xs font-bold text-[#66745c]">Todavía no hay encuestas para {hubConsulta}.</p> : consultasDelHubSeleccionado.map((consulta, index) => { const conteos = consulta.opciones.map((opcion) => `${opcion}: ${consulta.respuestas.filter((respuesta) => respuesta.opcion === opcion).length}`).join(" · "); const sinResponderHistorial = Math.max(totalClientesHubConsulta - consulta.respuestas.filter((respuesta) => idsClientesHubConsulta.has(respuesta.clienteId)).length, 0); return <article key={consulta.id} className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-xs"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-black">Encuesta N°{index + 1}</h3><p className="font-semibold text-[#66745c]">{consulta.pregunta}</p><p className="mt-1 font-bold">{formatoFecha(consulta.fechaCreacion.slice(0, 10))} · {consulta.estado} · {conteos} · Sin responder: {sinResponderHistorial}</p></div><button onClick={() => { setConsultaActivaId(consulta.id); setPasoConsulta("resultados"); }} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Ver encuesta</button></div></article>; })}</div>
+              <div className="space-y-2">{consultasDelHubSeleccionado.length === 0 ? <p className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-xs font-bold text-[#66745c]">Todavía no hay encuestas para {hubConsulta}.</p> : consultasDelHubSeleccionado.map((consulta, index) => { const conteos = (consulta.opciones ?? []).map((opcion) => `${opcion}: ${(consulta.respuestas ?? []).filter((respuesta) => respuesta.opcion === opcion).length}`).join(" · "); const sinResponderHistorial = Math.max(totalClientesHubConsulta - (consulta.respuestas ?? []).filter((respuesta) => idsClientesHubConsulta.has(respuesta.clienteId)).length, 0); return <article key={consulta.id} className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-xs"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-black">Encuesta N°{index + 1}</h3><p className="font-semibold text-[#66745c]">{consulta.pregunta}</p><p className="mt-1 font-bold">{formatoFecha(consulta.fechaCreacion.slice(0, 10))} · {consulta.estado} · {conteos} · Sin responder: {sinResponderHistorial}</p></div><button onClick={() => { setConsultaActivaId(consulta.id); setPasoConsulta("resultados"); }} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Ver encuesta</button></div></article>; })}</div>
             </section>
           </section>}
 
@@ -1659,7 +1671,7 @@ export default function Home() {
           {resumenGuardadoContactos && <div className="rounded-lg border border-[#b7d6ba] bg-[#f2fff4] px-3 py-2 text-xs font-black text-[#1f2a1d]">Último guardado: {resumenGuardadoContactos.clientesConHub} clientes en Hubs, {resumenGuardadoContactos.clientesSinHub} clientes sin Hub, {resumenGuardadoContactos.actores} actores/equipo, {resumenGuardadoContactos.auxiliares} auxiliares, {resumenGuardadoContactos.ignorados} ignorados.</div>}
           <div className="max-h-[62vh] overflow-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="sticky top-0 bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Incluir sí/no</th><th className="border p-2">Rol</th><th className="border p-2">Nombre</th><th className="border p-2">Referencia</th><th className="border p-2">WhatsApp</th><th className="border p-2">Email</th><th className="border p-2">Hub sugerido / Hub asignado</th><th className="border p-2">Tipo destino</th><th className="border p-2">Acción eliminar</th></tr></thead><tbody>{contactosImportados.length === 0 ? <tr><td colSpan={9} className="border p-6 text-center font-bold text-[#66745c]">Pegá una base cruda y tocá Procesar contactos para generar esta tabla de revisión.</td></tr> : contactosImportados.map((contacto) => <tr key={contacto.id} className={contacto.incluir ? "bg-[#eef4ea]" : "bg-white"}><td className="border p-2 text-center"><input type="checkbox" checked={contacto.incluir} onChange={(e) => actualizarContactoImportado(contacto.id, { incluir: e.target.checked })} /></td><td className="border p-1">{inputTexto(contacto.rol, (valor) => actualizarContactoImportado(contacto.id, { rol: valor.toUpperCase() as RolContactoImportado }), "min-w-24")}</td><td className="border p-1">{inputTexto(contacto.nombre, (valor) => actualizarContactoImportado(contacto.id, { nombre: valor }), "min-w-40")}</td><td className="border p-1">{inputTexto(contacto.referencia, (valor) => actualizarContactoImportado(contacto.id, { referencia: valor }), "min-w-48")}</td><td className="border p-1">{inputTexto(contacto.whatsapp, (valor) => actualizarContactoImportado(contacto.id, { whatsapp: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(contacto.email, (valor) => actualizarContactoImportado(contacto.id, { email: valor }), "min-w-48")}</td><td className="border p-1"><select value={contacto.hub} onChange={(e) => actualizarContactoImportado(contacto.id, { hub: e.target.value as HubImportacion })} className="h-8 min-w-52 rounded border border-[#cfd8c6] bg-white px-2 outline-none"><option value="Sin Hub asignado">Sin Hub asignado</option>{hubsOperativos.map((hub) => <option key={`hub-fila-${contacto.id}-${hub}`} value={hub}>{hub}</option>)}</select></td><td className="border p-1"><select value={contacto.tipoDestino} onChange={(e) => actualizarContactoImportado(contacto.id, { tipoDestino: e.target.value as TipoDestinoImportacion })} className="h-8 min-w-36 rounded border border-[#cfd8c6] bg-white px-2 outline-none"><option value="cliente">Cliente</option><option value="actor">Actor / Equipo</option><option value="auxiliar">Auxiliar</option><option value="ignorar">Ignorar</option></select></td><td className="border p-2 text-center"><button onClick={() => eliminarContactoImportado(contacto.id)} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div>
           <section className="rounded-lg border border-[#d8dfd1] bg-[#fffdf2] px-3 py-2 text-xs font-black"><span className="mr-2 text-[#66745c]">Sin Hub asignado:</span>{isMounted ? conteoSinHub : "—"} contactos</section>
-          <section className="rounded-lg border border-[#d8dfd1] bg-[#f8faf5] px-3 py-2 text-xs font-black"><span className="mr-2 text-[#66745c]">Organización actual:</span>{hubsOperativos.map((hub, index) => <span key={`organizacion-${hub}`}>{index > 0 ? " | " : ""}{hub}: {isMounted ? (jornada.datosPorHub[hub] || datosHubInicial(hub)).clientesIngresos.length : "—"} clientes</span>)}<span> | Sin Hub asignado: {isMounted ? conteoSinHub : "—"} contactos</span></section>
+          <section className="rounded-lg border border-[#d8dfd1] bg-[#f8faf5] px-3 py-2 text-xs font-black"><span className="mr-2 text-[#66745c]">Organización actual:</span>{hubsOperativos.map((hub, index) => <span key={`organizacion-${hub}`}>{index > 0 ? " | " : ""}{hub}: {isMounted ? normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos.length : "—"} clientes</span>)}<span> | Sin Hub asignado: {isMounted ? conteoSinHub : "—"} contactos</span></section>
         </section>}
 
         {seccionActiva === "reporte" && <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
