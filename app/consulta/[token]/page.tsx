@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 
 const CONSULTAS_HUB_STORAGE_KEY = "hubya-consultas-hub";
 
+function slugOpcionConsulta(opcion: string) {
+  return opcion.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 type EstadoConsultaHub = "borrador" | "activa" | "cerrada";
 type ClienteConsultaHub = { id: number; nombre: string; telefono: string; email: string; token?: string };
 type RespuestaConsultaHub = { clienteId: number; opcion: string; respondidoEn: string };
@@ -51,6 +55,14 @@ export default function ConsultaPublicaPage({ params }: ConsultaPublicaPageProps
 
   const respuestaExistente = contexto?.consulta.respuestas.find((respuesta) => respuesta.clienteId === contexto.cliente.id);
 
+  useEffect(() => {
+    if (!contexto || respuestaExistente || respuestaEnviada || typeof window === "undefined") return;
+    const respuestaUrl = new URLSearchParams(window.location.search).get("respuesta");
+    if (!respuestaUrl) return;
+    const opcion = contexto.consulta.opciones.find((item) => slugOpcionConsulta(item) === respuestaUrl);
+    if (opcion) setOpcionSeleccionada(opcion);
+  }, [contexto, respuestaEnviada, respuestaExistente]);
+
   function enviarRespuesta() {
     if (!contexto || !opcionSeleccionada) return;
     const actualizadas = consultas.map((consulta) => {
@@ -62,6 +74,10 @@ export default function ConsultaPublicaPage({ params }: ConsultaPublicaPageProps
     setConsultas(actualizadas);
     setRespuestaEnviada(true);
   }
+
+  useEffect(() => {
+    if (contexto && opcionSeleccionada && !respuestaExistente && !respuestaEnviada) enviarRespuesta();
+  }, [contexto, opcionSeleccionada, respuestaEnviada, respuestaExistente]);
 
   if (!contexto) {
     return <main className="flex min-h-screen items-center justify-center bg-[#eef2e8] p-4 text-[#182018]"><section className="max-w-lg rounded-2xl border border-[#cfd8c6] bg-white p-6 text-center shadow-sm"><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HubYa</p><h1 className="mt-2 text-2xl font-black">Consulta no encontrada</h1><p className="mt-2 text-sm font-semibold text-[#66745c]">El link no existe en este navegador o todavía no fue generado.</p></section></main>;

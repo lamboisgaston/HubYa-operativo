@@ -72,6 +72,7 @@ type DestinatarioSeleccionado = {
   id: number;
   nombre: string;
   telefono: string;
+  email?: string;
   incluido: boolean;
 };
 
@@ -723,7 +724,7 @@ export default function Home() {
     setHubInformacion(hub);
     setAsuntoInformacion((actual) => actual || `WhatsApp HubYa — ${hub}`);
     setMensajeInformacion((actual) => actual || `Hola, te compartimos información correspondiente al ${hub}.`);
-    setDestinatariosInformacion(jornada.datosPorHub[hub].clientesIngresos.map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, incluido: Boolean(cliente.telefono.trim()) })));
+    setDestinatariosInformacion(jornada.datosPorHub[hub].clientesIngresos.map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email, incluido: Boolean(cliente.telefono.trim()) })));
     setEstadoInformacion("idle");
     setMensajeEstadoInformacion("Seleccioná destinatarios, referencia interna y mensaje para enviar.");
   }
@@ -1134,13 +1135,55 @@ export default function Home() {
     setMensajeGuardado("Links de respuesta generados. La consulta quedó activa.");
   }
 
-  function linkConsulta(token?: string) {
-    if (!token || typeof window === "undefined") return "";
-    return `${window.location.origin}/consulta/${token}`;
+  function slugOpcionConsulta(opcion: string) {
+    const normalizada = opcion.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (normalizada === "si") return "si";
+    if (normalizada === "no") return "no";
+    if (normalizada === "puede-ser") return "puede-ser";
+    return normalizada;
   }
 
-  function mensajeConsulta(cliente: ClienteConsultaHub) {
-    return `Hola ${cliente.nombre || "cliente"}, desde HubYa queremos confirmar la planificación del ${consultaActiva?.hub || hubConsulta}. Te compartimos una consulta breve: ${linkConsulta(cliente.token)}. Tu respuesta nos ayuda a organizar mejor la demanda y la oferta del Hub.`;
+  function linkConsulta(token?: string, opcion?: string) {
+    if (!token || typeof window === "undefined") return "";
+    const base = `${window.location.origin}/consulta/${token}`;
+    return opcion ? `${base}?respuesta=${slugOpcionConsulta(opcion)}` : base;
+  }
+
+  function linksPorOpcionConsulta(cliente: ClienteConsultaHub) {
+    return Object.fromEntries((consultaActiva?.opciones || ["Sí", "No", "Puede ser"]).map((opcion) => [opcion, linkConsulta(cliente.token, opcion)]));
+  }
+
+  function mailConsultaTexto(cliente: ClienteConsultaHub) {
+    const links = linksPorOpcionConsulta(cliente);
+    return [
+      `Asunto: Consulta HubYa — ${consultaActiva?.hub || hubConsulta}`,
+      "",
+      `Hola ${cliente.nombre || "cliente"},`,
+      "",
+      `Desde HubYa queremos confirmar la planificación del ${consultaActiva?.hub || hubConsulta}.`,
+      "",
+      consultaActiva?.pregunta || preguntaConsulta,
+      "",
+      ...(consultaActiva?.opciones || ["Sí", "No", "Puede ser"]).map((opcion) => `[ ${opcion} ] ${links[opcion]}`),
+      "",
+      "Tu respuesta nos ayuda a organizar mejor la demanda, el personal, los horarios y la frecuencia del Hub.",
+      "",
+      "Saludos,",
+      "HubYa",
+    ].join("\n");
+  }
+
+  async function enviarConsultaClientes(clientes: ClienteConsultaHub[]) {
+    if (!consultaActiva) return;
+    const destinatarios = clientes.filter((cliente) => cliente.token && cliente.email.trim()).map((cliente) => ({ nombre: cliente.nombre, email: cliente.email, links: linksPorOpcionConsulta(cliente) }));
+    if (destinatarios.length === 0) return setMensajeGuardado("No hay clientes con token y email válido para enviar.");
+    const respuesta = await fetch("/api/enviar-consulta", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hub: consultaActiva.hub, pregunta: consultaActiva.pregunta, destinatarios }),
+    });
+    const data = await respuesta.json().catch(() => ({}));
+    setMensajeGuardado(respuesta.ok ? `Consulta enviada por email a ${data.enviados} cliente(s).` : `No se pudo enviar por Resend: ${data.error || "error desconocido"}`);
   }
 
   const conteoSinHub = contactosSinHub.length;
@@ -1209,10 +1252,10 @@ export default function Home() {
           <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Consultas del Hub</p><h2 className="text-lg font-black">Consultas del Hub</h2><p className="text-xs font-semibold text-[#66745c]">Creá preguntas simples, generá links únicos por cliente y revisá resultados sin exponer respuestas de otros clientes.</p></div><button onClick={crearConsultaHub} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white">Crear consulta</button></div>
           <div className="grid gap-3 lg:grid-cols-[360px_1fr]">
             <div className="space-y-3 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub<select value={hubConsulta} onChange={(e) => { const hub = e.target.value as HubDisponible; setHubConsulta(hub); setPreguntaConsulta(`¿Vas a seguir formando parte del ${hub} durante el próximo año?`); setClientesConsultaSeleccionados([]); }} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold outline-none">{HUBS_DISPONIBLES.map((hub) => <option key={`consulta-hub-${hub}`} value={hub}>{hub}</option>)}</select></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Título<input value={tituloConsulta} onChange={(e) => setTituloConsulta(e.target.value)} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Pregunta<textarea value={preguntaConsulta} onChange={(e) => setPreguntaConsulta(e.target.value)} className="min-h-20 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label><div className="space-y-2"><p className="text-[11px] font-bold uppercase text-[#66745c]">Opciones editables</p>{opcionesConsulta.map((opcion, index) => <div key={`opcion-${index}`} className="flex gap-2"><input value={opcion} onChange={(e) => setOpcionesConsulta((actuales) => actuales.map((item, itemIndex) => itemIndex === index ? e.target.value : item))} className="h-8 flex-1 rounded-lg border border-[#cfd8c6] px-2 text-sm outline-none" /><button onClick={() => setOpcionesConsulta((actuales) => actuales.filter((_, itemIndex) => itemIndex !== index))} className="h-8 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-2 text-xs font-black text-[#743c3c]">×</button></div>)}<button onClick={() => setOpcionesConsulta((actuales) => [...actuales, ""])} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Agregar opción</button></div></div>
-            <div className="space-y-3"><div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Seleccionar</th><th className="border p-2">Cliente</th><th className="border p-2">Teléfono</th></tr></thead><tbody>{clientesDisponiblesConsulta.length === 0 ? <tr><td colSpan={3} className="border p-4 text-center font-bold text-[#66745c]">No hay clientes cargados para este Hub.</td></tr> : clientesDisponiblesConsulta.map((cliente) => <tr key={`cliente-consulta-${cliente.id}`}><td className="border p-2 text-center"><input type="checkbox" checked={clientesConsultaSeleccionados.includes(cliente.id)} onChange={(e) => setClientesConsultaSeleccionados((actuales) => e.target.checked ? [...actuales, cliente.id] : actuales.filter((id) => id !== cliente.id))} /></td><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2">{cliente.telefono || "Sin teléfono"}</td></tr>)}</tbody></table></div>
+            <div className="space-y-3"><div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Seleccionar</th><th className="border p-2">Cliente</th><th className="border p-2">Teléfono</th><th className="border p-2">Email</th></tr></thead><tbody>{clientesDisponiblesConsulta.length === 0 ? <tr><td colSpan={4} className="border p-4 text-center font-bold text-[#66745c]">No hay clientes cargados para este Hub.</td></tr> : clientesDisponiblesConsulta.map((cliente) => <tr key={`cliente-consulta-${cliente.id}`}><td className="border p-2 text-center"><input type="checkbox" checked={clientesConsultaSeleccionados.includes(cliente.id)} onChange={(e) => setClientesConsultaSeleccionados((actuales) => e.target.checked ? [...actuales, cliente.id] : actuales.filter((id) => id !== cliente.id))} /></td><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2">{cliente.telefono || "Sin teléfono"}</td><td className="border p-2">{cliente.email || "Sin email"}</td></tr>)}</tbody></table></div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">{conteosConsulta.map((item) => <div key={`conteo-${item.opcion}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">{item.opcion}</p><p className="text-xl font-black">{item.cantidad}</p></div>)}<div className="rounded-lg border border-[#cfd8c6] bg-[#fffdf2] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Sin responder</p><p className="text-xl font-black">{sinResponderConsulta}</p></div></div>
             <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Consulta activa<select value={consultaActiva?.id || ""} onChange={(e) => setConsultaActivaId(e.target.value)} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold normal-case outline-none"><option value="">Sin consultas</option>{consultasHub.map((consulta) => <option key={consulta.id} value={consulta.id}>{consulta.titulo} · {consulta.hub} · {consulta.estado}</option>)}</select></label>
-            {consultaActiva && <div className="space-y-2 rounded-xl border border-[#d8dfd1] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-black">{consultaActiva.titulo}</h3><p className="text-xs font-semibold text-[#66745c]">{consultaActiva.pregunta}</p></div><button onClick={() => generarLinksConsulta(consultaActiva.id)} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar links de respuesta</button></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Cliente</th><th className="border p-2">Respuesta</th><th className="border p-2">Fecha de respuesta</th><th className="border p-2">Link y mensaje</th></tr></thead><tbody>{consultaActiva.clientesDestinatarios.map((cliente) => { const respuesta = respuestasPorCliente.get(cliente.id); return <tr key={`resultado-${cliente.id}`}><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2 font-black">{respuesta?.opcion || "Sin responder"}</td><td className="border p-2">{respuesta ? new Date(respuesta.respondidoEn).toLocaleString("es-AR") : "—"}</td><td className="border p-2"><div className="flex flex-wrap gap-1"><button disabled={!cliente.token} onClick={() => copiarTexto(linkConsulta(cliente.token), "Link de respuesta")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black disabled:opacity-50">Copiar link</button><button disabled={!cliente.token} onClick={() => copiarTexto(mensajeConsulta(cliente), "Mensaje de envío")} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white disabled:opacity-50">Copiar mensaje</button></div></td></tr>; })}</tbody></table></div></div>}
+            {consultaActiva && <div className="space-y-2 rounded-xl border border-[#d8dfd1] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-black">{consultaActiva.titulo}</h3><p className="text-xs font-semibold text-[#66745c]">{consultaActiva.pregunta}</p></div><button onClick={() => generarLinksConsulta(consultaActiva.id)} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar links de respuesta</button></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Cliente</th><th className="border p-2">Email</th><th className="border p-2">Respuesta</th><th className="border p-2">Fecha de respuesta</th><th className="border p-2">Link y mensaje</th></tr></thead><tbody>{consultaActiva.clientesDestinatarios.map((cliente) => { const respuesta = respuestasPorCliente.get(cliente.id); return <tr key={`resultado-${cliente.id}`}><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2">{cliente.email || "Sin email"}</td><td className="border p-2 font-black">{respuesta?.opcion || "Sin responder"}</td><td className="border p-2">{respuesta ? new Date(respuesta.respondidoEn).toLocaleString("es-AR") : "—"}</td><td className="border p-2"><div className="flex flex-wrap gap-1"><button disabled={!cliente.token} onClick={() => copiarTexto(linkConsulta(cliente.token), "Link de respuesta")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black disabled:opacity-50">Copiar link</button><button disabled={!cliente.token} onClick={() => copiarTexto(mailConsultaTexto(cliente), "Mail de consulta")} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white disabled:opacity-50">Copiar mail de consulta</button><button disabled={!cliente.token || !cliente.email} onClick={() => enviarConsultaClientes([cliente])} className="h-7 rounded-md bg-[#5d7032] px-2 text-[11px] font-black text-white disabled:opacity-50">Enviar consulta al cliente seleccionado</button></div></td></tr>; })}</tbody></table></div><button onClick={() => enviarConsultaClientes(consultaActiva.clientesDestinatarios)} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Enviar consulta a clientes seleccionados</button></div>}
             </div>
           </div>
         </section>}
