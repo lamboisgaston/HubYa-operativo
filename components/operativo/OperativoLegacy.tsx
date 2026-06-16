@@ -705,7 +705,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const [mensajeFichaHub, setMensajeFichaHub] = useState("Hola, compartimos una actualización de la ficha operativa del Hub.");
   const [incluirPostulantesFicha, setIncluirPostulantesFicha] = useState(true);
   const reporteVisualRef = useRef<HTMLElement>(null);
-  const seleccionReporteInicializadaRef = useRef(false);
+  const firmaSeleccionReporteRef = useRef("");
   const hubsOperativos = useMemo(() => fusionarNombresHubs(hubsCanonicos), [hubsCanonicos]);
   const contactosImportadosFiltrados = useMemo(() => {
     const busquedaNormalizada = normalizarContactoBusqueda(busquedaContactos);
@@ -867,15 +867,14 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   useEffect(() => {
     setClientesReporteSeleccionados((actuales) => {
       const idsValidos = datosHub.clientesIngresos.filter((cliente) => emailValido(cliente.email)).map((cliente) => cliente.id);
-      if (!seleccionReporteInicializadaRef.current) {
-        seleccionReporteInicializadaRef.current = true;
+      const firmaSeleccion = `${jornada.hub}|${idsValidos.join(",")}`;
+      if (firmaSeleccionReporteRef.current !== firmaSeleccion) {
+        firmaSeleccionReporteRef.current = firmaSeleccion;
         return idsValidos;
       }
-      const depurados = actuales.filter((id) => idsValidos.includes(id));
-      const nuevos = idsValidos.filter((id) => !actuales.includes(id));
-      return [...depurados, ...nuevos];
+      return actuales.filter((id) => idsValidos.includes(id));
     });
-  }, [datosHub.clientesIngresos]);
+  }, [datosHub.clientesIngresos, jornada.hub]);
   const fechaFormateada = formatoFecha(jornada.fecha);
   const totalFacturadoHub = datosHub.clientesIngresos.reduce((total, cliente) => total + numero(cliente.importe), 0);
   const totalGastos = datosHub.gastos.reduce((total, gasto) => total + numero(gasto.importe), 0);
@@ -942,7 +941,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : `Cliente ${index + 1}`, [clienteActivo?.id]);
   const destinatariosSeleccionados = destinatariosInformacion.filter((destinatario) => destinatario.incluido);
-  const destinatariosSinTelefonoSeleccionados = destinatariosSeleccionados.filter((destinatario) => !destinatario.telefono.trim());
+  const destinatariosConEmailInformacion = destinatariosInformacion.filter((destinatario) => emailValido(destinatario.email || ""));
 
   useEffect(() => {
     if (!isMounted) return;
@@ -951,11 +950,11 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function seleccionarHubInformacion(hub: HubDisponible) {
     setHubInformacion(hub);
-    setAsuntoInformacion((actual) => actual || `WhatsApp HubYa — ${hub}`);
+    setAsuntoInformacion((actual) => actual || `Email HubYa — ${hub}`);
     setMensajeInformacion((actual) => actual || `Hola, te compartimos información correspondiente al ${hub}.`);
-    setDestinatariosInformacion(normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos.map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email, incluido: Boolean(cliente.telefono.trim()) })));
+    setDestinatariosInformacion(normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos.map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email, incluido: emailValido(cliente.email) })));
     setEstadoInformacion("idle");
-    setMensajeEstadoInformacion("Seleccioná destinatarios, referencia interna y mensaje para enviar.");
+    setMensajeEstadoInformacion("Seleccioná destinatarios con email válido, referencia interna y mensaje para enviar.");
   }
 
   function actualizarDestinatarioInformacion(id: number, incluido: boolean) {
@@ -963,7 +962,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   }
 
   function marcarTodosDestinatarios(incluido: boolean) {
-    setDestinatariosInformacion((actuales) => actuales.map((destinatario) => ({ ...destinatario, incluido: incluido && Boolean(destinatario.telefono.trim()) })));
+    setDestinatariosInformacion((actuales) => actuales.map((destinatario) => ({ ...destinatario, incluido: incluido && emailValido(destinatario.email || "") })));
   }
 
   async function enviarInformacion() {
@@ -977,9 +976,9 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       setMensajeEstadoInformacion("Error: debe seleccionar al menos un destinatario.");
       return;
     }
-    if (destinatariosSinTelefonoSeleccionados.length > 0) {
+    if (destinatariosSeleccionados.some((destinatario) => !emailValido(destinatario.email || ""))) {
       setEstadoInformacion("error");
-      setMensajeEstadoInformacion("Error: no se puede enviar a clientes sin teléfono.");
+      setMensajeEstadoInformacion("Error: no se puede enviar a clientes sin email válido.");
       return;
     }
     if (!asuntoInformacion.trim()) {
@@ -993,18 +992,25 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       return;
     }
 
+    const confirmar = window.confirm(`Vas a enviar este mensaje a ${destinatariosSeleccionados.length} clientes. ¿Confirmar envío?`);
+    if (!confirmar) return;
+
     setEstadoInformacion("enviando");
-    setMensajeEstadoInformacion("Enviando...");
-    const resultados = [];
-    for (const destinatario of destinatariosSeleccionados) {
-      const respuesta = await fetch("/api/whatsapp/enviar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telefonoDestino: destinatario.telefono, nombreCliente: destinatario.nombre, hub: hubInformacion, mensaje: [mensajeInformacion, notaInformacion].filter(Boolean).join("\n\n") }),
-      });
-      const data = await respuesta.json().catch(() => ({}));
-      resultados.push({ ok: respuesta.ok, nombre: destinatario.nombre, error: data?.error });
+    setMensajeEstadoInformacion(`Enviando email a ${destinatariosSeleccionados.length} clientes...`);
+    const respuesta = await fetch("/api/enviar-informacion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hub: hubInformacion, asunto: asuntoInformacion, mensaje: mensajeInformacion, nota: notaInformacion, destinatarios: destinatariosSeleccionados.map(({ nombre, email }) => ({ nombre, email })) }),
+    });
+    const data = await respuesta.json().catch(() => ({}));
+    if (!respuesta.ok && !Array.isArray(data?.errores)) {
+      setEstadoInformacion("error");
+      setMensajeEstadoInformacion(`Error al enviar: ${data?.error || "no se pudo completar el envío."}`);
+      return;
     }
+    const resultados = Array.from({ length: data?.enviados || 0 }, () => ({ ok: true, nombre: "", error: null }));
+    const erroresApi = Array.isArray(data?.errores) ? data.errores : [];
+    for (const error of erroresApi) resultados.push({ ok: false, nombre: error.email || "cliente", error: error.error });
     const errores = resultados.filter((resultado) => !resultado.ok);
     if (errores.length > 0) {
       setEstadoInformacion("error");
@@ -1012,7 +1018,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       return;
     }
     setEstadoInformacion("enviado");
-    setMensajeEstadoInformacion(`WhatsApp enviados individualmente: ${resultados.length}`);
+    setMensajeEstadoInformacion(`Resultado: email enviado a ${resultados.length} clientes seleccionados.`);
   }
 
 
@@ -1788,19 +1794,19 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
         {seccionActiva === "informacion" && <section className="mb-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Módulo independiente</p><h2 className="text-lg font-black">Envío por WhatsApp</h2><p className="text-xs font-semibold text-[#66745c]">No modifica el reporte económico ni la jornada actual. Cada cliente recibe su propio WhatsApp individual. Nunca se usan grupos ni se muestran datos de otros clientes.</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Módulo independiente</p><h2 className="text-lg font-black">Envío por email</h2><p className="text-xs font-semibold text-[#66745c]">No modifica el reporte económico ni la jornada actual. Cada cliente recibe su propio email individual. Nunca se usan grupos ni se muestran datos de otros clientes.</p></div>
             <p className={`rounded-lg border px-3 py-2 text-xs font-black ${estadoInformacion === "error" ? "border-[#d6b7b7] bg-[#fff7f7] text-[#743c3c]" : estadoInformacion === "enviado" ? "border-[#b7d6ba] bg-[#f2fff4] text-[#2f6d32]" : "border-[#cfd8c6] bg-[#f8faf5] text-[#66745c]"}`}>{mensajeEstadoInformacion}</p>
           </div>
           <div className="grid gap-3 lg:grid-cols-[280px_1fr]">
             <div className="space-y-2">
               <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub<select value={hubInformacion} onChange={(e) => e.target.value ? seleccionarHubInformacion(e.target.value as HubDisponible) : setHubInformacion("")} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold outline-none"><option value="">Seleccionar Hub</option>{hubsOperativos.map((hub) => <option key={hub} value={hub}>{hub}</option>)}</select></label>
-              <div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#66745c]">Destinatarios WhatsApp seleccionados: <span className="text-[#1f2a1d]">{destinatariosSeleccionados.length}</span></div>
-              <div className="flex flex-wrap gap-2"><button onClick={() => marcarTodosDestinatarios(true)} className="h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Seleccionar todos</button><button onClick={() => marcarTodosDestinatarios(false)} className="h-7 rounded-md border border-[#cfd8c6] px-3 text-xs font-black">Desmarcar todos</button></div>
+              <div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#66745c]">Clientes seleccionados: <span className="text-[#1f2a1d]">{destinatariosSeleccionados.length} de {destinatariosConEmailInformacion.length}</span></div>
+              <div className="flex flex-wrap gap-2"><button onClick={() => marcarTodosDestinatarios(true)} className="h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Marcar todos</button><button onClick={() => marcarTodosDestinatarios(false)} className="h-7 rounded-md border border-[#cfd8c6] px-3 text-xs font-black">Desmarcar todos</button></div>
             </div>
             <div className="space-y-3">
-              <div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Incluido</th><th className="border p-1">Nombre</th><th className="border p-1">Teléfono WhatsApp</th></tr></thead><tbody>{destinatariosInformacion.length === 0 ? <tr><td colSpan={3} className="border p-3 text-center font-bold text-[#66745c]">Seleccioná un Hub para ver sus clientes.</td></tr> : destinatariosInformacion.map((destinatario, index) => <tr key={`destinatario-${destinatario.id}-${index}`} className={destinatario.incluido ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={destinatario.incluido} disabled={!destinatario.telefono.trim()} onChange={(e) => actualizarDestinatarioInformacion(destinatario.id, e.target.checked)} /></td><td className="border border-[#e1e6dc] p-1 font-semibold">{destinatario.nombre || "Sin nombre"}</td><td className={`border border-[#e1e6dc] p-1 ${destinatario.telefono.trim() ? "" : "font-black text-[#743c3c]"}`}>{destinatario.telefono.trim() || "Sin teléfono: no disponible para envío"}</td></tr>)}</tbody></table></div>
-              <div className="grid gap-2"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Referencia interna<input value={asuntoInformacion} onChange={(e) => setAsuntoInformacion(e.target.value)} placeholder={hubInformacion ? `WhatsApp HubYa — ${hubInformacion}` : "WhatsApp HubYa — [Hub seleccionado]"} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Mensaje principal<textarea value={mensajeInformacion} onChange={(e) => setMensajeInformacion(e.target.value)} placeholder={hubInformacion ? `Hola, te compartimos información correspondiente al ${hubInformacion}.` : "Hola, te compartimos información correspondiente al [Hub seleccionado]."} className="min-h-24 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nota opcional<textarea value={notaInformacion} onChange={(e) => setNotaInformacion(e.target.value)} className="min-h-16 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label></div>
-              <button onClick={enviarInformacion} disabled={estadoInformacion === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar WhatsApp individuales</button>
+              <div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Incluido</th><th className="border p-1">Nombre</th><th className="border p-1">Email</th></tr></thead><tbody>{destinatariosInformacion.length === 0 ? <tr><td colSpan={3} className="border p-3 text-center font-bold text-[#66745c]">Seleccioná un Hub para ver sus clientes.</td></tr> : destinatariosInformacion.map((destinatario, index) => <tr key={`destinatario-${destinatario.id}-${index}`} className={destinatario.incluido ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={destinatario.incluido} disabled={!emailValido(destinatario.email || "")} onChange={(e) => actualizarDestinatarioInformacion(destinatario.id, e.target.checked)} /></td><td className="border border-[#e1e6dc] p-1 font-semibold">{destinatario.nombre || "Sin nombre"}</td><td className={`border border-[#e1e6dc] p-1 ${emailValido(destinatario.email || "") ? "" : "font-black text-[#743c3c]"}`}>{emailValido(destinatario.email || "") ? destinatario.email : "Sin email cargado"}</td></tr>)}</tbody></table></div>
+              <div className="grid gap-2"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Referencia interna<input value={asuntoInformacion} onChange={(e) => setAsuntoInformacion(e.target.value)} placeholder={hubInformacion ? `Email HubYa — ${hubInformacion}` : "Email HubYa — [Hub seleccionado]"} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Mensaje principal<textarea value={mensajeInformacion} onChange={(e) => setMensajeInformacion(e.target.value)} placeholder={hubInformacion ? `Hola, te compartimos información correspondiente al ${hubInformacion}.` : "Hola, te compartimos información correspondiente al [Hub seleccionado]."} className="min-h-24 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nota opcional<textarea value={notaInformacion} onChange={(e) => setNotaInformacion(e.target.value)} className="min-h-16 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label></div>
+              <button onClick={enviarInformacion} disabled={estadoInformacion === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar a seleccionados</button>
             </div>
           </div>
         </section>}
