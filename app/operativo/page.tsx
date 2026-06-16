@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EQUIPOS_ACTIVOS_STORAGE_KEY, ESTADOS_EQUIPO_ACTIVO, ESTADOS_INTEGRANTE, ROLES_INTEGRANTE, SOLICITUDES_OFERTA_STORAGE_KEY, TIPOS_EQUIPO_ACTIVO, createEquipoActivo, equiposActivosIniciales, slugEquipo, type ConsultaEquipoActivo, type EquipoActivo, type IntegranteEquipoActivo, type MensajeEquipoActivo, type SolicitudOferta } from "@/lib/data/equiposActivos";
+import { SOLICITUDES_NUEVO_HUB_STORAGE_KEY, type SolicitudNuevoHub } from "@/components/public/RequestHubForm";
 
 type CampoNumerico = number | "";
 
@@ -126,6 +127,7 @@ const LISTA_GENERAL_CONTACTOS_STORAGE_KEY = "listaGeneralContactos";
 const ACTORES_EQUIPO_STORAGE_KEY = "actoresEquipo";
 const AUXILIARES_STORAGE_KEY = "auxiliares";
 const CONSULTAS_HUB_STORAGE_KEY = "hubya-consultas-hub";
+const NUEVO_HUB_FORM_INICIAL = { tipoHub: "demanda", nombre: "", zona: "", rama: "", equipoOperativo: "", descripcion: "", responsable: "" };
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -590,7 +592,7 @@ export default function Home() {
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
   const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
-  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar" | "consultas" | "equipos">("reporte");
+  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub">("reporte");
   const [hubInformacion, setHubInformacion] = useState<HubDisponible | "">("");
   const [asuntoInformacion, setAsuntoInformacion] = useState("");
   const [mensajeInformacion, setMensajeInformacion] = useState("");
@@ -618,6 +620,9 @@ export default function Home() {
   const [mensajeEquipo, setMensajeEquipo] = useState({ asunto: "", mensaje: "" });
   const [integrantesMensajeSeleccionados, setIntegrantesMensajeSeleccionados] = useState<string[]>(equiposActivosIniciales[0]?.integrantes.map((integrante) => integrante.id) || []);
   const [preguntaEquipo, setPreguntaEquipo] = useState("¿Estás disponible para trabajar la próxima semana?");
+  const [nuevoHubForm, setNuevoHubForm] = useState(NUEVO_HUB_FORM_INICIAL);
+  const [solicitudesNuevoHub, setSolicitudesNuevoHub] = useState<SolicitudNuevoHub[]>([]);
+  const [estadoNuevoHub, setEstadoNuevoHub] = useState("Elegí demanda u oferta para crear un Hub desde el panel interno.");
   const reporteVisualRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -628,6 +633,7 @@ export default function Home() {
     setAuxiliares(leerAuxiliares());
     try { setEquiposActivos(JSON.parse(localStorage.getItem(EQUIPOS_ACTIVOS_STORAGE_KEY) || "null") || equiposActivosIniciales); } catch { setEquiposActivos(equiposActivosIniciales); }
     try { setSolicitudesOferta(JSON.parse(localStorage.getItem(SOLICITUDES_OFERTA_STORAGE_KEY) || "[]")); } catch { setSolicitudesOferta([]); }
+    try { setSolicitudesNuevoHub(JSON.parse(localStorage.getItem(SOLICITUDES_NUEVO_HUB_STORAGE_KEY) || "[]")); } catch { setSolicitudesNuevoHub([]); }
     const consultasGuardadas = leerConsultasHub();
     setConsultasHub(consultasGuardadas);
     setConsultaActivaId("");
@@ -679,6 +685,11 @@ export default function Home() {
     if (!isMounted) return;
     localStorage.setItem(SOLICITUDES_OFERTA_STORAGE_KEY, JSON.stringify(solicitudesOferta));
   }, [solicitudesOferta, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    localStorage.setItem(SOLICITUDES_NUEVO_HUB_STORAGE_KEY, JSON.stringify(solicitudesNuevoHub));
+  }, [solicitudesNuevoHub, isMounted]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -1275,6 +1286,35 @@ export default function Home() {
   }
 
   const conteoSinHub = contactosSinHub.length;
+
+  async function crearHubDesdePanel() {
+    if (!nuevoHubForm.nombre.trim() || !nuevoHubForm.zona.trim()) {
+      setEstadoNuevoHub("Error: nombre y zona son obligatorios para crear un Hub.");
+      return;
+    }
+    if (nuevoHubForm.tipoHub === "oferta") {
+      const nuevo = createEquipoActivo({ nombre: nuevoHubForm.nombre, zonaBase: nuevoHubForm.zona, tipo: "Otro", responsable: nuevoHubForm.responsable, descripcion: nuevoHubForm.descripcion, observaciones: nuevoHubForm.rama });
+      setEquiposActivos((actuales) => [nuevo, ...actuales]);
+      setEquipoActivoId(nuevo.id);
+      setSeccionActiva("equipos");
+      setNuevoHubForm(NUEVO_HUB_FORM_INICIAL);
+      setEstadoNuevoHub(`Hub de oferta / equipo activo creado: ${nuevo.nombre}.`);
+      return;
+    }
+    const respuesta = await fetch("/api/hubs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: nuevoHubForm.nombre, zona: nuevoHubForm.zona, rama: nuevoHubForm.rama, equipoOperativo: nuevoHubForm.equipoOperativo, descripcionPublica: nuevoHubForm.descripcion }) });
+    const data = await respuesta.json().catch(() => ({}));
+    if (!respuesta.ok) {
+      setEstadoNuevoHub(`Error al crear Hub de demanda: ${data.error || "respuesta inválida"}`);
+      return;
+    }
+    setNuevoHubForm(NUEVO_HUB_FORM_INICIAL);
+    setEstadoNuevoHub(`Hub de demanda creado y publicado: ${data.nombre}.`);
+  }
+
+  function actualizarSolicitudNuevoHub(id: string, estado: SolicitudNuevoHub["estado"]) {
+    setSolicitudesNuevoHub((actuales) => actuales.map((solicitud) => solicitud.id === id ? { ...solicitud, estado } : solicitud));
+  }
+
   function actualizarEquipoActivo(id: string, cambios: Partial<EquipoActivo>) {
     setEquiposActivos((actuales) => actuales.map((equipo) => equipo.id === id ? { ...equipo, ...cambios, slug: cambios.nombre ? slugEquipo(cambios.nombre) : equipo.slug } : equipo));
   }
@@ -1356,9 +1396,26 @@ export default function Home() {
             <button onClick={() => setSeccionActiva("reporte")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "reporte" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Reporte diario</button>
             <button onClick={() => setSeccionActiva("informacion")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "informacion" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Envío por WhatsApp</button>
             <button onClick={() => setSeccionActiva("importar")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "importar" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Importar contactos</button>
-            <a href="/operativo/solicitudes" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Solicitudes de ingreso</a><button onClick={() => setSeccionActiva("consultas")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "consultas" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Consultas del Hub</button><a href="/web-publica" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Web pública</a><button onClick={() => setSeccionActiva("equipos")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "equipos" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Equipos activos</button>
+            <a href="/operativo/solicitudes" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Solicitudes de ingreso</a><button onClick={() => setSeccionActiva("nuevoHub")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "nuevoHub" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Nuevo Hub</button><button onClick={() => setSeccionActiva("consultas")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "consultas" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Consultas del Hub</button><a href="/web-publica" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Web pública</a><button onClick={() => setSeccionActiva("equipos")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "equipos" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Equipos activos</button>
           </div>
         </header>
+
+
+
+        {seccionActiva === "nuevoHub" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+          <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Crear Hub</p><h2 className="text-lg font-black">Nuevo Hub de demanda u oferta</h2><p className="text-xs font-semibold text-[#66745c]">Demanda agrupa clientes; oferta crea un Equipo activo para ejecutar una oferta operativa.</p></div>
+          <div className="grid gap-2 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3 md:grid-cols-3">
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Tipo de Hub<select value={nuevoHubForm.tipoHub} onChange={(e) => setNuevoHubForm((actual) => ({ ...actual, tipoHub: e.target.value }))} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm normal-case"><option value="demanda">Hub de demanda</option><option value="oferta">Hub de oferta / Equipo activo</option></select></label>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nombre<input value={nuevoHubForm.nombre} onChange={(e) => setNuevoHubForm((actual) => ({ ...actual, nombre: e.target.value }))} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Zona<input value={nuevoHubForm.zona} onChange={(e) => setNuevoHubForm((actual) => ({ ...actual, zona: e.target.value }))} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Rama / rubro<input value={nuevoHubForm.rama} onChange={(e) => setNuevoHubForm((actual) => ({ ...actual, rama: e.target.value }))} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Equipo operativo / responsable<input value={nuevoHubForm.tipoHub === "demanda" ? nuevoHubForm.equipoOperativo : nuevoHubForm.responsable} onChange={(e) => setNuevoHubForm((actual) => ({ ...actual, [actual.tipoHub === "demanda" ? "equipoOperativo" : "responsable"]: e.target.value }))} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case" /></label>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] md:col-span-3">Descripción<textarea value={nuevoHubForm.descripcion} onChange={(e) => setNuevoHubForm((actual) => ({ ...actual, descripcion: e.target.value }))} className="min-h-20 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case" /></label>
+            <button onClick={crearHubDesdePanel} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white md:col-span-3">Crear Hub</button>
+          </div>
+          <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs font-black text-[#66745c]">{estadoNuevoHub}</p>
+          <div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Solicitudes públicas de nuevos Hubs</h3><div className="mt-2 overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Tipo</th><th className="border p-2">Hub</th><th className="border p-2">Zona</th><th className="border p-2">Contacto</th><th className="border p-2">Descripción</th><th className="border p-2">Estado</th><th className="border p-2">Acciones</th></tr></thead><tbody>{solicitudesNuevoHub.length === 0 ? <tr><td colSpan={7} className="border p-4 text-center font-bold text-[#66745c]">Sin solicitudes públicas de nuevos Hubs.</td></tr> : solicitudesNuevoHub.map((solicitud) => <tr key={solicitud.id}><td className="border p-2 font-black">{solicitud.tipoHub === "demanda" ? "Demanda" : "Oferta"}</td><td className="border p-2">{solicitud.nombreHub}</td><td className="border p-2">{solicitud.zona}</td><td className="border p-2">{solicitud.responsable}<br />{solicitud.whatsapp}<br />{solicitud.email}</td><td className="border p-2">{solicitud.rubro} · {solicitud.descripcion}</td><td className="border p-2 font-black">{solicitud.estado}</td><td className="border p-2"><button onClick={() => actualizarSolicitudNuevoHub(solicitud.id, "aprobada")} className="mr-2 font-black text-[#2f6d32]">Aprobar</button><button onClick={() => actualizarSolicitudNuevoHub(solicitud.id, "rechazada")} className="font-black text-[#743c3c]">Rechazar</button></td></tr>)}</tbody></table></div></div>
+        </section>}
 
         {seccionActiva === "equipos" && equipoActivo && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
