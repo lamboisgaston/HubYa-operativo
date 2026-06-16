@@ -46,12 +46,17 @@ type TotalesResumenHub = {
   totalDistribuido: number;
 };
 
+type EstadoReporteHub = "BORRADOR" | "GUARDADO" | "ENVIADO";
+
 type ResumenGuardadoHub = {
   id: string;
   hub: HubDisponible;
   fecha: string;
   nombre: string;
   guardadoEn: string;
+  ultimaEdicion?: string;
+  estado?: EstadoReporteHub;
+  fechaEnvio?: string;
   datos: DatosHub;
   gastos: FilaGasto[];
   distribucion: (FilaActor & { importeDistribuido: number; importeFinal: number })[];
@@ -120,6 +125,7 @@ type ConsultaHub = {
 
 const LOCAL_STORAGE_KEY = "hubya-jornada-operativa-actual";
 const HISTORIAL_RESUMENES_STORAGE_KEY = "hubya-historial-resumenes";
+const BORRADORES_REPORTES_STORAGE_KEY = "hubya-borradores-reportes";
 const INFORMACION_STORAGE_KEY = "hubya-envio-informacion-borrador";
 const CONTACTOS_SIN_HUB_STORAGE_KEY = "clientesSinHub";
 const CONTACTOS_SIN_HUB_LEGACY_STORAGE_KEY = "hubya-contactos-sin-hub";
@@ -354,6 +360,9 @@ function normalizarResumenGuardado(resumen: Partial<ResumenGuardadoHub>, hub: Hu
     fecha: resumen.fecha || fechaInicial,
     nombre: resumen.nombre || `Jornada ${hub} — ${formatoFecha(resumen.fecha || fechaInicial)}`,
     guardadoEn: resumen.guardadoEn || new Date().toISOString(),
+    ultimaEdicion: resumen.ultimaEdicion || resumen.guardadoEn || new Date().toISOString(),
+    estado: resumen.estado || "GUARDADO",
+    fechaEnvio: resumen.fechaEnvio || "",
     datos,
     gastos: (resumen.gastos || datos.gastos).map((gasto) => ({ id: gasto.id || crearId(), concepto: gasto.concepto || "", importe: gasto.importe ?? 0 })),
     distribucion: (resumen.distribucion || []).map((actor) => ({ ...normalizarActor(actor), importeDistribuido: Number(actor.importeDistribuido || 0), importeFinal: Number(actor.importeFinal || 0) })),
@@ -647,6 +656,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const [hubsCanonicos, setHubsCanonicos] = useState<HubPublico[]>([]);
   const [hubSeleccionado, setHubSeleccionado] = useState(Boolean(initialHubName));
   const [historialResumenes, setHistorialResumenes] = useState<HistorialResumenesPorHub>(historialVacio);
+  const [borradoresReportes, setBorradoresReportes] = useState<HistorialResumenesPorHub>(historialVacio);
+  const [bandejaReportes, setBandejaReportes] = useState<"borradores" | "guardados">("borradores");
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
   const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
@@ -717,6 +728,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       return { ...inicial, hub: initialHubName, datosPorHub: { ...inicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosActuales, initialClientes) } };
     });
     setHistorialResumenes(leerHistorialResumenes());
+    try { setBorradoresReportes(normalizarHistorial(JSON.parse(localStorage.getItem(BORRADORES_REPORTES_STORAGE_KEY) || "{}"))); } catch { setBorradoresReportes(historialVacio()); }
     setContactosSinHub(leerContactosSinHub());
     setContactosImportados(leerContactosTrabajo());
     setAuxiliares(leerAuxiliares());
@@ -754,6 +766,11 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     if (!isMounted) return;
     localStorage.setItem(HISTORIAL_RESUMENES_STORAGE_KEY, JSON.stringify(historialResumenes));
   }, [historialResumenes, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    localStorage.setItem(BORRADORES_REPORTES_STORAGE_KEY, JSON.stringify(borradoresReportes));
+  }, [borradoresReportes, isMounted]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -851,6 +868,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   });
   const totalDistribuido = distribucionCalculada.reduce((total, actor) => total + actor.importeFinal, 0);
   const resumenesDelHub = historialResumenes[jornada.hub] || [];
+  const borradoresDelHub = borradoresReportes[jornada.hub] || [];
+
 
   function actualizarJornada(cambios: Partial<JornadaOperativa>) {
     setJornada((actual) => ({ ...actual, ...cambios }));
@@ -993,6 +1012,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre]);
 
   const asuntoReporte = `Reporte diario HubYa — ${jornada.hub} — ${fechaFormateada}`;
+  const firmaDatosHub = JSON.stringify(datosHub);
 
   const emailPrivado = useMemo(() => [
     `Hola ${clienteActivo?.nombre || "cliente"}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}. Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.`,
@@ -1000,6 +1020,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     "Saludos,",
     "HubYa",
   ].join("\n"), [clienteActivo?.nombre, fechaFormateada, jornada.hub]);
+
+  useEffect(() => {
+    if (!isMounted || !hubSeleccionado || seccionActiva !== "reporte") return;
+    const borrador = { ...crearResumenGuardado(`borrador-${jornada.hub}`, nombreResumenActual(), jornada.fecha), estado: "BORRADOR" as EstadoReporteHub, ultimaEdicion: new Date().toISOString() };
+    setBorradoresReportes((actual) => ({ ...actual, [jornada.hub]: [borrador, ...(actual[jornada.hub] || []).filter((item) => item.id !== borrador.id)] }));
+  }, [firmaDatosHub, isMounted, hubSeleccionado, jornada.fecha, jornada.hub, jornada.nombreResumen, reporteTexto, seccionActiva]);
 
   const clientesDelHub = datosHub.clientesIngresos;
   const clienteActivoReporte = clientesDelHub.find((cliente) => cliente.id === datosHub.clienteActivoId) || clientesDelHub[0] || clienteActivo;
@@ -1167,6 +1193,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       fecha,
       nombre,
       guardadoEn: new Date().toISOString(),
+      ultimaEdicion: new Date().toISOString(),
+      estado: "GUARDADO",
       datos: JSON.parse(JSON.stringify(datosHub)) as DatosHub,
       gastos: JSON.parse(JSON.stringify(datosHub.gastos)) as FilaGasto[],
       distribucion: JSON.parse(JSON.stringify(distribucionCalculada)) as ResumenGuardadoHub["distribucion"],
@@ -1179,11 +1207,36 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     };
   }
 
-  function guardarResumenHub() {
-    const resumen = crearResumenGuardado();
+  function guardarBorradorHub(mensaje = true) {
+    const borrador = { ...crearResumenGuardado(`borrador-${jornada.hub}`, nombreResumenActual(), jornada.fecha), estado: "BORRADOR" as EstadoReporteHub, ultimaEdicion: new Date().toISOString() };
+    setBorradoresReportes((actual) => ({ ...actual, [jornada.hub]: [borrador, ...(actual[jornada.hub] || []).filter((item) => item.id !== borrador.id)] }));
+    if (mensaje) setMensajeGuardado(`Borrador guardado para ${jornada.hub}: ${borrador.nombre}`);
+  }
+
+  function guardarResumenHub(estado: EstadoReporteHub = "GUARDADO") {
+    const resumen = { ...crearResumenGuardado(String(crearId()), nombreResumenActual(), jornada.fecha), estado, fechaEnvio: estado === "ENVIADO" ? new Date().toISOString() : "" };
     setHistorialResumenes((actual) => ({ ...actual, [jornada.hub]: [resumen, ...(actual[jornada.hub] || [])] }));
+    setBorradoresReportes((actual) => ({ ...actual, [jornada.hub]: (actual[jornada.hub] || []).filter((item) => item.id !== `borrador-${jornada.hub}`) }));
     setJornada((actual) => ({ ...actual, nombreResumen: resumen.nombre }));
-    setMensajeGuardado(`Resumen guardado para ${jornada.hub}: ${resumen.nombre}`);
+    setBandejaReportes("guardados");
+    setMensajeGuardado(`Reporte ${estado === "ENVIADO" ? "enviado" : "guardado como definitivo"} para ${jornada.hub}: ${resumen.nombre}`);
+  }
+
+
+  function crearNuevoReporteHub() {
+    const hubActual = jornada.hub;
+    setJornada((actual) => ({ ...actual, hub: hubActual, fecha: fechaInicial, nombreResumen: "", datosPorHub: { ...actual.datosPorHub, [hubActual]: datosHubInicial(hubActual) } }));
+    setHubSeleccionado(true);
+    setBandejaReportes("borradores");
+    setMensajeGuardado(`Nuevo reporte iniciado para ${hubActual}. Se guardará automáticamente como borrador.`);
+  }
+
+  function cerrarBorradorHub(resumen: ResumenGuardadoHub, estado: Exclude<EstadoReporteHub, "BORRADOR">) {
+    const cerrado = normalizarResumenGuardado({ ...resumen, id: String(crearId()), estado, guardadoEn: new Date().toISOString(), ultimaEdicion: new Date().toISOString(), fechaEnvio: estado === "ENVIADO" ? new Date().toISOString() : "" }, resumen.hub);
+    setHistorialResumenes((actual) => ({ ...actual, [resumen.hub]: [cerrado, ...(actual[resumen.hub] || [])] }));
+    setBorradoresReportes((actual) => ({ ...actual, [resumen.hub]: (actual[resumen.hub] || []).filter((item) => item.id !== resumen.id) }));
+    setBandejaReportes("guardados");
+    setMensajeGuardado(`Reporte ${estado === "ENVIADO" ? "enviado" : "guardado como definitivo"}: ${resumen.nombre}`);
   }
 
   function abrirResumenHub(resumen: ResumenGuardadoHub) {
@@ -1193,15 +1246,17 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   }
 
   function duplicarResumenHub(resumen: ResumenGuardadoHub) {
-    const copia = normalizarResumenGuardado({ ...resumen, id: String(crearId()), nombre: `${resumen.nombre} (copia)`, guardadoEn: new Date().toISOString(), fecha: jornada.fecha }, resumen.hub);
-    setHistorialResumenes((actual) => ({ ...actual, [resumen.hub]: [copia, ...(actual[resumen.hub] || [])] }));
+    const copia = normalizarResumenGuardado({ ...resumen, id: `borrador-${resumen.hub}-${crearId()}`, nombre: `${resumen.nombre} (nuevo borrador)`, guardadoEn: new Date().toISOString(), ultimaEdicion: new Date().toISOString(), estado: "BORRADOR", fecha: jornada.fecha }, resumen.hub);
+    setBorradoresReportes((actual) => ({ ...actual, [resumen.hub]: [copia, ...(actual[resumen.hub] || [])] }));
+    setBandejaReportes("borradores");
     abrirResumenHub(copia);
   }
 
   function eliminarResumenHub(resumen: ResumenGuardadoHub) {
-    if (!window.confirm(`¿Eliminar el resumen "${resumen.nombre}"?`)) return;
-    setHistorialResumenes((actual) => ({ ...actual, [resumen.hub]: (actual[resumen.hub] || []).filter((item) => item.id !== resumen.id) }));
-    setMensajeGuardado(`Resumen eliminado: ${resumen.nombre}`);
+    if (!window.confirm(`¿Eliminar el reporte "${resumen.nombre}"?`)) return;
+    if (resumen.estado === "BORRADOR") setBorradoresReportes((actual) => ({ ...actual, [resumen.hub]: (actual[resumen.hub] || []).filter((item) => item.id !== resumen.id) }));
+    else setHistorialResumenes((actual) => ({ ...actual, [resumen.hub]: (actual[resumen.hub] || []).filter((item) => item.id !== resumen.id) }));
+    setMensajeGuardado(`Reporte eliminado: ${resumen.nombre}`);
   }
 
   async function copiarTexto(texto: string, etiqueta: string) {
@@ -1825,14 +1880,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           <details className="rounded-xl border border-[#1f2a1d] bg-[#1f2a1d] p-3 text-white shadow-sm"><summary className="cursor-pointer text-sm font-black uppercase tracking-wide">Mail corto para enviar con el documento</summary><div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]"><select value={datosHub.clienteActivoId} onChange={(e) => actualizarDatosHub({ clienteActivoId: Number(e.target.value) })} className="h-8 rounded-lg bg-white px-2 text-sm font-semibold text-[#182018]">{datosHub.clientesIngresos.map((cliente, index) => <option key={`cliente-activo-${cliente.id}-${index}`} value={cliente.id}>{cliente.nombre || "Sin cliente"}</option>)}</select><button onClick={() => copiarTexto(emailPrivado, "Email privado")} className="h-8 rounded-lg bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar texto del mail</button></div><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/10 p-3 text-xs leading-5">{emailPrivado}</pre></details>
           <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Historial independiente</p><h2 className="text-lg font-black">Resúmenes guardados del Hub</h2><p className="text-xs font-bold text-[#66745c]">Solo se listan resúmenes de {jornada.hub}.</p></div>
-              <button onClick={guardarResumenHub} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar resumen del Hub</button>
+              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Reportes del Hub</p><h2 className="text-lg font-black">{jornada.hub}</h2><p className="text-xs font-bold text-[#66745c]">Bandejas separadas: borradores de trabajo e historial guardado.</p></div>
+              <div className="flex flex-wrap gap-2"><button onClick={crearNuevoReporteHub} className="h-8 rounded-lg border border-[#cfd8c6] px-3 text-xs font-black">Crear nuevo reporte</button><button onClick={() => guardarBorradorHub()} className="h-8 rounded-lg border border-[#cfd8c6] px-3 text-xs font-black">Guardar borrador</button><button onClick={() => guardarResumenHub("GUARDADO")} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar como definitivo</button></div>
             </div>
+            <div className="mb-3 flex gap-2"><button onClick={() => setBandejaReportes("borradores")} className={`rounded-lg px-3 py-2 text-xs font-black ${bandejaReportes === "borradores" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-[#f8faf5]"}`}>Borradores ({borradoresDelHub.length})</button><button onClick={() => setBandejaReportes("guardados")} className={`rounded-lg px-3 py-2 text-xs font-black ${bandejaReportes === "guardados" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-[#f8faf5]"}`}>Guardados ({resumenesDelHub.length})</button></div>
             <div className="overflow-x-auto rounded-lg border border-[#d8dfd1]">
-              <table className="w-full border-collapse text-xs">
-                <thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1.5">Fecha</th><th className="border p-1.5">Nombre del resumen</th><th className="border p-1.5">Estado operativo</th><th className="border p-1.5 text-right">Total facturado</th><th className="border p-1.5">Guardado</th><th className="border p-1.5">Acciones</th></tr></thead>
-                <tbody>{resumenesDelHub.length === 0 ? <tr><td colSpan={6} className="border p-3 text-center font-bold text-[#66745c]">Todavía no hay resúmenes guardados para {jornada.hub}.</td></tr> : resumenesDelHub.map((resumen, index) => <tr key={`resumen-${resumen.id}-${index}`}><td className="border border-[#e1e6dc] p-1.5 font-semibold">{formatoFecha(resumen.fecha)}</td><td className="border border-[#e1e6dc] p-1.5 font-bold">{resumen.nombre}</td><td className="border border-[#e1e6dc] p-1.5">{resumen.estadoOperativo || "Sin cargar"}</td><td className="border border-[#e1e6dc] p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalFacturado)}</td><td className="border border-[#e1e6dc] p-1.5">{new Date(resumen.guardadoEn).toLocaleString("es-AR")}</td><td className="border border-[#e1e6dc] p-1.5"><div className="flex flex-wrap gap-1"><button onClick={() => abrirResumenHub(resumen)} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Abrir</button><button onClick={() => duplicarResumenHub(resumen)} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Duplicar</button><button onClick={() => eliminarResumenHub(resumen)} className="h-7 rounded-md border border-[#d6b7b7] bg-[#fff7f7] px-2 text-[11px] font-black text-[#743c3c]">Eliminar</button></div></td></tr>)}</tbody>
-              </table>
+              {bandejaReportes === "borradores" ? <table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1.5">Fecha</th><th className="border p-1.5">Nombre del reporte</th><th className="border p-1.5 text-right">Clientes</th><th className="border p-1.5 text-right">Total facturado</th><th className="border p-1.5">Estado</th><th className="border p-1.5">Última edición</th><th className="border p-1.5">Acciones</th></tr></thead><tbody>{borradoresDelHub.length === 0 ? <tr><td colSpan={7} className="border p-3 text-center font-bold text-[#66745c]">Todavía no hay borradores para {jornada.hub}.</td></tr> : borradoresDelHub.map((resumen, index) => <tr key={`borrador-${resumen.id}-${index}`}><td className="border p-1.5 font-semibold">{formatoFecha(resumen.fecha)}</td><td className="border p-1.5 font-bold">{resumen.nombre}</td><td className="border p-1.5 text-right font-black">{resumen.datos.clientesIngresos.length}</td><td className="border p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalFacturado)}</td><td className="border p-1.5 font-black text-[#8a6a16]">BORRADOR</td><td className="border p-1.5">{new Date(resumen.ultimaEdicion || resumen.guardadoEn).toLocaleString("es-AR")}</td><td className="border p-1.5"><div className="flex flex-wrap gap-1"><button onClick={() => abrirResumenHub(resumen)} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Continuar editando</button><button onClick={() => cerrarBorradorHub(resumen, "ENVIADO")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Enviar</button><button onClick={() => cerrarBorradorHub(resumen, "GUARDADO")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Guardar como definitivo</button><button onClick={() => eliminarResumenHub(resumen)} className="h-7 rounded-md border border-[#d6b7b7] bg-[#fff7f7] px-2 text-[11px] font-black text-[#743c3c]">Eliminar</button></div></td></tr>)}</tbody></table> : <table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1.5">Fecha</th><th className="border p-1.5">Nombre del reporte</th><th className="border p-1.5 text-right">Clientes</th><th className="border p-1.5 text-right">Facturado</th><th className="border p-1.5 text-right">Gastos</th><th className="border p-1.5 text-right">A distribuir</th><th className="border p-1.5">Estado</th><th className="border p-1.5">Envío</th><th className="border p-1.5">Acciones</th></tr></thead><tbody>{resumenesDelHub.length === 0 ? <tr><td colSpan={9} className="border p-3 text-center font-bold text-[#66745c]">Todavía no hay reportes guardados para {jornada.hub}.</td></tr> : resumenesDelHub.map((resumen, index) => <tr key={`resumen-${resumen.id}-${index}`}><td className="border p-1.5 font-semibold">{formatoFecha(resumen.fecha)}</td><td className="border p-1.5 font-bold">{resumen.nombre}</td><td className="border p-1.5 text-right font-black">{resumen.datos.clientesIngresos.length}</td><td className="border p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalFacturado)}</td><td className="border p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalGastos)}</td><td className="border p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalADistribuir)}</td><td className="border p-1.5 font-black">{resumen.estado || "GUARDADO"}</td><td className="border p-1.5">{resumen.fechaEnvio ? new Date(resumen.fechaEnvio).toLocaleString("es-AR") : "—"}</td><td className="border p-1.5"><div className="flex flex-wrap gap-1"><button onClick={() => abrirResumenHub(resumen)} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Ver reporte</button><button onClick={() => guardarResumenHub("ENVIADO")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Reenviar</button><button onClick={() => copiarTexto(resumen.reporteTexto || reporteTexto, "Reporte guardado")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Copiar</button><button onClick={descargarImagenReporte} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Descargar imagen</button><button onClick={() => duplicarResumenHub(resumen)} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Duplicar como nuevo borrador</button></div></td></tr>)}</tbody></table>}
             </div>
           </section>
 

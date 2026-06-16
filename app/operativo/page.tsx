@@ -58,7 +58,7 @@ export default async function OperativoPage() {
                 </div>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  <Link href={`/operativo/hubs/${hub.slug}/reporte`} className="rounded-2xl bg-[#1f2a1d] px-4 py-3 text-center text-sm font-black text-white">Reporte diario</Link>
+                  <Link href={`/operativo/hubs/${hub.slug}/reportes`} className="rounded-2xl bg-[#1f2a1d] px-4 py-3 text-center text-sm font-black text-white">Reportes del Hub</Link>
                   <Link href={`/operativo/hubs/${hub.slug}/ficha`} className="rounded-2xl border border-[#cfd8c6] bg-white px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Editar ficha</Link>
                 </div>
               </article>
