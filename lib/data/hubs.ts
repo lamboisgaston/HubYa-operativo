@@ -9,9 +9,13 @@ export type HubServicio = { id: string; hub_id: string; nombre_servicio: string;
 export type HubServicioVinculo = { id: string; hub_servicio_id: string; oferta_nombre: string; estado: EstadoHubServicioVinculo; responsable: string; observaciones: string; created_at: string; updated_at: string };
 export type HubServicioPublico = HubServicio & { vinculoActivo: HubServicioVinculo | null; postulantes: HubServicioVinculo[] };
 export type HubPublico = Hub & { clientesActivos: number; servicios: HubServicioPublico[] };
+export type EstadoReporteHub = "BORRADOR" | "GUARDADO" | "ENVIADO";
+export type ReporteHub = { id: string; hubId?: string; hub?: string; estado: EstadoReporteHub; nombre?: string; fecha?: string; totales?: { totalFacturado?: number; totalGastos?: number; totalADistribuir?: number; totalDistribuido?: number }; [key: string]: unknown };
+export type HubOperativo = HubPublico & { cantidadClientes: number; cantidadReportesBorrador: number; cantidadReportesGuardados: number; estabilidadOperativa: string; serviciosActivos: HubServicioPublico[] };
+export type HubDetalleOperativo = HubOperativo & { ficha: HubPublico; clientes: Cliente[]; reportesBorrador: ReporteHub[]; reportesGuardados: ReporteHub[]; reportesEnviados: ReporteHub[]; vinculos: HubServicioVinculo[]; postulantes: HubServicioVinculo[] };
 export type NuevoHubDemandaInput = { nombre: string; zona: string; descripcionPublica?: string; rama?: string; equipoOperativo?: string };
 
-type Store = { hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[] };
+type Store = { hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[]; reportes?: ReporteHub[] };
 const DATA_FILE = path.join(process.cwd(), "data", "hubya-public.json");
 const now = new Date().toISOString();
 const seedHubs: Hub[] = ["Tipal", "Punto", "Praderas", "Valle Escondido", "Chacras de Santa María", "La Aguada", "Prado", "La Reserva"].map((zona, index) => ({ id: `hub-${index + 1}`, nombre: `Hub ${zona}`, slug: zona.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), zona, estado: "activo", descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente, equipo disponible y trabajos programados sin exponer datos privados de clientes.`, rama: "JardinerosYa", equipoOperativo: "JardinerosYa01", activo: true, trabajosRealizados: 0, ultimaActividad: now, createdAt: now, updatedAt: now }));
@@ -44,17 +48,56 @@ const seedHubServicioVinculos: HubServicioVinculo[] = seedServicios.flatMap((ser
 });
 export const MODELOS_SUGERIDOS = "Producción real: usar PostgreSQL con Prisma, Supabase, Neon o la base elegida. Modelos sugeridos: Hub, Cliente, hub_servicios y hub_servicio_vinculos. Regla: el vínculo pertenece siempre a una demanda/servicio dentro de un Hub, no a un Hub abstracto.";
 
+export function normalizarClaveHub(valor: string) {
+  return valor.replace(/^hub\s+/i, "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+}
+
+export function nombreHubCanonico(valor: string) {
+  const base = valor.replace(/^hub\s+/i, "").trim();
+  const prolijo = base.toLowerCase().split(/\s+/).filter(Boolean).map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1)).join(" ");
+  return `Hub ${prolijo || "Nuevo"}`;
+}
+
+function estabilidadReferencial(cantidadClientes: number) {
+  if (cantidadClientes <= 0) return "Sin datos reales";
+  return `${Math.max(1, Math.ceil(cantidadClientes / 12))} persona estable`;
+}
+
 function mergeById<T extends { id: string }>(actuales: T[] | undefined, semillas: T[]): T[] {
   const idsActuales = new Set((actuales || []).map((item) => item.id));
   return [...(actuales || []), ...semillas.filter((semilla) => !idsActuales.has(semilla.id))];
 }
 
-function normalizeStore(store: Partial<Store>): Store {
-  const hubs = mergeById(store.hubs, seedHubs);
-  const hub_servicios = mergeById(store.hub_servicios, seedServicios);
-  const hub_servicio_vinculos = mergeById(store.hub_servicio_vinculos, seedHubServicioVinculos);
+function deduplicarHubs(hubsEntrada: Hub[]) {
+  const idCanonico = new Map<string, string>();
+  const hubs: Hub[] = [];
+  for (const hub of hubsEntrada) {
+    const clave = normalizarClaveHub(hub.nombre || hub.zona || hub.slug);
+    const existenteId = idCanonico.get(clave);
+    if (existenteId) {
+      idCanonico.set(hub.id, existenteId);
+      continue;
+    }
+    const slug = slugHub(hub.nombre.replace(/^Hub\s+/i, "") || hub.zona || hub.slug);
+    const canonico = { ...hub, nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim() };
+    idCanonico.set(clave, canonico.id);
+    idCanonico.set(canonico.id, canonico.id);
+    idCanonico.set(canonico.slug, canonico.id);
+    hubs.push(canonico);
+  }
+  return { hubs, idCanonico };
+}
 
-  return { hubs, clientes: store.clientes || seedClientes, solicitudes: store.solicitudes || [], hub_servicios, hub_servicio_vinculos };
+function normalizeStore(store: Partial<Store>): Store {
+  const mezclados = mergeById(store.hubs, seedHubs);
+  const { hubs, idCanonico } = deduplicarHubs(mezclados);
+  const hub_servicios = mergeById(store.hub_servicios, seedServicios).map((servicio) => ({ ...servicio, hub_id: idCanonico.get(servicio.hub_id) || servicio.hub_id }));
+  const hub_servicio_vinculos = mergeById(store.hub_servicio_vinculos, seedHubServicioVinculos);
+  const hubPorClave = new Map(hubs.flatMap((hub) => [[normalizarClaveHub(hub.nombre), hub.id], [normalizarClaveHub(hub.zona), hub.id], [hub.slug, hub.id]]));
+  const clientes = (store.clientes || seedClientes).map((cliente) => ({ ...cliente, hubId: idCanonico.get(cliente.hubId) || hubPorClave.get(normalizarClaveHub(cliente.hubId)) || cliente.hubId }));
+  const reportes = (store.reportes || []).map((reporte) => ({ ...reporte, hubId: (reporte.hubId && (idCanonico.get(reporte.hubId) || hubPorClave.get(normalizarClaveHub(reporte.hubId)))) || (reporte.hub && hubPorClave.get(normalizarClaveHub(reporte.hub))) || reporte.hubId }));
+
+  return { hubs, clientes, solicitudes: store.solicitudes || [], hub_servicios, hub_servicio_vinculos, reportes };
 }
 async function readStore(): Promise<Store> { try { return normalizeStore(JSON.parse(await readFile(DATA_FILE, "utf8"))); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; const store = normalizeStore({}); await writeStore(store); return store; } }
 async function writeStore(store: Store) { await mkdir(path.dirname(DATA_FILE), { recursive: true }); await writeFile(DATA_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf8"); }
@@ -67,3 +110,22 @@ export async function createHubDemanda(input: NuevoHubDemandaInput) { const stor
 export async function addClienteToHub(hubId: string, cliente: Omit<Cliente, "id" | "hubId" | "estado" | "createdAt" | "updatedAt">) { const store = await readStore(); const timestamp = new Date().toISOString(); const nuevo: Cliente = { id: `cliente-${Date.now()}`, hubId, estado: "activo", createdAt: timestamp, updatedAt: timestamp, ...cliente }; store.clientes = [nuevo, ...store.clientes]; await writeStore(store); return nuevo; }
 export async function updatePublicStore(mutator: (store: Store) => Store | Promise<Store>) { const store = await readStore(); const next = await mutator(store); await writeStore(next); return next; }
 export async function getPublicStore() { return readStore(); }
+export async function getClientesPorHub(hubId: string) { return getClientesByHubId(hubId); }
+export async function getReportesPorHub(hubId: string) { const store = await readStore(); return (store.reportes || []).filter((reporte) => reporte.hubId === hubId || reporte.hub === hubId); }
+export async function getHubsOperativos(): Promise<HubOperativo[]> {
+  const hubs = await getHubs();
+  const store = await readStore();
+  return hubs.map((hub) => {
+    const reportes = (store.reportes || []).filter((reporte) => reporte.hubId === hub.id || reporte.hub === hub.nombre);
+    const serviciosActivos = hub.servicios.filter((servicio) => servicio.activo);
+    return { ...hub, cantidadClientes: hub.clientesActivos, cantidadReportesBorrador: reportes.filter((reporte) => reporte.estado === "BORRADOR").length, cantidadReportesGuardados: reportes.filter((reporte) => reporte.estado === "GUARDADO" || reporte.estado === "ENVIADO").length, estabilidadOperativa: estabilidadReferencial(hub.clientesActivos), serviciosActivos };
+  });
+}
+export async function getHubDetalle(hubId: string): Promise<HubDetalleOperativo | null> {
+  const hub = (await getHubsOperativos()).find((item) => item.id === hubId || item.slug === hubId);
+  if (!hub) return null;
+  const clientes = await getClientesPorHub(hub.id);
+  const reportes = await getReportesPorHub(hub.id);
+  const vinculos = hub.servicios.flatMap((servicio) => [servicio.vinculoActivo, ...servicio.postulantes].filter((vinculo): vinculo is HubServicioVinculo => Boolean(vinculo)));
+  return { ...hub, ficha: hub, clientes, reportesBorrador: reportes.filter((reporte) => reporte.estado === "BORRADOR"), reportesGuardados: reportes.filter((reporte) => reporte.estado === "GUARDADO"), reportesEnviados: reportes.filter((reporte) => reporte.estado === "ENVIADO"), vinculos, postulantes: vinculos.filter((vinculo) => vinculo.estado === "POSTULANTE") };
+}
