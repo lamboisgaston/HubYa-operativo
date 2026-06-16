@@ -650,7 +650,7 @@ function leerJornadaInicial(): JornadaOperativa {
   return { ...base, datosPorHub: aplicarClientesPorHub(base.datosPorHub, leerClientesPorHub()) };
 }
 
-export default function OperativoLegacy({ initialSection = "reporte", initialHubName, initialClientes = [] }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string; initialClientes?: Cliente[] }) {
+export default function OperativoLegacy({ initialSection = "reporte", initialHubName, initialClientes = [], simpleMode = false }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string; initialClientes?: Cliente[]; simpleMode?: boolean }) {
   const [isMounted, setIsMounted] = useState(false);
   const [jornada, setJornada] = useState<JornadaOperativa>(() => initialHubName ? { ...jornadaInicial, hub: initialHubName, datosPorHub: { ...jornadaInicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosHubInicial(initialHubName), initialClientes) } } : jornadaInicial);
   const [hubsCanonicos, setHubsCanonicos] = useState<HubPublico[]>([]);
@@ -1632,7 +1632,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   return (
     <main className="min-h-screen bg-[#eef2e8] text-[#182018]">
       <section className="mx-auto max-w-[1600px] px-3 py-3 sm:px-4">
-        <header className="sticky top-0 z-20 mb-3 rounded-xl border border-[#cfd8c6] bg-white/95 p-3 shadow-sm backdrop-blur">
+        {!simpleMode && <header className="sticky top-0 z-20 mb-3 rounded-xl border border-[#cfd8c6] bg-white/95 p-3 shadow-sm backdrop-blur">
           <div className="grid gap-2 xl:grid-cols-[1fr_220px_180px_220px_auto] xl:items-end">
             <div><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HubYa Operativo · carga manual + reporte vivo</p><h1 className="text-xl font-black leading-tight">Reporte del Hub — {jornada.hub} — {fechaFormateada}</h1></div>
             <div className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]"><span>Hub seleccionado</span><div className="flex h-8 items-center rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-2 text-sm font-black normal-case text-[#1f2a1d]">{jornada.hub} · {datosHub.clientesIngresos.length} clientes</div></div>
@@ -1647,7 +1647,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             <button onClick={() => setSeccionActiva("importar")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "importar" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Importar contactos</button>
             <a href="/operativo/solicitudes" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Solicitudes de ingreso</a><button onClick={() => setSeccionActiva("nuevoHub")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "nuevoHub" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Nuevo Hub</button><button onClick={() => setSeccionActiva("consultas")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "consultas" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Consultas del Hub</button><a href="/web-publica" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Web pública</a><button onClick={() => setSeccionActiva("vinculos")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "vinculos" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Vínculos</button><button onClick={() => setSeccionActiva("equipos")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "equipos" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Equipos activos</button>
           </div>
-        </header>
+        </header>}
 
 
 

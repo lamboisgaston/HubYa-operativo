@@ -1,0 +1,51 @@
+import Link from "next/link";
+import { getHubDetalle } from "@/lib/data/hubs";
+import { getHubOr404 } from "./utils";
+
+export default async function HubEntradaPage({ params }: { params: Promise<{ hubId: string }> }) {
+  const { hubId } = await params;
+  const hub = await getHubOr404(hubId);
+  const detalle = await getHubDetalle(hub.id);
+  const serviciosActivos = hub.servicios.filter((servicio) => servicio.activo).length;
+
+  return (
+    <main className="min-h-screen bg-[#f6f7f2] px-4 py-6 text-[#1f2a1d]">
+      <section className="mx-auto grid max-w-5xl gap-5">
+        <header className="rounded-[2rem] border border-[#d8dfd1] bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#7a8a6d]">Hub seleccionado: {hub.nombre}</p>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-black">¿Qué querés hacer?</h1>
+              <p className="mt-1 text-sm font-bold text-[#66745c]">Entrá solo a la herramienta que necesitás usar ahora.</p>
+            </div>
+            <Link href="/operativo" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black">Volver a mis Hubs</Link>
+          </div>
+        </header>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[
+            ["Ficha del Hub", "ficha"],
+            ["Reportes", "reportes"],
+            ["Contactos", "contactos"],
+            ["Vínculos", "vinculos"],
+          ].map(([label, path]) => (
+            <Link key={path} href={`/operativo/hubs/${hub.slug}/${path}`} className="rounded-[2rem] border border-[#d8dfd1] bg-white p-8 text-center text-2xl font-black shadow-sm transition hover:border-[#1f2a1d] hover:bg-[#eef2e8]">
+              {label}
+            </Link>
+          ))}
+        </div>
+
+        <section className="rounded-[2rem] border border-[#d8dfd1] bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-black">Resumen simple</h2>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Vecinos</dt><dd className="text-2xl font-black">{hub.clientesActivos}</dd></div>
+            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Borradores</dt><dd className="text-2xl font-black">{detalle?.reportesBorrador.length ?? 0}</dd></div>
+            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Reportes guardados</dt><dd className="text-2xl font-black">{(detalle?.reportesGuardados.length ?? 0) + (detalle?.reportesEnviados.length ?? 0)}</dd></div>
+            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Servicios activos</dt><dd className="text-2xl font-black">{serviciosActivos}</dd></div>
+            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Estabilidad operativa</dt><dd className="font-black">{detalle?.estabilidadOperativa ?? "Sin datos"}</dd></div>
+          </dl>
+        </section>
+      </section>
+    </main>
+  );
+}
