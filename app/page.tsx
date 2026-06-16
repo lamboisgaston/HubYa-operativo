@@ -609,6 +609,7 @@ export default function Home() {
   const [opcionesConsulta, setOpcionesConsulta] = useState(["Sí", "No", "Puede ser"]);
   const [clientesConsultaSeleccionados, setClientesConsultaSeleccionados] = useState<number[]>([]);
   const [consultaActivaId, setConsultaActivaId] = useState("");
+  const [pasoConsulta, setPasoConsulta] = useState<"seleccionar" | "crear" | "enviar" | "resultados">("seleccionar");
   const reporteVisualRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -619,10 +620,10 @@ export default function Home() {
     setAuxiliares(leerAuxiliares());
     const consultasGuardadas = leerConsultasHub();
     setConsultasHub(consultasGuardadas);
-    setConsultaActivaId(consultasGuardadas[0]?.id || "");
+    setConsultaActivaId("");
     leerConsultasServidor().then((consultasRemotas) => {
       setConsultasHub((actuales) => fusionarConsultasHub(actuales, consultasRemotas));
-      setConsultaActivaId((actual) => actual || consultasRemotas[0]?.id || "");
+      setConsultaActivaId((actual) => actual);
     }).catch(() => {
       // Las respuestas externas requieren persistencia de servidor; localStorage no permite compartir estado entre el cliente que responde y el panel administrador.
     });
@@ -1146,7 +1147,7 @@ export default function Home() {
   }
 
   const consultasDelHubSeleccionado = consultasHub.filter((consulta) => consulta.hub === hubConsulta).sort((a, b) => new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime());
-  const consultaActiva = consultasHub.find((consulta) => consulta.id === consultaActivaId && consulta.hub === hubConsulta) || consultasDelHubSeleccionado.at(-1);
+  const consultaActiva = consultasHub.find((consulta) => consulta.id === consultaActivaId && consulta.hub === hubConsulta);
   const clientesDisponiblesConsulta = jornada.datosPorHub[hubConsulta].clientesIngresos;
   const respuestasPorCliente = new Map((consultaActiva?.respuestas || []).map((respuesta) => [respuesta.clienteId, respuesta]));
   const opcionesVisiblesConsulta = consultaActiva?.opciones || opcionesConsulta;
@@ -1161,11 +1162,11 @@ export default function Home() {
     setHubConsulta(hub);
     setPreguntaConsulta(`¿Vas a seguir formando parte del ${hub} el próximo año?`);
     setClientesConsultaSeleccionados(jornada.datosPorHub[hub].clientesIngresos.filter((cliente) => cliente.email.trim()).map((cliente) => cliente.id));
-    const ultimaConsulta = consultasHub.filter((consulta) => consulta.hub === hub).sort((a, b) => new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime()).at(-1);
-    setConsultaActivaId(ultimaConsulta?.id || "");
+    setConsultaActivaId("");
+    setPasoConsulta("seleccionar");
   }
 
-  async function crearYEnviarConsultaHub() {
+  async function crearConsultaHub() {
     const opciones = opcionesConsulta.map((opcion) => opcion.trim()).filter(Boolean);
     const clientesDestinatarios = clientesDisponiblesConsulta.filter((cliente) => clientesConsultaSeleccionados.includes(cliente.id) && cliente.email.trim()).map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email }));
     if (!preguntaConsulta.trim() || opciones.length === 0 || clientesDestinatarios.length === 0) return setMensajeGuardado("Completá pregunta, opciones y al menos un cliente con email para crear la encuesta.");
@@ -1173,14 +1174,12 @@ export default function Home() {
     const id = `consulta-${Date.now()}`;
     const fechaCreacion = new Date().toISOString();
     const titulo = `Encuesta N°${numeroEncuesta} — ${hubConsulta} — ${formatoFecha(fechaCreacion.slice(0, 10))}`;
-    const consulta: ConsultaHub = { id, hub: hubConsulta, titulo, pregunta: preguntaConsulta.trim(), opciones, clientesDestinatarios: clientesDestinatarios.map((cliente) => ({ ...cliente, token: crearTokenConsulta(id, cliente.id, hubConsulta) })), respuestas: [], fechaCreacion, estado: "activa" };
+    const consulta: ConsultaHub = { id, hub: hubConsulta, titulo, pregunta: preguntaConsulta.trim(), opciones, clientesDestinatarios: clientesDestinatarios.map((cliente) => ({ ...cliente, token: crearTokenConsulta(id, cliente.id, hubConsulta) })), respuestas: [], fechaCreacion, estado: "borrador" };
     setConsultasHub((actuales) => [consulta, ...actuales]);
     setConsultaActivaId(id);
+    setPasoConsulta("enviar");
     await guardarConsultaServidor(consulta).catch(() => undefined);
-    const destinatarios = consulta.clientesDestinatarios.map((cliente) => ({ nombre: cliente.nombre, email: cliente.email, links: Object.fromEntries(consulta.opciones.map((opcion) => [opcion, linkConsulta(cliente.token, opcion)])) }));
-    const respuesta = await fetch("/api/enviar-consulta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hub: consulta.hub, pregunta: consulta.pregunta, destinatarios }) });
-    const data = await respuesta.json().catch(() => ({}));
-    setMensajeGuardado(respuesta.ok ? `${titulo}: creada y enviada por email a ${data.enviados} cliente(s).` : `${titulo}: guardada. Resend no envió (${data.error || "sin configuración"}); usá los links/mails para copiar.`);
+    setMensajeGuardado(`${titulo}: creada como borrador. Ahora podés enviarla.`);
   }
 
   function cerrarConsultaHub(id: string) {
@@ -1239,7 +1238,15 @@ export default function Home() {
       body: JSON.stringify({ hub: consultaActiva.hub, pregunta: consultaActiva.pregunta, destinatarios }),
     });
     const data = await respuesta.json().catch(() => ({}));
-    setMensajeGuardado(respuesta.ok ? `Consulta enviada por email a ${data.enviados} cliente(s).` : `No se pudo enviar por Resend: ${data.error || "error desconocido"}`);
+    if (respuesta.ok) {
+      const actualizada = { ...consultaActiva, estado: "activa" as EstadoConsultaHub };
+      setConsultasHub((actuales) => actuales.map((consulta) => consulta.id === actualizada.id ? actualizada : consulta));
+      guardarConsultaServidor(actualizada).catch(() => undefined);
+      setPasoConsulta("resultados");
+      setMensajeGuardado(`Encuesta enviada por email a ${data.enviados} cliente(s).`);
+      return;
+    }
+    setMensajeGuardado(`No se pudo enviar por Resend: ${data.error || "error desconocido"}`);
   }
 
   const conteoSinHub = contactosSinHub.length;
@@ -1305,36 +1312,45 @@ export default function Home() {
 
 
         {seccionActiva === "consultas" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Consultas del Hub</p><h2 className="text-lg font-black">Encuestas simples del Hub</h2><p className="text-xs font-semibold text-[#66745c]">Elegí un Hub, escribí la pregunta y tocá Crear y enviar encuesta. Cada cliente recibe links únicos y privados.</p></div>
-            <button onClick={crearYEnviarConsultaHub} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white">Crear y enviar encuesta</button>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Consultas del Hub</p>
+            <h2 className="text-lg font-black">Encuestas simples por pasos</h2>
+            <p className="text-xs font-semibold text-[#66745c]">Flujo ordenado: elegí Hub, creá la encuesta, enviala y revisá resultados individuales.</p>
           </div>
-          <div className="grid gap-3 xl:grid-cols-[300px_1.2fr_1fr]">
-            <section className="rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3">
-              <p className="mb-2 text-[11px] font-black uppercase text-[#66745c]">A) Selección de Hub</p>
-              <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub<select value={hubConsulta} onChange={(e) => seleccionarHubConsulta(e.target.value as HubDisponible)} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold outline-none">{HUBS_DISPONIBLES.map((hub) => <option key={`consulta-hub-${hub}`} value={hub}>{hub}</option>)}</select></label>
-              <div className="mt-3 rounded-lg border border-[#cfd8c6] bg-white p-2 text-xs font-bold text-[#66745c]">Total clientes del Hub: <span className="text-[#1f2a1d]">{totalClientesHubConsulta}</span></div>
-            </section>
+          <div className="grid gap-2 md:grid-cols-4">
+            {[["seleccionar", "1. Seleccionar Hub"], ["crear", "2. Crear encuesta"], ["enviar", "3. Enviar encuesta"], ["resultados", "4. Ver resultados"]].map(([paso, etiqueta]) => <div key={paso} className={`rounded-lg border p-2 text-xs font-black ${pasoConsulta === paso ? "border-[#1f2a1d] bg-[#1f2a1d] text-white" : "border-[#d8dfd1] bg-[#f8faf5] text-[#66745c]"}`}>{etiqueta}</div>)}
+          </div>
 
-            <section className="space-y-3 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3">
-              <p className="text-[11px] font-black uppercase text-[#66745c]">B) Nueva encuesta</p>
-              <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Pregunta<textarea value={preguntaConsulta} onChange={(e) => setPreguntaConsulta(e.target.value)} className="min-h-20 rounded-lg border border-[#cfd8c6] bg-white p-2 text-sm normal-case outline-none" /></label>
-              <div className="grid gap-2 md:grid-cols-3">{opcionesConsulta.slice(0, 3).map((opcion, index) => <label key={`opcion-${index}`} className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Opción {index + 1}<input value={opcion} onChange={(e) => setOpcionesConsulta((actuales) => actuales.map((item, itemIndex) => itemIndex === index ? e.target.value : item))} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm normal-case outline-none" /></label>)}</div>
-              <div className="overflow-x-auto rounded-lg border border-[#d8dfd1] bg-white"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Cliente</th><th className="border p-2">Email</th><th className="border p-2">Enviar</th></tr></thead><tbody>{clientesDisponiblesConsulta.length === 0 ? <tr><td colSpan={3} className="border p-4 text-center font-bold text-[#66745c]">No hay clientes cargados para este Hub.</td></tr> : clientesDisponiblesConsulta.map((cliente) => { const tieneEmail = Boolean(cliente.email.trim()); return <tr key={`cliente-consulta-${cliente.id}`} className={clientesConsultaSeleccionados.includes(cliente.id) ? "bg-[#eef4ea]" : "bg-white"}><td className="border p-2 font-semibold"><label className="flex items-center gap-2"><input type="checkbox" checked={clientesConsultaSeleccionados.includes(cliente.id)} disabled={!tieneEmail} onChange={(e) => setClientesConsultaSeleccionados((actuales) => e.target.checked ? [...actuales, cliente.id] : actuales.filter((id) => id !== cliente.id))} />{cliente.nombre || "Sin nombre"}</label></td><td className="border p-2">{cliente.email || "—"}</td><td className={`border p-2 font-black ${tieneEmail ? "text-[#2f6d32]" : "text-[#743c3c]"}`}>{tieneEmail ? "Sí" : "sin email"}</td></tr>; })}</tbody></table></div>
-            </section>
-
-            <div className="space-y-3">
-              <section className="rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3">
-                <p className="mb-2 text-[11px] font-black uppercase text-[#66745c]">C) Historial de encuestas del Hub</p>
-                <div className="max-h-72 space-y-2 overflow-auto">{consultasDelHubSeleccionado.length === 0 ? <p className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-xs font-bold text-[#66745c]">Todavía no hay encuestas para {hubConsulta}.</p> : consultasDelHubSeleccionado.map((consulta, index) => { const conteos = consulta.opciones.map((opcion) => `${opcion}: ${consulta.respuestas.filter((respuesta) => respuesta.opcion === opcion).length}`).join(" · "); const sinResponderHistorial = Math.max(totalClientesHubConsulta - consulta.respuestas.filter((respuesta) => idsClientesHubConsulta.has(respuesta.clienteId)).length, 0); return <article key={consulta.id} className="rounded-lg border border-[#cfd8c6] bg-white p-2 text-xs"><div className="flex items-start justify-between gap-2"><div><h3 className="font-black">Encuesta N°{index + 1}</h3><p className="font-semibold text-[#66745c]">{consulta.pregunta}</p><p className="mt-1 font-bold">{formatoFecha(consulta.fechaCreacion.slice(0, 10))} · {consulta.estado} · {conteos} · Sin responder: {sinResponderHistorial}</p></div><button onClick={() => setConsultaActivaId(consulta.id)} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Ver encuesta</button></div></article>; })}</div>
-              </section>
-
-              <section className="rounded-xl border border-[#d8dfd1] bg-white p-3">
-                <p className="mb-2 text-[11px] font-black uppercase text-[#66745c]">D) Resultados de encuesta seleccionada</p>
-                {!consultaActiva ? <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs font-bold text-[#66745c]">Seleccioná o creá una encuesta para ver resultados.</p> : <div className="space-y-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-black">{consultaActiva.titulo}</h3><p className="text-xs font-semibold text-[#66745c]">{consultaActiva.pregunta}</p></div><div className="flex gap-2"><button onClick={() => enviarConsultaClientes(consultaActiva.clientesDestinatarios)} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Reenviar</button><button onClick={() => cerrarConsultaHub(consultaActiva.id)} disabled={consultaActiva.estado === "cerrada"} className="h-7 rounded-md border border-[#d6b7b7] bg-[#fff7f7] px-2 text-[11px] font-black text-[#743c3c] disabled:opacity-50">Cerrar encuesta</button></div></div><div className="grid gap-2 md:grid-cols-5">{conteosConsulta.map((item) => <div key={`conteo-${item.opcion}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">{item.opcion}</p><p className="text-lg font-black">{item.cantidad}</p></div>)}<div className="rounded-lg border border-[#cfd8c6] bg-[#fffdf2] p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">Sin responder</p><p className="text-lg font-black">{sinResponderConsulta}</p></div><div className="rounded-lg border border-[#cfd8c6] bg-white p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">Total clientes del Hub</p><p className="text-lg font-black">{totalClientesHubConsulta}</p></div></div><div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Cliente</th><th className="border p-2">Email</th><th className="border p-2">Estado</th><th className="border p-2">Respuesta</th><th className="border p-2">Fecha respuesta</th></tr></thead><tbody>{clientesDisponiblesConsulta.map((cliente) => { const respuesta = respuestasPorCliente.get(cliente.id); return <tr key={`resultado-${cliente.id}`}><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2">{cliente.email || "—"}</td><td className={`border p-2 font-black ${respuesta ? "text-[#2f6d32]" : "text-[#66745c]"}`}>{respuesta ? "Respondió" : "Sin responder"}</td><td className="border p-2 font-black">{respuesta?.opcion || "—"}</td><td className="border p-2">{respuesta ? new Date(respuesta.respondidoEn).toLocaleString("es-AR") : "—"}</td></tr>; })}</tbody></table></div>{mailsConsultaParaCopiar && <details className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><summary className="cursor-pointer text-xs font-black">Links/mails guardados para copiar si Resend no está configurado</summary><pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[11px]">{mailsConsultaParaCopiar}</pre></details>}</div>}
-              </section>
+          {pasoConsulta === "seleccionar" && <section className="space-y-3 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <label className="grid min-w-64 gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub<select value={hubConsulta} onChange={(e) => seleccionarHubConsulta(e.target.value as HubDisponible)} className="h-9 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold outline-none">{HUBS_DISPONIBLES.map((hub) => <option key={`consulta-hub-${hub}`} value={hub}>{hub}</option>)}</select></label>
+              <button onClick={() => { setConsultaActivaId(""); setPreguntaConsulta(`¿Vas a seguir formando parte del ${hubConsulta} el próximo año?`); setClientesConsultaSeleccionados(clientesDisponiblesConsulta.filter((cliente) => cliente.email.trim()).map((cliente) => cliente.id)); setPasoConsulta("crear"); }} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white">Nueva encuesta</button>
             </div>
-          </div>
+            <div className="rounded-lg border border-[#cfd8c6] bg-white p-2 text-xs font-bold text-[#66745c]">Total clientes del Hub: <span className="text-[#1f2a1d]">{totalClientesHubConsulta}</span></div>
+            <section>
+              <p className="mb-2 text-[11px] font-black uppercase text-[#66745c]">Historial de encuestas del Hub</p>
+              <div className="space-y-2">{consultasDelHubSeleccionado.length === 0 ? <p className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-xs font-bold text-[#66745c]">Todavía no hay encuestas para {hubConsulta}.</p> : consultasDelHubSeleccionado.map((consulta, index) => { const conteos = consulta.opciones.map((opcion) => `${opcion}: ${consulta.respuestas.filter((respuesta) => respuesta.opcion === opcion).length}`).join(" · "); const sinResponderHistorial = Math.max(totalClientesHubConsulta - consulta.respuestas.filter((respuesta) => idsClientesHubConsulta.has(respuesta.clienteId)).length, 0); return <article key={consulta.id} className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-xs"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-black">Encuesta N°{index + 1}</h3><p className="font-semibold text-[#66745c]">{consulta.pregunta}</p><p className="mt-1 font-bold">{formatoFecha(consulta.fechaCreacion.slice(0, 10))} · {consulta.estado} · {conteos} · Sin responder: {sinResponderHistorial}</p></div><button onClick={() => { setConsultaActivaId(consulta.id); setPasoConsulta("resultados"); }} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Ver encuesta</button></div></article>; })}</div>
+            </section>
+          </section>}
+
+          {pasoConsulta === "crear" && <section className="space-y-3 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3">
+            <p className="text-[11px] font-black uppercase text-[#66745c]">Paso 2 — Crear encuesta para {hubConsulta}</p>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Pregunta<textarea value={preguntaConsulta} onChange={(e) => setPreguntaConsulta(e.target.value)} className="min-h-20 rounded-lg border border-[#cfd8c6] bg-white p-2 text-sm normal-case outline-none" /></label>
+            <div className="grid gap-2 md:grid-cols-3">{opcionesConsulta.slice(0, 3).map((opcion, index) => <label key={`opcion-${index}`} className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Opción {index + 1}<input value={opcion} onChange={(e) => setOpcionesConsulta((actuales) => actuales.map((item, itemIndex) => itemIndex === index ? e.target.value : item))} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm normal-case outline-none" /></label>)}</div>
+            <div className="overflow-x-auto rounded-lg border border-[#d8dfd1] bg-white"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Cliente</th><th className="border p-2">Email</th><th className="border p-2">Enviar</th></tr></thead><tbody>{clientesDisponiblesConsulta.length === 0 ? <tr><td colSpan={3} className="border p-4 text-center font-bold text-[#66745c]">No hay clientes cargados para este Hub.</td></tr> : clientesDisponiblesConsulta.map((cliente) => { const tieneEmail = Boolean(cliente.email.trim()); const seleccionado = clientesConsultaSeleccionados.includes(cliente.id); return <tr key={`cliente-consulta-${cliente.id}`} className={seleccionado ? "bg-[#eef4ea]" : "bg-white"}><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2">{cliente.email || "—"}</td><td className="border p-2"><label className="flex items-center gap-2 font-black"><input type="checkbox" checked={seleccionado} disabled={!tieneEmail} onChange={(e) => setClientesConsultaSeleccionados((actuales) => e.target.checked ? [...actuales, cliente.id] : actuales.filter((id) => id !== cliente.id))} />{seleccionado && tieneEmail ? "Sí" : "No"}</label></td></tr>; })}</tbody></table></div>
+            <button onClick={crearConsultaHub} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white">Crear encuesta</button>
+          </section>}
+
+          {pasoConsulta === "enviar" && consultaActiva && <section className="space-y-3 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3">
+            <p className="text-[11px] font-black uppercase text-[#66745c]">Paso 3 — Enviar encuesta</p>
+            <article className="rounded-lg border border-[#cfd8c6] bg-white p-3"><h3 className="font-black">{consultaActiva.titulo}</h3><p className="mt-1 text-sm font-semibold text-[#66745c]">{consultaActiva.pregunta}</p><p className="mt-2 text-xs font-bold">Destinatarios: {consultaActiva.clientesDestinatarios.length} · Estado: {consultaActiva.estado}</p></article>
+            <button onClick={() => enviarConsultaClientes(consultaActiva.clientesDestinatarios)} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white">Enviar encuesta</button>
+          </section>}
+
+          {pasoConsulta === "resultados" && <section className="rounded-xl border border-[#d8dfd1] bg-white p-3">
+            <p className="mb-2 text-[11px] font-black uppercase text-[#66745c]">Paso 4 — Ver resultados</p>
+            {!consultaActiva ? <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs font-bold text-[#66745c]">Seleccioná una encuesta desde el historial.</p> : <div className="space-y-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-black">{consultaActiva.titulo}</h3><p className="text-xs font-semibold text-[#66745c]">{consultaActiva.pregunta}</p></div><div className="flex gap-2">{consultaActiva.estado === "borrador" && <button onClick={() => setPasoConsulta("enviar")} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Enviar encuesta</button>}<button onClick={() => enviarConsultaClientes(consultaActiva.clientesDestinatarios)} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Reenviar</button><button onClick={() => cerrarConsultaHub(consultaActiva.id)} disabled={consultaActiva.estado === "cerrada"} className="h-7 rounded-md border border-[#d6b7b7] bg-[#fff7f7] px-2 text-[11px] font-black text-[#743c3c] disabled:opacity-50">Cerrar encuesta</button></div></div><div className="grid gap-2 md:grid-cols-5">{conteosConsulta.map((item) => <div key={`conteo-${item.opcion}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">{item.opcion}</p><p className="text-lg font-black">{item.cantidad}</p></div>)}<div className="rounded-lg border border-[#cfd8c6] bg-[#fffdf2] p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">Sin responder</p><p className="text-lg font-black">{sinResponderConsulta}</p></div><div className="rounded-lg border border-[#cfd8c6] bg-white p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">Total clientes del Hub</p><p className="text-lg font-black">{totalClientesHubConsulta}</p></div></div><div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Cliente</th><th className="border p-2">Email</th><th className="border p-2">Estado</th><th className="border p-2">Respuesta</th><th className="border p-2">Fecha respuesta</th></tr></thead><tbody>{clientesDisponiblesConsulta.map((cliente) => { const respuesta = respuestasPorCliente.get(cliente.id); return <tr key={`resultado-${cliente.id}`}><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2">{cliente.email || "—"}</td><td className={`border p-2 font-black ${respuesta ? "text-[#2f6d32]" : "text-[#66745c]"}`}>{respuesta ? "Respondió" : "Sin responder"}</td><td className="border p-2 font-black">{respuesta?.opcion || "—"}</td><td className="border p-2">{respuesta ? new Date(respuesta.respondidoEn).toLocaleString("es-AR") : "—"}</td></tr>; })}</tbody></table></div>{mailsConsultaParaCopiar && <details className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><summary className="cursor-pointer text-xs font-black">Links/mails guardados para copiar si Resend no está configurado</summary><pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[11px]">{mailsConsultaParaCopiar}</pre></details>}</div>}
+          </section>}
         </section>}
 
         {seccionActiva === "importar" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
