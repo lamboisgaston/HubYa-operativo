@@ -98,6 +98,21 @@ type ContactoImportado = {
 type ContactoSinHub = Omit<ContactoImportado, "incluir"> & { guardadoEn: string };
 type ResumenGuardadoContactos = { clientesConHub: number; clientesSinHub: number; actores: number; auxiliares: number; ignorados: number };
 
+type EstadoConsultaHub = "borrador" | "activa" | "cerrada";
+type ClienteConsultaHub = { id: number; nombre: string; telefono: string; email: string; token?: string };
+type RespuestaConsultaHub = { clienteId: number; opcion: string; respondidoEn: string };
+type ConsultaHub = {
+  id: string;
+  hub: HubDisponible;
+  titulo: string;
+  pregunta: string;
+  opciones: string[];
+  clientesDestinatarios: ClienteConsultaHub[];
+  respuestas: RespuestaConsultaHub[];
+  fechaCreacion: string;
+  estado: EstadoConsultaHub;
+};
+
 const LOCAL_STORAGE_KEY = "hubya-jornada-operativa-actual";
 const HISTORIAL_RESUMENES_STORAGE_KEY = "hubya-historial-resumenes";
 const INFORMACION_STORAGE_KEY = "hubya-envio-informacion-borrador";
@@ -108,6 +123,7 @@ const CONTACTOS_TRABAJO_STORAGE_KEY = "hubya-contactos-trabajo";
 const LISTA_GENERAL_CONTACTOS_STORAGE_KEY = "listaGeneralContactos";
 const ACTORES_EQUIPO_STORAGE_KEY = "actoresEquipo";
 const AUXILIARES_STORAGE_KEY = "auxiliares";
+const CONSULTAS_HUB_STORAGE_KEY = "hubya-consultas-hub";
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -499,6 +515,40 @@ function aplicarClientesPorHub(datosPorHub: DatosPorHub, clientesPorHub: Record<
   })) as DatosPorHub;
 }
 
+function crearTokenConsulta(consultaId: string, clienteId: number, hub: HubDisponible) {
+  const base = `${consultaId}-${clienteId}-${hub}-${Math.random().toString(36).slice(2, 10)}`;
+  if (typeof btoa === "function") return btoa(unescape(encodeURIComponent(base))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 32);
+  return base.replace(/[^a-zA-Z0-9]/g, "").slice(0, 32);
+}
+
+function normalizarConsultaHub(consulta: Partial<ConsultaHub>): ConsultaHub | null {
+  if (!consulta.id || !consulta.hub || !HUBS_DISPONIBLES.includes(consulta.hub)) return null;
+  return {
+    id: consulta.id,
+    hub: consulta.hub,
+    titulo: consulta.titulo || "Consulta del Hub",
+    pregunta: consulta.pregunta || "",
+    opciones: Array.isArray(consulta.opciones) && consulta.opciones.length ? consulta.opciones : ["Sí", "No", "Puede ser"],
+    clientesDestinatarios: Array.isArray(consulta.clientesDestinatarios) ? consulta.clientesDestinatarios : [],
+    respuestas: Array.isArray(consulta.respuestas) ? consulta.respuestas : [],
+    fechaCreacion: consulta.fechaCreacion || new Date().toISOString(),
+    estado: consulta.estado || "borrador",
+  };
+}
+
+function leerConsultasHub() {
+  if (typeof window === "undefined") return [] as ConsultaHub[];
+  const guardadas = window.localStorage.getItem(CONSULTAS_HUB_STORAGE_KEY);
+  if (!guardadas) return [] as ConsultaHub[];
+  try {
+    const consultas = JSON.parse(guardadas) as Partial<ConsultaHub>[];
+    return consultas.map(normalizarConsultaHub).filter((consulta): consulta is ConsultaHub => Boolean(consulta));
+  } catch {
+    window.localStorage.removeItem(CONSULTAS_HUB_STORAGE_KEY);
+    return [] as ConsultaHub[];
+  }
+}
+
 function normalizarJornada(jornada: Partial<JornadaOperativa> & { clientesPorHub?: Record<string, unknown[]>; resumenesPorHub?: Record<string, Partial<ResumenHubManual>> }): JornadaOperativa {
   const hub = HUBS_DISPONIBLES.includes(jornada.hub as HubDisponible) ? (jornada.hub as HubDisponible) : jornadaInicial.hub;
   const datosPorHub = Object.fromEntries(HUBS_DISPONIBLES.map((hubDisponible) => [hubDisponible, normalizarDatosHub(jornada.datosPorHub?.[hubDisponible], hubDisponible)])) as DatosPorHub;
@@ -520,7 +570,7 @@ export default function Home() {
   const [mensajeGuardado, setMensajeGuardado] = useState("Sin guardar en este navegador");
   const [estadoEnvio, setEstadoEnvio] = useState<"idle" | "enviando" | "enviado" | "error">("idle");
   const [mensajeEnvio, setMensajeEnvio] = useState("Listo para enviar el reporte individual.");
-  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar">("reporte");
+  const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar" | "consultas">("reporte");
   const [hubInformacion, setHubInformacion] = useState<HubDisponible | "">("");
   const [asuntoInformacion, setAsuntoInformacion] = useState("");
   const [mensajeInformacion, setMensajeInformacion] = useState("");
@@ -534,6 +584,13 @@ export default function Home() {
   const [auxiliares, setAuxiliares] = useState<ContactoImportado[]>([]);
   const [mensajeImportacion, setMensajeImportacion] = useState("Pegá una base cruda, procesala, revisá la tabla y guardá los contactos seleccionados.");
   const [resumenGuardadoContactos, setResumenGuardadoContactos] = useState<ResumenGuardadoContactos | null>(null);
+  const [consultasHub, setConsultasHub] = useState<ConsultaHub[]>([]);
+  const [hubConsulta, setHubConsulta] = useState<HubDisponible>(jornadaInicial.hub);
+  const [tituloConsulta, setTituloConsulta] = useState("Continuidad en el Hub");
+  const [preguntaConsulta, setPreguntaConsulta] = useState("¿Vas a seguir formando parte del Hub Praderas durante el próximo año?");
+  const [opcionesConsulta, setOpcionesConsulta] = useState(["Sí", "No", "Puede ser"]);
+  const [clientesConsultaSeleccionados, setClientesConsultaSeleccionados] = useState<number[]>([]);
+  const [consultaActivaId, setConsultaActivaId] = useState("");
   const reporteVisualRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -542,6 +599,9 @@ export default function Home() {
     setContactosSinHub(leerContactosSinHub());
     setContactosImportados(leerContactosTrabajo());
     setAuxiliares(leerAuxiliares());
+    const consultasGuardadas = leerConsultasHub();
+    setConsultasHub(consultasGuardadas);
+    setConsultaActivaId(consultasGuardadas[0]?.id || "");
     const borradorInformacion = leerBorradorInformacion();
     setAsuntoInformacion(borradorInformacion.asunto);
     setMensajeInformacion(borradorInformacion.mensaje);
@@ -569,6 +629,22 @@ export default function Home() {
     if (!isMounted) return;
     localStorage.setItem(AUXILIARES_STORAGE_KEY, JSON.stringify(auxiliares));
   }, [auxiliares, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    localStorage.setItem(CONSULTAS_HUB_STORAGE_KEY, JSON.stringify(consultasHub));
+  }, [consultasHub, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    const sincronizarConsultas = () => setConsultasHub(leerConsultasHub());
+    window.addEventListener("focus", sincronizarConsultas);
+    window.addEventListener("storage", sincronizarConsultas);
+    return () => {
+      window.removeEventListener("focus", sincronizarConsultas);
+      window.removeEventListener("storage", sincronizarConsultas);
+    };
+  }, [isMounted]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -1036,6 +1112,37 @@ export default function Home() {
     setMensajeImportacion(`Guardado: ${clientesConHub.length} clientes en Hubs, ${clientesSinHubNuevos.length} clientes sin Hub, ${actoresNuevos.length} actores/equipo y ${auxiliaresNuevos.length} auxiliares.`);
   }
 
+  const consultasDelHubSeleccionado = consultasHub.filter((consulta) => consulta.hub === hubConsulta);
+  const consultaActiva = consultasHub.find((consulta) => consulta.id === consultaActivaId) || consultasDelHubSeleccionado[0];
+  const clientesDisponiblesConsulta = jornada.datosPorHub[hubConsulta].clientesIngresos;
+  const respuestasPorCliente = new Map((consultaActiva?.respuestas || []).map((respuesta) => [respuesta.clienteId, respuesta]));
+  const conteosConsulta = (consultaActiva?.opciones || ["Sí", "No", "Puede ser"]).map((opcion) => ({ opcion, cantidad: (consultaActiva?.respuestas || []).filter((respuesta) => respuesta.opcion === opcion).length }));
+  const sinResponderConsulta = consultaActiva ? consultaActiva.clientesDestinatarios.length - consultaActiva.respuestas.length : 0;
+
+  function crearConsultaHub() {
+    const clientesDestinatarios = clientesDisponiblesConsulta.filter((cliente) => clientesConsultaSeleccionados.includes(cliente.id)).map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email }));
+    if (!preguntaConsulta.trim() || clientesDestinatarios.length === 0) return setMensajeGuardado("Completá pregunta y seleccioná al menos un cliente para crear la consulta.");
+    const id = `consulta-${Date.now()}`;
+    const consulta: ConsultaHub = { id, hub: hubConsulta, titulo: tituloConsulta.trim() || "Consulta del Hub", pregunta: preguntaConsulta.trim(), opciones: opcionesConsulta.map((opcion) => opcion.trim()).filter(Boolean), clientesDestinatarios, respuestas: [], fechaCreacion: new Date().toISOString(), estado: "borrador" };
+    setConsultasHub((actuales) => [consulta, ...actuales]);
+    setConsultaActivaId(id);
+    setMensajeGuardado(`Consulta creada para ${hubConsulta}: ${clientesDestinatarios.length} clientes.`);
+  }
+
+  function generarLinksConsulta(id: string) {
+    setConsultasHub((actuales) => actuales.map((consulta) => consulta.id !== id ? consulta : { ...consulta, estado: "activa", clientesDestinatarios: consulta.clientesDestinatarios.map((cliente) => ({ ...cliente, token: cliente.token || crearTokenConsulta(consulta.id, cliente.id, consulta.hub) })) }));
+    setMensajeGuardado("Links de respuesta generados. La consulta quedó activa.");
+  }
+
+  function linkConsulta(token?: string) {
+    if (!token || typeof window === "undefined") return "";
+    return `${window.location.origin}/consulta/${token}`;
+  }
+
+  function mensajeConsulta(cliente: ClienteConsultaHub) {
+    return `Hola ${cliente.nombre || "cliente"}, desde HubYa queremos confirmar la planificación del ${consultaActiva?.hub || hubConsulta}. Te compartimos una consulta breve: ${linkConsulta(cliente.token)}. Tu respuesta nos ayuda a organizar mejor la demanda y la oferta del Hub.`;
+  }
+
   const conteoSinHub = contactosSinHub.length;
   const inputNumero = (valor: CampoNumerico, onChange: (valor: CampoNumerico) => void) => <input type="number" step="0.25" value={valor} onChange={(e) => onChange(normalizarNumero(e.target.value))} className="h-7 w-28 bg-transparent px-1 text-right outline-none" />;
   const inputTexto = (valor: string, onChange: (valor: string) => void, ancho = "min-w-40") => <input value={valor} onChange={(e) => onChange(e.target.value)} className={`h-7 ${ancho} bg-transparent px-1 outline-none`} />;
@@ -1074,6 +1181,7 @@ export default function Home() {
             <button onClick={() => setSeccionActiva("reporte")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "reporte" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Reporte diario</button>
             <button onClick={() => setSeccionActiva("informacion")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "informacion" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Envío por WhatsApp</button>
             <button onClick={() => setSeccionActiva("importar")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "importar" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Importar contactos</button>
+            <button onClick={() => setSeccionActiva("consultas")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "consultas" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Consultas del Hub</button>
           </div>
         </header>
 
@@ -1096,6 +1204,18 @@ export default function Home() {
           </div>
         </section>}
 
+
+        {seccionActiva === "consultas" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Consultas del Hub</p><h2 className="text-lg font-black">Consultas del Hub</h2><p className="text-xs font-semibold text-[#66745c]">Creá preguntas simples, generá links únicos por cliente y revisá resultados sin exponer respuestas de otros clientes.</p></div><button onClick={crearConsultaHub} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white">Crear consulta</button></div>
+          <div className="grid gap-3 lg:grid-cols-[360px_1fr]">
+            <div className="space-y-3 rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub<select value={hubConsulta} onChange={(e) => { const hub = e.target.value as HubDisponible; setHubConsulta(hub); setPreguntaConsulta(`¿Vas a seguir formando parte del ${hub} durante el próximo año?`); setClientesConsultaSeleccionados([]); }} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold outline-none">{HUBS_DISPONIBLES.map((hub) => <option key={`consulta-hub-${hub}`} value={hub}>{hub}</option>)}</select></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Título<input value={tituloConsulta} onChange={(e) => setTituloConsulta(e.target.value)} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Pregunta<textarea value={preguntaConsulta} onChange={(e) => setPreguntaConsulta(e.target.value)} className="min-h-20 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label><div className="space-y-2"><p className="text-[11px] font-bold uppercase text-[#66745c]">Opciones editables</p>{opcionesConsulta.map((opcion, index) => <div key={`opcion-${index}`} className="flex gap-2"><input value={opcion} onChange={(e) => setOpcionesConsulta((actuales) => actuales.map((item, itemIndex) => itemIndex === index ? e.target.value : item))} className="h-8 flex-1 rounded-lg border border-[#cfd8c6] px-2 text-sm outline-none" /><button onClick={() => setOpcionesConsulta((actuales) => actuales.filter((_, itemIndex) => itemIndex !== index))} className="h-8 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-2 text-xs font-black text-[#743c3c]">×</button></div>)}<button onClick={() => setOpcionesConsulta((actuales) => [...actuales, ""])} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Agregar opción</button></div></div>
+            <div className="space-y-3"><div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Seleccionar</th><th className="border p-2">Cliente</th><th className="border p-2">Teléfono</th></tr></thead><tbody>{clientesDisponiblesConsulta.length === 0 ? <tr><td colSpan={3} className="border p-4 text-center font-bold text-[#66745c]">No hay clientes cargados para este Hub.</td></tr> : clientesDisponiblesConsulta.map((cliente) => <tr key={`cliente-consulta-${cliente.id}`}><td className="border p-2 text-center"><input type="checkbox" checked={clientesConsultaSeleccionados.includes(cliente.id)} onChange={(e) => setClientesConsultaSeleccionados((actuales) => e.target.checked ? [...actuales, cliente.id] : actuales.filter((id) => id !== cliente.id))} /></td><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2">{cliente.telefono || "Sin teléfono"}</td></tr>)}</tbody></table></div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">{conteosConsulta.map((item) => <div key={`conteo-${item.opcion}`} className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">{item.opcion}</p><p className="text-xl font-black">{item.cantidad}</p></div>)}<div className="rounded-lg border border-[#cfd8c6] bg-[#fffdf2] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">Sin responder</p><p className="text-xl font-black">{sinResponderConsulta}</p></div></div>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Consulta activa<select value={consultaActiva?.id || ""} onChange={(e) => setConsultaActivaId(e.target.value)} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold normal-case outline-none"><option value="">Sin consultas</option>{consultasHub.map((consulta) => <option key={consulta.id} value={consulta.id}>{consulta.titulo} · {consulta.hub} · {consulta.estado}</option>)}</select></label>
+            {consultaActiva && <div className="space-y-2 rounded-xl border border-[#d8dfd1] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-black">{consultaActiva.titulo}</h3><p className="text-xs font-semibold text-[#66745c]">{consultaActiva.pregunta}</p></div><button onClick={() => generarLinksConsulta(consultaActiva.id)} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar links de respuesta</button></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Cliente</th><th className="border p-2">Respuesta</th><th className="border p-2">Fecha de respuesta</th><th className="border p-2">Link y mensaje</th></tr></thead><tbody>{consultaActiva.clientesDestinatarios.map((cliente) => { const respuesta = respuestasPorCliente.get(cliente.id); return <tr key={`resultado-${cliente.id}`}><td className="border p-2 font-semibold">{cliente.nombre || "Sin nombre"}</td><td className="border p-2 font-black">{respuesta?.opcion || "Sin responder"}</td><td className="border p-2">{respuesta ? new Date(respuesta.respondidoEn).toLocaleString("es-AR") : "—"}</td><td className="border p-2"><div className="flex flex-wrap gap-1"><button disabled={!cliente.token} onClick={() => copiarTexto(linkConsulta(cliente.token), "Link de respuesta")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black disabled:opacity-50">Copiar link</button><button disabled={!cliente.token} onClick={() => copiarTexto(mensajeConsulta(cliente), "Mensaje de envío")} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white disabled:opacity-50">Copiar mensaje</button></div></td></tr>; })}</tbody></table></div></div>}
+            </div>
+          </div>
+        </section>}
 
         {seccionActiva === "importar" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
