@@ -637,6 +637,9 @@ export default function Home() {
   const [hubVinculos, setHubVinculos] = useState<HubVinculo[]>([]);
   const [nuevoVinculoForm, setNuevoVinculoForm] = useState(NUEVO_VINCULO_FORM_INICIAL);
   const [estadoVinculos, setEstadoVinculos] = useState("HubYa agrupa demanda; la oferta se vincula para resolverla.");
+  const [asuntoFichaHub, setAsuntoFichaHub] = useState("Actualización de la ficha del Hub");
+  const [mensajeFichaHub, setMensajeFichaHub] = useState("Hola, compartimos una actualización de la ficha operativa del Hub.");
+  const [incluirPostulantesFicha, setIncluirPostulantesFicha] = useState(true);
   const reporteVisualRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -1397,13 +1400,67 @@ export default function Home() {
   }
 
   function eliminarVinculo(id: string) {
-    setHubVinculos((actuales) => actuales.filter((vinculo) => vinculo.id !== id));
-    setEstadoVinculos("Vínculo eliminado del listado local.");
+    actualizarVinculo(id, { estado: "SUSPENDIDO", fecha_fin: new Date().toISOString().slice(0, 10) });
+    setEstadoVinculos("Integrante removido de la ficha. Queda disponible para volver a agregarlo cambiando el estado.");
   }
 
-  const vinculosHubActual = hubVinculos.filter((vinculo) => vinculo.hub_id === jornada.hub);
-  const resolutoresActivosHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO");
+  function moverVinculo(id: string, direccion: -1 | 1) {
+    setHubVinculos((actuales) => {
+      const index = actuales.findIndex((vinculo) => vinculo.id === id);
+      const destino = index + direccion;
+      if (index < 0 || destino < 0 || destino >= actuales.length) return actuales;
+      const copia = [...actuales];
+      [copia[index], copia[destino]] = [copia[destino], copia[index]];
+      return copia;
+    });
+  }
+
+  function equipoPorId(ofertaId: string) {
+    return equiposActivos.find((equipo) => equipo.id === ofertaId) || null;
+  }
+
+  function emailsVinculo(vinculo: HubVinculo) {
+    const equipo = equipoPorId(vinculo.oferta_id);
+    return equipo?.integrantes.filter((integrante) => integrante.email.trim()).map((integrante) => ({ nombre: integrante.nombre, email: integrante.email.trim() })) || [];
+  }
+
+  function emailPrincipalVinculo(vinculo: HubVinculo) {
+    return emailsVinculo(vinculo)[0]?.email || "Sin email cargado";
+  }
+
+  function abrirPerfilVinculo(vinculo: HubVinculo) {
+    const equipo = equipoPorId(vinculo.oferta_id);
+    if (!equipo) return setEstadoVinculos("No se encontró el perfil del equipo/oferta.");
+    setEquipoActivoId(equipo.id);
+    setSeccionActiva("equipos");
+  }
+
+  async function notificarDestinatariosFicha(destinatarios: { nombre: string; email: string }[], alcance: string) {
+    const unicos = Array.from(new Map(destinatarios.map((destinatario) => [destinatario.email.toLowerCase(), destinatario])).values());
+    if (unicos.length === 0) return setEstadoVinculos(`No hay emails cargados para notificar ${alcance}. Todos los integrantes deben tener email.`);
+    if (!asuntoFichaHub.trim() || !mensajeFichaHub.trim()) return setEstadoVinculos("Completá asunto y mensaje antes de notificar.");
+    setEstadoVinculos(`Enviando email a ${unicos.length} destinatarios de ${alcance}...`);
+    const respuesta = await fetch("/api/enviar-informacion", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hub: jornada.hub, asunto: asuntoFichaHub, mensaje: mensajeFichaHub, nota: `Ficha editable del Hub · ${alcance}`, destinatarios: unicos }) });
+    const data = await respuesta.json().catch(() => ({}));
+    setEstadoVinculos(respuesta.ok ? `Notificación enviada a ${unicos.length} emails de ${alcance}.` : `No se pudo enviar: ${data?.error || "revisá configuración de email"}.`);
+  }
+
+  function notificarVinculo(vinculo: HubVinculo) {
+    void notificarDestinatariosFicha(emailsVinculo(vinculo), nombreOferta(vinculo.oferta_id));
+  }
+
+  function notificarFichaHub() {
+    const destinatarios = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO" || (incluirPostulantesFicha && (vinculo.estado === "POSTULANTE" || vinculo.estado === "EVALUACION"))).flatMap(emailsVinculo);
+    void notificarDestinatariosFicha(destinatarios, `${jornada.hub}${incluirPostulantesFicha ? " con postulantes" : " sin postulantes"}`);
+  }
+
+  const vinculosHubActual = hubVinculos.filter((vinculo) => vinculo.hub_id === jornada.hub && vinculo.estado !== "FINALIZADO");
+  const resolutoresActivosHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO" && !/paisaj|viver/i.test(`${nombreOferta(vinculo.oferta_id)} ${vinculo.rol} ${vinculo.capacidad}`));
+  const paisajistasHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO" && /paisaj/i.test(`${nombreOferta(vinculo.oferta_id)} ${vinculo.rol} ${vinculo.capacidad}`));
+  const viverosHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO" && /viver/i.test(`${nombreOferta(vinculo.oferta_id)} ${vinculo.rol} ${vinculo.capacidad}`));
   const postulantesHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "POSTULANTE" || vinculo.estado === "EVALUACION");
+  const integrantesFichaHub = vinculosHubActual.filter((vinculo) => vinculo.estado === "ACTIVO" || vinculo.estado === "POSTULANTE" || vinculo.estado === "EVALUACION");
+  const emailsFichaCargados = new Set(integrantesFichaHub.flatMap((vinculo) => emailsVinculo(vinculo).map((destinatario) => destinatario.email.toLowerCase()))).size;
 
   const inputNumero = (valor: CampoNumerico, onChange: (valor: CampoNumerico) => void) => <input type="number" step="0.25" value={valor} onChange={(e) => onChange(normalizarNumero(e.target.value))} className="h-7 w-28 bg-transparent px-1 text-right outline-none" />;
   const inputTexto = (valor: string, onChange: (valor: string) => void, ancho = "min-w-40") => <input value={valor} onChange={(e) => onChange(e.target.value)} className={`h-7 ${ancho} bg-transparent px-1 outline-none`} />;
@@ -1466,7 +1523,14 @@ export default function Home() {
         {seccionActiva === "vinculos" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Gestión de Vínculos</p><h2 className="text-lg font-black">Demanda agrupada ←→ oferta / resolutor</h2><p className="text-xs font-semibold text-[#66745c]">{estadoVinculos}</p></div><p className="max-w-xl rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#66745c]">El vínculo no une Hub con Hub. Une la demanda agrupada de un Hub con ofertas, equipos resolutores o postulantes.</p></div>
           <div className="grid gap-3 xl:grid-cols-[0.8fr_1.2fr]"><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Nuevo vínculo</h3><div className="mt-3 grid gap-2"><select value={nuevoVinculoForm.hub_id} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, hub_id: e.target.value as HubDisponible }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold">{HUBS_DISPONIBLES.map((hub) => <option key={`nuevo-vinculo-${hub}`} value={hub}>{hub}</option>)}</select><select value={nuevoVinculoForm.oferta_id} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, oferta_id: e.target.value }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold"><option value="">Seleccionar oferta/equipo</option>{equiposActivos.map((equipo) => <option key={`oferta-${equipo.id}`} value={equipo.id}>{equipo.nombre}</option>)}</select><select value={nuevoVinculoForm.estado} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, estado: e.target.value as EstadoHubVinculo }))} className="h-9 rounded-lg border border-[#cfd8c6] px-2 text-xs font-bold">{ESTADOS_HUB_VINCULO.map((estado) => <option key={estado} value={estado}>{estado}</option>)}</select>{inputTexto(nuevoVinculoForm.rol, (valor) => setNuevoVinculoForm((actual) => ({ ...actual, rol: valor })), "min-w-full rounded-lg border border-[#cfd8c6]")}{inputTexto(nuevoVinculoForm.capacidad, (valor) => setNuevoVinculoForm((actual) => ({ ...actual, capacidad: valor })), "min-w-full rounded-lg border border-[#cfd8c6]")}<textarea value={nuevoVinculoForm.observaciones} onChange={(e) => setNuevoVinculoForm((actual) => ({ ...actual, observaciones: e.target.value }))} placeholder="Observaciones" className="min-h-20 rounded-lg border border-[#cfd8c6] p-2 text-xs font-semibold outline-none" /><button onClick={crearVinculoDesdePanel} className="h-9 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Crear vínculo</button></div></div><div className="rounded-xl border border-[#d8dfd1] p-3"><h3 className="text-sm font-black">Listado de vínculos</h3><div className="mt-2 overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Hub</th><th className="border p-2">Oferta / resolutor</th><th className="border p-2">Estado</th><th className="border p-2">Rol</th><th className="border p-2">Capacidad</th><th className="border p-2">Observaciones</th><th className="border p-2"></th></tr></thead><tbody>{hubVinculos.length === 0 ? <tr><td colSpan={7} className="border p-4 text-center font-bold text-[#66745c]">Sin vínculos cargados.</td></tr> : hubVinculos.map((vinculo) => <tr key={vinculo.id}><td className="border p-1 font-black">{vinculo.hub_id}</td><td className="border p-1">{nombreOferta(vinculo.oferta_id)}</td><td className="border p-1"><select value={vinculo.estado} onChange={(e) => actualizarVinculo(vinculo.id, { estado: e.target.value as EstadoHubVinculo })} className="h-7 bg-transparent font-black">{ESTADOS_HUB_VINCULO.map((estado) => <option key={`${vinculo.id}-${estado}`} value={estado}>{estado}</option>)}</select></td><td className="border p-1">{inputTexto(vinculo.rol, (valor) => actualizarVinculo(vinculo.id, { rol: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(vinculo.capacidad, (valor) => actualizarVinculo(vinculo.id, { capacidad: valor }), "min-w-40")}</td><td className="border p-1">{inputTexto(vinculo.observaciones, (valor) => actualizarVinculo(vinculo.id, { observaciones: valor }), "min-w-56")}</td><td className="border p-1 text-center"><button onClick={() => eliminarVinculo(vinculo.id)} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div></div></div>
-          <div className="grid gap-3 lg:grid-cols-3"><div className="rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3"><p className="text-[10px] font-black uppercase text-[#66745c]">{jornada.hub}</p><h3 className="text-sm font-black">Demanda agrupada</h3><ul className="mt-2 list-disc pl-4 text-xs font-semibold text-[#66745c]"><li>{datosHub.clientesIngresos.length} clientes</li><li>{(historialResumenes[jornada.hub] || []).length} trabajos históricos / resúmenes</li><li>{datosHub.clientesIngresos.filter((cliente) => cliente.trabajoPendiente.trim()).length} trabajos pendientes</li></ul></div><div className="rounded-xl border border-[#b7d6ba] bg-[#f2fff4] p-3"><h3 className="text-sm font-black">Resuelven la demanda</h3>{resolutoresActivosHub.length === 0 ? <p className="mt-2 text-xs font-bold text-[#66745c]">Sin resolutores activos.</p> : <ul className="mt-2 space-y-1 text-xs font-black">{resolutoresActivosHub.map((vinculo) => <li key={`activo-${vinculo.id}`}>{nombreOferta(vinculo.oferta_id)} <span className="font-semibold text-[#66745c]">· {vinculo.rol}</span></li>)}</ul>}</div><div className="rounded-xl border border-[#d8d1b7] bg-[#fffdf2] p-3"><h3 className="text-sm font-black">Postulantes</h3>{postulantesHub.length === 0 ? <p className="mt-2 text-xs font-bold text-[#66745c]">Sin postulantes.</p> : <ul className="mt-2 space-y-1 text-xs font-black">{postulantesHub.map((vinculo) => <li key={`postulante-${vinculo.id}`}>{nombreOferta(vinculo.oferta_id)} <span className="font-semibold text-[#66745c]">· {vinculo.estado}</span></li>)}</ul>}</div></div>
+          <div className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Ficha editable del Hub</p><h3 className="text-2xl font-black uppercase">{jornada.hub}</h3><p className="text-sm font-bold text-[#66745c]">Salta Capital · Vecinos: {datosHub.clientesIngresos.length} · Hs anuales: {datosHub.clientesIngresos.reduce((total, cliente) => total + Number(cliente.importe || 0), 0).toLocaleString("es-AR")}</p></div>
+              <div className="grid gap-2 text-xs font-bold text-[#66745c]"><span>Emails cargados en ficha: <b className="text-[#1f2a1d]">{emailsFichaCargados}</b></span><label className="flex items-center gap-2"><input type="checkbox" checked={incluirPostulantesFicha} onChange={(e) => setIncluirPostulantesFicha(e.target.checked)} /> Incluir postulantes</label></div>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]"><input value={asuntoFichaHub} onChange={(e) => setAsuntoFichaHub(e.target.value)} className="h-9 rounded-lg border border-[#cfd8c6] px-3 text-xs font-bold" placeholder="Asunto email" /><input value={mensajeFichaHub} onChange={(e) => setMensajeFichaHub(e.target.value)} className="h-9 rounded-lg border border-[#cfd8c6] px-3 text-xs font-bold" placeholder="Mensaje email" /><button onClick={notificarFichaHub} className="h-9 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Notificar a toda la ficha del Hub</button></div>
+            {[["ABASTECEN LA DEMANDA", resolutoresActivosHub], ["PAISAJISTAS ASOCIADAS", paisajistasHub], ["VIVEROS ASOCIADOS", viverosHub], ["POSTULANTES", postulantesHub]].map(([titulo, items]) => <div key={titulo as string} className="mt-4 rounded-xl border border-[#d8dfd1] bg-white p-3"><h4 className="text-xs font-black uppercase tracking-[0.15em] text-[#66745c]">{titulo as string}</h4>{(items as HubVinculo[]).length === 0 ? <p className="mt-2 text-xs font-bold text-[#66745c]">Sin integrantes cargados.</p> : <ul className="mt-2 space-y-2">{(items as HubVinculo[]).map((vinculo) => <li key={`ficha-${vinculo.id}`} className="rounded-lg border border-[#e1e6dc] bg-[#fbfcf8] p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-black">{nombreOferta(vinculo.oferta_id)} <span className="font-semibold text-[#66745c]">/ {vinculo.rol}</span></p><p className={`text-xs font-bold ${emailPrincipalVinculo(vinculo) === "Sin email cargado" ? "text-[#743c3c]" : "text-[#66745c]"}`}>Email: {emailPrincipalVinculo(vinculo)}</p><input value={vinculo.observaciones} onChange={(e) => actualizarVinculo(vinculo.id, { observaciones: e.target.value })} className="mt-1 h-7 min-w-64 rounded border border-[#d8dfd1] px-2 text-xs font-semibold" placeholder="Editar observación" /></div><div className="flex flex-wrap gap-2"><button onClick={() => abrirPerfilVinculo(vinculo)} className="rounded-lg border border-[#cfd8c6] px-2 py-1 text-[11px] font-black">Ver perfil</button><button onClick={() => eliminarVinculo(vinculo.id)} className="rounded-lg border border-[#d8b7b7] px-2 py-1 text-[11px] font-black text-[#743c3c]">Remover</button><button onClick={() => vinculo.estado === "ACTIVO" ? setEstadoVinculos("Editá rol, capacidad u observaciones directamente en la ficha o en el listado.") : actualizarVinculo(vinculo.id, { estado: "ACTIVO", fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: "" })} className="rounded-lg border border-[#cfd8c6] px-2 py-1 text-[11px] font-black">{vinculo.estado === "ACTIVO" ? "Editar" : "Aprobar como oferente"}</button><button onClick={() => notificarVinculo(vinculo)} className="rounded-lg bg-[#eef2e8] px-2 py-1 text-[11px] font-black">Notificar</button><button onClick={() => moverVinculo(vinculo.id, -1)} className="rounded-lg border border-[#cfd8c6] px-2 py-1 text-[11px] font-black">↑</button><button onClick={() => moverVinculo(vinculo.id, 1)} className="rounded-lg border border-[#cfd8c6] px-2 py-1 text-[11px] font-black">↓</button></div></div></li>)}</ul>}</div>)}
+          </div>
         </section>}
 
         {seccionActiva === "equipos" && equipoActivo && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
