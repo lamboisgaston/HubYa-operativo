@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { getHubsOperativos } from "@/lib/data/hubs";
+import { getContactos, getHubsOperativos } from "@/lib/data/hubs";
+import { ContactosMesaTrabajo } from "@/components/operativo/ContactosMesaTrabajo";
 
 export default async function OperativoPage() {
-  const hubs = await getHubsOperativos();
+  const [hubs, contactos] = await Promise.all([getHubsOperativos(), getContactos()]);
 
   return (
     <main className="min-h-screen bg-[#f6f7f2] px-4 py-6 text-[#1f2a1d] sm:px-6 lg:px-8">
@@ -26,6 +27,8 @@ export default async function OperativoPage() {
             </article>
           ))}
         </div>
+
+        <ContactosMesaTrabajo hubs={hubs} contactos={contactos} />
       </section>
     </main>
   );
