@@ -1,0 +1,19 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+export type HubEstado = "activo" | "pausado" | "inactivo";
+export type Cliente = { id: string; nombre: string; email: string; whatsapp: string; referencia?: string; hubId: string; estado: "activo" | "inactivo"; createdAt: string; updatedAt: string };
+export type Hub = { id: string; nombre: string; slug: string; zona: string; estado: HubEstado; descripcionPublica: string; rama: string; equipoOperativo: string; activo: boolean; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
+export type HubPublico = Hub & { clientesActivos: number };
+type Store = { hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[] };
+const DATA_FILE = path.join(process.cwd(), "data", "hubya-public.json");
+const now = new Date().toISOString();
+const seedHubs: Hub[] = ["Tipal", "Punto", "Praderas", "Valle Escondido", "Chacras de Santa María", "La Aguada", "Prado", "La Reserva"].map((zona, index) => ({ id: `hub-${index + 1}`, nombre: `Hub ${zona}`, slug: zona.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), zona, estado: "activo", descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente, equipo disponible y trabajos programados sin exponer datos privados de clientes.`, rama: "JardinerosYa", equipoOperativo: "JardinerosYa01", activo: true, trabajosRealizados: 0, ultimaActividad: now, createdAt: now, updatedAt: now }));
+const seedClientes: Cliente[] = Array.from({ length: 9 }, (_, index) => ({ id: `cliente-tipal-${index + 1}`, nombre: `Cliente ${index + 1}`, email: "", whatsapp: "", referencia: "Alta inicial", hubId: "hub-1", estado: "activo", createdAt: now, updatedAt: now }));
+export const MODELOS_SUGERIDOS = "Producción real: usar PostgreSQL con Prisma, Supabase, Neon o la base elegida. Modelos sugeridos: Hub, Cliente y SolicitudHub con los campos documentados en el pedido.";
+async function readStore(): Promise<Store> { try { return JSON.parse(await readFile(DATA_FILE, "utf8")); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; const store = { hubs: seedHubs, clientes: seedClientes, solicitudes: [] }; await writeStore(store); return store; } }
+async function writeStore(store: Store) { await mkdir(path.dirname(DATA_FILE), { recursive: true }); await writeFile(DATA_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf8"); }
+export async function getHubs(): Promise<HubPublico[]> { const store = await readStore(); return store.hubs.filter((hub) => hub.activo).map((hub) => ({ ...hub, clientesActivos: store.clientes.filter((cliente) => cliente.hubId === hub.id && cliente.estado === "activo").length })); }
+export async function getHubBySlug(slug: string): Promise<HubPublico | null> { return (await getHubs()).find((hub) => hub.slug === slug) || null; }
+export async function addClienteToHub(hubId: string, cliente: Omit<Cliente, "id" | "hubId" | "estado" | "createdAt" | "updatedAt">) { const store = await readStore(); const timestamp = new Date().toISOString(); const nuevo: Cliente = { id: `cliente-${Date.now()}`, hubId, estado: "activo", createdAt: timestamp, updatedAt: timestamp, ...cliente }; store.clientes = [nuevo, ...store.clientes]; await writeStore(store); return nuevo; }
+export async function updatePublicStore(mutator: (store: Store) => Store | Promise<Store>) { const store = await readStore(); const next = await mutator(store); await writeStore(next); return next; }
+export async function getPublicStore() { return readStore(); }

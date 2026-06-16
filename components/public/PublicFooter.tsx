@@ -1,0 +1,1 @@
+export function PublicFooter() { return <footer className="border-t border-white/10 bg-[#0a0a0f] px-6 py-10 text-center text-sm text-[#6b7280]"><strong className="text-[#f5f5f0]">hubya</strong> — Tecnología salteña para procesos recurrentes · 2026</footer>; }
