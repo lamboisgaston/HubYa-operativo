@@ -1,2 +1,3 @@
-import { NextResponse } from "next/server"; import { getHubs } from "@/lib/data/hubs";
+import { NextResponse } from "next/server"; import { createHubDemanda, getHubs } from "@/lib/data/hubs";
 export async function GET() { return NextResponse.json(await getHubs()); }
+export async function POST(request: Request) { const body = await request.json().catch(() => ({})); if (!body?.nombre || !body?.zona) return NextResponse.json({ error: "Nombre y zona son obligatorios." }, { status: 400 }); const hub = await createHubDemanda({ nombre: String(body.nombre), zona: String(body.zona), descripcionPublica: String(body.descripcionPublica || ""), rama: String(body.rama || ""), equipoOperativo: String(body.equipoOperativo || "") }); return NextResponse.json(hub, { status: 201 }); }
