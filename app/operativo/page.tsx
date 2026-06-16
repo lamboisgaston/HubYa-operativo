@@ -377,6 +377,10 @@ function normalizarTextoBusqueda(valor: string) {
   return valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
+function normalizarContactoBusqueda(valor: unknown) {
+  return String(valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
+}
+
 function detectarRol(linea: string): RolContactoImportado {
   const texto = normalizarTextoBusqueda(linea);
   if (/\bcliente\b/.test(texto)) return "CLIENTE";
@@ -635,6 +639,7 @@ export default function Home() {
   const [mensajeEstadoInformacion, setMensajeEstadoInformacion] = useState("Listo para enviar información individual.");
   const [baseContactosCruda, setBaseContactosCruda] = useState("");
   const [contactosImportados, setContactosImportados] = useState<ContactoImportado[]>([]);
+  const [busquedaContactos, setBusquedaContactos] = useState("");
   const [contactosSinHub, setContactosSinHub] = useState<ContactoSinHub[]>([]);
   const [auxiliares, setAuxiliares] = useState<ContactoImportado[]>([]);
   const [mensajeImportacion, setMensajeImportacion] = useState("Pegá una base cruda, procesala, revisá la tabla y guardá los contactos seleccionados.");
@@ -664,6 +669,24 @@ export default function Home() {
   const [incluirPostulantesFicha, setIncluirPostulantesFicha] = useState(true);
   const reporteVisualRef = useRef<HTMLElement>(null);
   const hubsOperativos = useMemo(() => fusionarNombresHubs(hubsCanonicos), [hubsCanonicos]);
+  const contactosImportadosFiltrados = useMemo(() => {
+    const busquedaNormalizada = normalizarContactoBusqueda(busquedaContactos);
+    const busquedaSinEspacios = busquedaNormalizada.replace(/\s+/g, "");
+    if (!busquedaNormalizada) return contactosImportados;
+
+    return contactosImportados.filter((contacto) => {
+      const textoNormalizado = [
+        contacto.nombre,
+        contacto.email,
+        contacto.whatsapp,
+        contacto.referencia,
+        contacto.hub,
+        contacto.tipoDestino,
+      ].map(normalizarContactoBusqueda).join(" ");
+
+      return textoNormalizado.includes(busquedaNormalizada) || textoNormalizado.replace(/\s+/g, "").includes(busquedaSinEspacios);
+    });
+  }, [busquedaContactos, contactosImportados]);
 
   useEffect(() => {
     setJornada(leerJornadaInicial());
@@ -1667,9 +1690,13 @@ export default function Home() {
             <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-3 py-2 text-xs font-black text-[#66745c]">{mensajeImportacion}</p>
           </div>
           <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Base cruda<textarea value={baseContactosCruda} onChange={(e) => setBaseContactosCruda(e.target.value)} placeholder="CLIENTE Florencia Siufi florsiufi@gmail.com&#10;CLIENTE Tipal Gabriela Aguiar gabuaguiar@hotmail.com" className="min-h-48 rounded-xl border border-[#cfd8c6] p-3 text-sm normal-case outline-none" /></label>
+          <div className="rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3">
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Buscar contacto por nombre, email, WhatsApp, referencia o Hub...<input value={busquedaContactos} onChange={(e) => setBusquedaContactos(e.target.value)} placeholder="Buscar contacto por nombre, email, WhatsApp, referencia o Hub..." className="h-12 rounded-xl border border-[#cfd8c6] bg-white px-4 text-base font-semibold normal-case outline-none focus:border-[#5d7032]" /></label>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-black text-[#66745c]">Mostrando {contactosImportadosFiltrados.length} de {contactosImportados.length} contactos</p><button type="button" onClick={() => setBusquedaContactos("")} disabled={!busquedaContactos} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d] disabled:opacity-50">Limpiar búsqueda</button></div>
+          </div>
           <div className="flex flex-wrap gap-2"><button onClick={procesarContactosATabla} className="h-9 rounded-lg bg-[#5d7032] px-4 text-xs font-black text-white">Procesar contactos</button><button onClick={guardarContactosSeleccionados} disabled={contactosImportados.length === 0} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white disabled:opacity-50">Guardar contactos seleccionados</button></div>
           {resumenGuardadoContactos && <div className="rounded-lg border border-[#b7d6ba] bg-[#f2fff4] px-3 py-2 text-xs font-black text-[#1f2a1d]">Último guardado: {resumenGuardadoContactos.clientesConHub} clientes en Hubs, {resumenGuardadoContactos.clientesSinHub} clientes sin Hub, {resumenGuardadoContactos.actores} actores/equipo, {resumenGuardadoContactos.auxiliares} auxiliares, {resumenGuardadoContactos.ignorados} ignorados.</div>}
-          <div className="max-h-[62vh] overflow-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="sticky top-0 bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Incluir sí/no</th><th className="border p-2">Rol</th><th className="border p-2">Nombre</th><th className="border p-2">Referencia</th><th className="border p-2">WhatsApp</th><th className="border p-2">Email</th><th className="border p-2">Hub sugerido / Hub asignado</th><th className="border p-2">Tipo destino</th><th className="border p-2">Acción eliminar</th></tr></thead><tbody>{contactosImportados.length === 0 ? <tr><td colSpan={9} className="border p-6 text-center font-bold text-[#66745c]">Pegá una base cruda y tocá Procesar contactos para generar esta tabla de revisión.</td></tr> : contactosImportados.map((contacto) => <tr key={contacto.id} className={contacto.incluir ? "bg-[#eef4ea]" : "bg-white"}><td className="border p-2 text-center"><input type="checkbox" checked={contacto.incluir} onChange={(e) => actualizarContactoImportado(contacto.id, { incluir: e.target.checked })} /></td><td className="border p-1">{inputTexto(contacto.rol, (valor) => actualizarContactoImportado(contacto.id, { rol: valor.toUpperCase() as RolContactoImportado }), "min-w-24")}</td><td className="border p-1">{inputTexto(contacto.nombre, (valor) => actualizarContactoImportado(contacto.id, { nombre: valor }), "min-w-40")}</td><td className="border p-1">{inputTexto(contacto.referencia, (valor) => actualizarContactoImportado(contacto.id, { referencia: valor }), "min-w-48")}</td><td className="border p-1">{inputTexto(contacto.whatsapp, (valor) => actualizarContactoImportado(contacto.id, { whatsapp: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(contacto.email, (valor) => actualizarContactoImportado(contacto.id, { email: valor }), "min-w-48")}</td><td className="border p-1"><select value={contacto.hub} onChange={(e) => actualizarContactoImportado(contacto.id, { hub: e.target.value as HubImportacion })} className="h-8 min-w-52 rounded border border-[#cfd8c6] bg-white px-2 outline-none"><option value="Sin Hub asignado">Sin Hub asignado</option>{hubsOperativos.map((hub) => <option key={`hub-fila-${contacto.id}-${hub}`} value={hub}>{hub}</option>)}</select></td><td className="border p-1"><select value={contacto.tipoDestino} onChange={(e) => actualizarContactoImportado(contacto.id, { tipoDestino: e.target.value as TipoDestinoImportacion })} className="h-8 min-w-36 rounded border border-[#cfd8c6] bg-white px-2 outline-none"><option value="cliente">Cliente</option><option value="actor">Actor / Equipo</option><option value="auxiliar">Auxiliar</option><option value="ignorar">Ignorar</option></select></td><td className="border p-2 text-center"><button onClick={() => eliminarContactoImportado(contacto.id)} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div>
+          <div className="max-h-[62vh] overflow-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="sticky top-0 bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">Incluir sí/no</th><th className="border p-2">Rol</th><th className="border p-2">Nombre</th><th className="border p-2">Referencia</th><th className="border p-2">WhatsApp</th><th className="border p-2">Email</th><th className="border p-2">Hub sugerido / Hub asignado</th><th className="border p-2">Tipo destino</th><th className="border p-2">Acción eliminar</th></tr></thead><tbody>{contactosImportados.length === 0 ? <tr><td colSpan={9} className="border p-6 text-center font-bold text-[#66745c]">Pegá una base cruda y tocá Procesar contactos para generar esta tabla de revisión.</td></tr> : contactosImportadosFiltrados.length === 0 ? <tr><td colSpan={9} className="border p-6 text-center font-bold text-[#66745c]">No hay contactos que coincidan con la búsqueda.</td></tr> : contactosImportadosFiltrados.map((contacto) => <tr key={contacto.id} className={contacto.incluir ? "bg-[#eef4ea]" : "bg-white"}><td className="border p-2 text-center"><input type="checkbox" checked={contacto.incluir} onChange={(e) => actualizarContactoImportado(contacto.id, { incluir: e.target.checked })} /></td><td className="border p-1">{inputTexto(contacto.rol, (valor) => actualizarContactoImportado(contacto.id, { rol: valor.toUpperCase() as RolContactoImportado }), "min-w-24")}</td><td className="border p-1">{inputTexto(contacto.nombre, (valor) => actualizarContactoImportado(contacto.id, { nombre: valor }), "min-w-40")}</td><td className="border p-1">{inputTexto(contacto.referencia, (valor) => actualizarContactoImportado(contacto.id, { referencia: valor }), "min-w-48")}</td><td className="border p-1">{inputTexto(contacto.whatsapp, (valor) => actualizarContactoImportado(contacto.id, { whatsapp: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(contacto.email, (valor) => actualizarContactoImportado(contacto.id, { email: valor }), "min-w-48")}</td><td className="border p-1"><select value={contacto.hub} onChange={(e) => actualizarContactoImportado(contacto.id, { hub: e.target.value as HubImportacion })} className="h-8 min-w-52 rounded border border-[#cfd8c6] bg-white px-2 outline-none"><option value="Sin Hub asignado">Sin Hub asignado</option>{hubsOperativos.map((hub) => <option key={`hub-fila-${contacto.id}-${hub}`} value={hub}>{hub}</option>)}</select></td><td className="border p-1"><select value={contacto.tipoDestino} onChange={(e) => actualizarContactoImportado(contacto.id, { tipoDestino: e.target.value as TipoDestinoImportacion })} className="h-8 min-w-36 rounded border border-[#cfd8c6] bg-white px-2 outline-none"><option value="cliente">Cliente</option><option value="actor">Actor / Equipo</option><option value="auxiliar">Auxiliar</option><option value="ignorar">Ignorar</option></select></td><td className="border p-2 text-center"><button onClick={() => eliminarContactoImportado(contacto.id)} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div>
           <section className="rounded-lg border border-[#d8dfd1] bg-[#fffdf2] px-3 py-2 text-xs font-black"><span className="mr-2 text-[#66745c]">Sin Hub asignado:</span>{isMounted ? conteoSinHub : "—"} contactos</section>
           <section className="rounded-lg border border-[#d8dfd1] bg-[#f8faf5] px-3 py-2 text-xs font-black"><span className="mr-2 text-[#66745c]">Organización actual:</span>{hubsOperativos.map((hub, index) => <span key={`organizacion-${hub}`}>{index > 0 ? " | " : ""}{hub}: {isMounted ? normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos.length : "—"} clientes</span>)}<span> | Sin Hub asignado: {isMounted ? conteoSinHub : "—"} contactos</span></section>
         </section>}
