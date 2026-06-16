@@ -405,7 +405,7 @@ function leerContactosTrabajo() {
   if (!guardados) return [] as ContactoImportado[];
   try {
     const contactos = JSON.parse(guardados) as Partial<ContactoImportado>[];
-    return contactos.map((contacto, index) => ({
+    const normalizados = contactos.map((contacto, index) => ({
       id: contacto.id || crearImportId(index, `${contacto.email || ""}|${contacto.nombre || ""}|${contacto.referencia || ""}`),
       incluir: contacto.incluir ?? true,
       rol: contacto.rol || "OTRO",
@@ -419,11 +419,18 @@ function leerContactosTrabajo() {
       tipoDestino: contacto.tipoDestino || "cliente",
       observacion: contacto.observacion || "",
     }));
+    return Array.from(new Map(normalizados.map((contacto) => [claveContactoPersistido(contacto), contacto])).values());
   } catch {
     window.localStorage.removeItem(LISTA_GENERAL_CONTACTOS_STORAGE_KEY);
     window.localStorage.removeItem(CONTACTOS_TRABAJO_STORAGE_KEY);
     return [] as ContactoImportado[];
   }
+}
+
+function claveContactoPersistido(contacto: Pick<ContactoImportado, "email" | "nombre" | "referencia">) {
+  const email = contacto.email.trim().toLowerCase();
+  if (email) return `email:${email}`;
+  return `nombre-ref:${normalizarTextoBusqueda(`${contacto.nombre.trim()}|${contacto.referencia.trim()}`)}`;
 }
 
 function leerAuxiliares() {
@@ -562,9 +569,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!isMounted) return;
-    const clientesPorHub = Object.fromEntries(HUBS_DISPONIBLES.map((hub) => [hub, jornada.datosPorHub[hub].clientesIngresos]));
+    const clientesPorHub = clientesPorHubDesdeListaGeneral(contactosImportados);
     localStorage.setItem(CLIENTES_POR_HUB_STORAGE_KEY, JSON.stringify(clientesPorHub));
-  }, [jornada.datosPorHub, isMounted]);
+  }, [contactosImportados, isMounted]);
 
   const datosHub = jornada.datosPorHub[jornada.hub];
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
@@ -731,7 +738,11 @@ export default function Home() {
     "HubYa",
   ].join("\n"), [clienteActivo?.nombre, fechaFormateada, jornada.hub]);
 
-  const filasClientesHtml = datosHub.clientesIngresos.map((cliente, index) => `
+  const clientesReporteHub = contactosImportados.filter((contacto) => contacto.hub === jornada.hub && contacto.tipoDestino === "cliente").map(clienteDesdeContacto);
+  const clientesDelHub = clientesReporteHub.length ? clientesReporteHub : datosHub.clientesIngresos;
+  const clienteActivoReporte = clientesDelHub.find((cliente) => cliente.id === datosHub.clienteActivoId) || clientesDelHub[0] || clienteActivo;
+
+  const filasClientesHtml = clientesDelHub.map((cliente, index) => `
                     <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(cliente.origen || "Sin origen")}</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(nombrePrivado(cliente, index) || "Sin cliente")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(cliente.importe))}</td></tr>`).join("");
   const filasGastosHtml = datosHub.gastos.map((gasto) => `
                     <tr><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(gasto.concepto || "Sin concepto")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(gasto.importe))}</td></tr>`).join("");
@@ -751,10 +762,10 @@ export default function Home() {
         <h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Resumen rápido para el cliente</h2>
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <tbody>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Cliente seleccionado</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(clienteActivo?.nombre || "Sin cliente seleccionado")}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Cliente seleccionado</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(clienteActivoReporte?.nombre || "Sin cliente seleccionado")}</td></tr>
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Hub</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(jornada.hub)}</td></tr>
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Fecha</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(fechaFormateada)}</td></tr>
-            <tr><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;font-weight:900;text-transform:uppercase;">Importe correspondiente a su espacio verde</td><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;color:#1f2a1d;font-size:18px;font-weight:900;">${escaparHtml(formatoPlano(clienteActivo?.importe) || formatoMoneda(0))}</td></tr>
+            <tr><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;font-weight:900;text-transform:uppercase;">Importe correspondiente a su espacio verde</td><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;color:#1f2a1d;font-size:18px;font-weight:900;">${escaparHtml(formatoPlano(clienteActivoReporte?.importe) || formatoMoneda(0))}</td></tr>
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Estado operativo</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(datosHub.resumen.estadoOperativo || "Sin cargar")}</td></tr>
           </tbody>
         </table>
@@ -784,7 +795,7 @@ export default function Home() {
           ${sobreHubYaHtml}
         </section>
       </div>
-    </article>`, [clienteActivo?.importe, clienteActivo?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
+    </article>`, [clienteActivoReporte?.importe, clienteActivoReporte?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos]);
 
 
   async function enviarReporteClienteSeleccionado() {
@@ -955,6 +966,13 @@ export default function Home() {
     };
   }
 
+  function clientesPorHubDesdeListaGeneral(contactos: ContactoImportado[]) {
+    return Object.fromEntries(HUBS_DISPONIBLES.map((hub) => [
+      hub,
+      contactos.filter((contacto) => contacto.hub === hub && contacto.tipoDestino === "cliente").map(clienteDesdeContacto),
+    ])) as Record<HubDisponible, FilaClienteIngreso[]>;
+  }
+
   function sincronizarContactosSinHub(contactos: ContactoImportado[]) {
     setContactosSinHub(contactos.filter((contacto) => contacto.hub === "Sin Hub asignado").map((contacto) => ({ ...contacto, guardadoEn: contacto.fechaRegistro || new Date().toISOString() })));
   }
@@ -962,7 +980,7 @@ export default function Home() {
   function volcarContactosATabla() {
     const filas = baseContactosCruda.split(/\r?\n/).map((linea, index) => {
       const contacto = procesarLineaContacto(linea, index);
-      return contacto ? { ...contacto, incluir: false, hub: "Sin Hub asignado" as HubImportacion, tipoDestino: "cliente" as TipoDestinoImportacion } : null;
+      return contacto ? { ...contacto, incluir: false, tipoDestino: "cliente" as TipoDestinoImportacion } : null;
     }).filter((fila): fila is ContactoImportado => Boolean(fila));
     let agregados = 0;
     let actualizados = 0;
@@ -996,16 +1014,8 @@ export default function Home() {
     });
   }
 
-  function eliminarContactoImportado(id: string) {
-    setContactosImportados((actuales) => {
-      const siguientes = actuales.filter((contacto) => contacto.id !== id);
-      sincronizarContactosSinHub(siguientes);
-      return siguientes;
-    });
-    setContactosSeleccionados((actuales) => actuales.filter((contactoId) => contactoId !== id));
-  }
-
   function guardarAsignacionContactos() {
+    const hubDestino = jornada.hub;
     const seleccionados = contactosImportados.filter((contacto) => contactosSeleccionados.includes(contacto.id));
     if (seleccionados.length === 0) {
       setMensajeImportacion("Marcá al menos un contacto para asignar.");
@@ -1018,34 +1028,28 @@ export default function Home() {
       const datosPorHubActualizados = Object.fromEntries(HUBS_DISPONIBLES.map((hub) => {
         const datos = actual.datosPorHub[hub];
         const clientesSinMovidos = datos.clientesIngresos.filter((cliente) => !clavesSeleccionadas.has(claveCliente(cliente)));
-        const clientesIngresos = hub === actual.hub ? [...clientesSinMovidos, ...clientesNuevos] : clientesSinMovidos;
+        const clientesIngresos = hub === hubDestino ? [...clientesSinMovidos, ...clientesNuevos] : clientesSinMovidos;
         return [hub, { ...datos, clientesIngresos, clienteActivoId: clientesIngresos[0]?.id || 0 }];
       })) as DatosPorHub;
       return { ...actual, datosPorHub: datosPorHubActualizados };
     });
 
     setContactosImportados((actuales) => {
-      const siguientes = actuales.map((contacto) => contactosSeleccionados.includes(contacto.id) ? { ...contacto, incluir: true, hub: jornada.hub, tipoDestino: "cliente" as TipoDestinoImportacion } : contacto);
+      const siguientes = actuales.map((contacto) => contactosSeleccionados.includes(contacto.id) ? { ...contacto, incluir: true, hub: hubDestino, tipoDestino: "cliente" as TipoDestinoImportacion } : contacto);
       sincronizarContactosSinHub(siguientes);
       return siguientes;
     });
     setContactosSeleccionados([]);
     setResumenGuardadoContactos({ clientesConHub: seleccionados.length, clientesSinHub: contactosImportados.filter((contacto) => contacto.hub === "Sin Hub asignado" && !contactosSeleccionados.includes(contacto.id)).length, actores: 0, auxiliares: auxiliares.length, ignorados: 0 });
-    setMensajeImportacion(`${seleccionados.length} contactos asignados a ${jornada.hub}.`);
+    setMensajeImportacion(`Se asignaron ${seleccionados.length} contactos a ${hubDestino}`);
   }
 
   function alternarContactoSeleccionado(id: string, marcado: boolean) {
     setContactosSeleccionados((actuales) => marcado ? Array.from(new Set([...actuales, id])) : actuales.filter((contactoId) => contactoId !== id));
   }
 
-  function mostrarHubDesdeResumen(hub: HubDisponible) {
-    seleccionarHubTrabajo(hub);
-    setFiltroContactos("hub-actual");
-    setSeccionActiva("importar");
-  }
-
   const contactosVisibles = contactosImportados.filter((contacto) => {
-    const coincideBusqueda = normalizarTextoBusqueda(`${contacto.nombre} ${contacto.email} ${contacto.referencia}`).includes(normalizarTextoBusqueda(busquedaContactos));
+    const coincideBusqueda = normalizarTextoBusqueda(`${contacto.nombre} ${contacto.email} ${contacto.whatsapp} ${contacto.referencia}`).includes(normalizarTextoBusqueda(busquedaContactos));
     const coincideFiltro = filtroContactos === "todos" || (filtroContactos === "sin-hub" && contacto.hub === "Sin Hub asignado") || (filtroContactos === "hub-actual" && contacto.hub === jornada.hub);
     return coincideBusqueda && coincideFiltro;
   });
@@ -1112,29 +1116,21 @@ export default function Home() {
 
 
         {seccionActiva === "importar" && <section className="mb-3 space-y-3 rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Lista general + asignación simple</p><h2 className="text-lg font-black">Asignar clientes a Hubs</h2><p className="text-xs font-semibold text-[#66745c]">Importá contactos a una lista general, elegí un Hub, marcá personas y guardá la asignación. No se duplica: si ya estaba en otro Hub, se mueve.</p></div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Lista general + asignación simple</p><h2 className="text-lg font-black">Asignar clientes a Hubs</h2></div>
             <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-3 py-2 text-xs font-black text-[#66745c]">{mensajeImportacion}</p>
           </div>
-          <div className="grid gap-2 rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-2 lg:grid-cols-[220px_1fr_auto_auto_auto] lg:items-end">
-            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub destino<select value={jornada.hub} onChange={(e) => seleccionarHubTrabajo(e.target.value as HubDisponible)} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold normal-case outline-none">{HUBS_DISPONIBLES.map((hub) => <option key={`selector-contactos-${hub}`} value={hub}>{hub}</option>)}</select></label>
-            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Buscar nombre/email/referencia<input value={busquedaContactos} onChange={(e) => setBusquedaContactos(e.target.value)} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm normal-case outline-none" placeholder="Florencia, email o referencia" /></label>
-            <button onClick={() => setMostrarImportador((actual) => !actual)} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Importar contactos</button>
-            <button onClick={guardarAsignacionContactos} disabled={contactosSeleccionados.length === 0} className="h-8 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white disabled:opacity-50">Guardar asignación</button>
-            <button onClick={() => setContactosSeleccionados([])} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Limpiar selección</button>
+          <div className="sticky top-[92px] z-10 grid gap-2 rounded-xl border border-[#cfd8c6] bg-[#f8faf5]/95 p-2 backdrop-blur lg:grid-cols-[220px_1fr_190px_auto_auto] lg:items-end">
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Hub destino<select value={jornada.hub} onChange={(e) => seleccionarHubTrabajo(e.target.value as HubDisponible)} className="h-9 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold normal-case outline-none">{HUBS_DISPONIBLES.map((hub) => <option key={`selector-contactos-${hub}`} value={hub}>{hub}</option>)}</select></label>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Buscar contacto<input value={busquedaContactos} onChange={(e) => setBusquedaContactos(e.target.value)} className="h-9 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm normal-case outline-none" placeholder="Florencia, email, WhatsApp o referencia" /></label>
+            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Vista<select value={filtroContactos} onChange={(e) => setFiltroContactos(e.target.value as typeof filtroContactos)} className="h-9 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold normal-case outline-none"><option value="todos">Todos los contactos</option><option value="sin-hub">Sin Hub asignado</option><option value="hub-actual">Del Hub seleccionado</option></select></label>
+            <button onClick={() => setMostrarImportador(true)} className="h-9 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Importar base</button>
+            <button onClick={guardarAsignacionContactos} disabled={contactosSeleccionados.length === 0} className="h-9 rounded-lg bg-[#1f2a1d] px-4 text-xs font-black text-white disabled:opacity-50">Guardar asignación</button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setFiltroContactos("sin-hub")} className={`h-8 rounded-lg px-3 text-xs font-black ${filtroContactos === "sin-hub" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>Mostrar solo contactos sin Hub</button>
-            <button onClick={() => setFiltroContactos("todos")} className={`h-8 rounded-lg px-3 text-xs font-black ${filtroContactos === "todos" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>Mostrar todos</button>
-            <button onClick={() => setFiltroContactos("hub-actual")} className={`h-8 rounded-lg px-3 text-xs font-black ${filtroContactos === "hub-actual" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>Mostrar clientes de este Hub</button>
-          </div>
-          {mostrarImportador && <div className="rounded-xl border border-[#cfd8c6] bg-white p-3 shadow-sm">
-            <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Base cruda<textarea value={baseContactosCruda} onChange={(e) => setBaseContactosCruda(e.target.value)} placeholder="CLIENTE, Florencia Siufi, Praderas lote 12, 387..., florencia@email.com" className="min-h-40 rounded-xl border border-[#cfd8c6] p-3 text-sm normal-case outline-none" /></label>
-            <button onClick={volcarContactosATabla} className="mt-2 h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Volcar a lista general</button>
-          </div>}
-          {resumenGuardadoContactos && <div className="rounded-xl border border-[#b7d6ba] bg-[#f2fff4] p-3 text-xs font-black text-[#1f2a1d]">Última asignación: {resumenGuardadoContactos.clientesConHub} clientes asignados. Sin Hub pendientes: {resumenGuardadoContactos.clientesSinHub}.</div>}
-          <div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Seleccionar</th><th className="border p-1">Rol</th><th className="border p-1">Nombre</th><th className="border p-1">Referencia</th><th className="border p-1">WhatsApp</th><th className="border p-1">Email</th><th className="border p-1">Hub actual</th><th className="border p-1">Acción</th></tr></thead><tbody>{contactosVisibles.length === 0 ? <tr><td colSpan={8} className="border p-3 text-center font-bold text-[#66745c]">No hay contactos para este filtro. Usá Importar contactos para pegar una base cruda.</td></tr> : contactosVisibles.map((contacto) => <tr key={contacto.id} className={contactosSeleccionados.includes(contacto.id) ? "bg-[#eef4ea]" : "bg-white"}><td className="border p-1 text-center"><input type="checkbox" checked={contactosSeleccionados.includes(contacto.id)} onChange={(e) => alternarContactoSeleccionado(contacto.id, e.target.checked)} /></td><td className="border p-1">{inputTexto(contacto.rol, (valor) => actualizarContactoImportado(contacto.id, { rol: valor.toUpperCase() as RolContactoImportado }), "min-w-24")}</td><td className="border p-1">{inputTexto(contacto.nombre, (valor) => actualizarContactoImportado(contacto.id, { nombre: valor }), "min-w-36")}</td><td className="border p-1">{inputTexto(contacto.referencia, (valor) => actualizarContactoImportado(contacto.id, { referencia: valor }), "min-w-48")}</td><td className="border p-1">{inputTexto(contacto.whatsapp, (valor) => actualizarContactoImportado(contacto.id, { whatsapp: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(contacto.email, (valor) => actualizarContactoImportado(contacto.id, { email: valor }), "min-w-48")}</td><td className="border p-1 font-bold">{contacto.hub}</td><td className="border p-1 text-center"><button onClick={() => eliminarContactoImportado(contacto.id)} className="font-black text-[#743c3c]">Quitar</button></td></tr>)}</tbody></table></div>
-          <section className="rounded-xl border border-[#d8dfd1] bg-[#f8faf5] p-3"><h3 className="mb-2 text-sm font-black">Organización actual</h3><div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{HUBS_DISPONIBLES.map((hub) => <button key={`organizacion-${hub}`} onClick={() => mostrarHubDesdeResumen(hub)} className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-left text-xs font-black hover:border-[#1f2a1d]">{hub}: {isMounted ? jornada.datosPorHub[hub].clientesIngresos.length : "—"} clientes</button>)}<button onClick={() => setFiltroContactos("sin-hub")} className="rounded-lg border border-[#cfd8c6] bg-white p-3 text-left text-xs font-black hover:border-[#1f2a1d]">Sin Hub asignado: {isMounted ? conteoSinHub : "—"} contactos</button></div></section>
+          {mostrarImportador && <div className="fixed inset-0 z-50 grid place-items-center bg-[#182018]/40 p-4"><div className="w-full max-w-2xl rounded-2xl border border-[#cfd8c6] bg-white p-4 shadow-xl"><div className="mb-3"><h3 className="text-lg font-black">Importar base</h3><p className="text-xs font-semibold text-[#66745c]">Pegá una base cruda. Se agrega a la lista general sin duplicar por email; si no hay email, se compara nombre + referencia.</p></div><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Base cruda<textarea value={baseContactosCruda} onChange={(e) => setBaseContactosCruda(e.target.value)} placeholder="CLIENTE, Florencia Siufi, Praderas lote 12, 387..., florencia@email.com" className="min-h-56 rounded-xl border border-[#cfd8c6] p-3 text-sm normal-case outline-none" /></label><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setMostrarImportador(false); setBaseContactosCruda(""); }} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cancelar</button><button onClick={volcarContactosATabla} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Importar a lista general</button></div></div></div>}
+          {resumenGuardadoContactos && <div className="rounded-lg border border-[#b7d6ba] bg-[#f2fff4] px-3 py-2 text-xs font-black text-[#1f2a1d]">Última asignación: {resumenGuardadoContactos.clientesConHub} contactos. Sin Hub pendientes: {resumenGuardadoContactos.clientesSinHub}.</div>}
+          <div className="max-h-[62vh] overflow-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="sticky top-0 bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-2">✓</th><th className="border p-2">Nombre</th><th className="border p-2">Referencia</th><th className="border p-2">Email</th><th className="border p-2">WhatsApp</th><th className="border p-2">Rol</th><th className="border p-2">Hub actual</th></tr></thead><tbody>{contactosVisibles.length === 0 ? <tr><td colSpan={7} className="border p-6 text-center font-bold text-[#66745c]">No hay contactos para esta vista. Usá Importar base para pegar una base cruda.</td></tr> : contactosVisibles.map((contacto) => <tr key={contacto.id} className={contactosSeleccionados.includes(contacto.id) ? "bg-[#eef4ea]" : "bg-white"}><td className="border p-2 text-center"><input type="checkbox" checked={contactosSeleccionados.includes(contacto.id)} onChange={(e) => alternarContactoSeleccionado(contacto.id, e.target.checked)} /></td><td className="border p-1">{inputTexto(contacto.nombre, (valor) => actualizarContactoImportado(contacto.id, { nombre: valor }), "min-w-40")}</td><td className="border p-1">{inputTexto(contacto.referencia, (valor) => actualizarContactoImportado(contacto.id, { referencia: valor }), "min-w-48")}</td><td className="border p-1">{inputTexto(contacto.email, (valor) => actualizarContactoImportado(contacto.id, { email: valor }), "min-w-48")}</td><td className="border p-1">{inputTexto(contacto.whatsapp, (valor) => actualizarContactoImportado(contacto.id, { whatsapp: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(contacto.rol, (valor) => actualizarContactoImportado(contacto.id, { rol: valor.toUpperCase() as RolContactoImportado }), "min-w-24")}</td><td className="border p-2 font-bold">{contacto.hub}</td></tr>)}</tbody></table></div>
+          <section className="rounded-lg border border-[#d8dfd1] bg-[#f8faf5] px-3 py-2 text-xs font-black"><span className="mr-2 text-[#66745c]">Organización actual:</span>{HUBS_DISPONIBLES.map((hub, index) => <span key={`organizacion-${hub}`}>{index > 0 ? " | " : ""}{hub}: {isMounted ? contactosImportados.filter((contacto) => contacto.hub === hub).length : "—"}</span>)}<span> | Sin Hub: {isMounted ? conteoSinHub : "—"}</span></section>
         </section>}
 
         {seccionActiva === "reporte" && <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
