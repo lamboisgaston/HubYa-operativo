@@ -777,6 +777,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const ramaReporte = `${hubActual?.rama || ""}`.toLowerCase();
   const tituloReporteHub = /jardiner|jardinería|jardineria|espacios? verdes?/.test(ramaReporte) ? "Reporte de Espacios Verdes" : /fumigadores|control de plagas|plagas/.test(ramaReporte) ? "Reporte de Control de Plagas" : "Reporte del Hub";
   const informacionReporte = hubActual?.informacionImportante?.mostrarEnReporte && hubActual.informacionImportante.texto ? hubActual.informacionImportante : null;
+  const parametrosJardinerosYaReporte = hubActual?.moduloOperativo === "jardinerosya" ? hubActual.parametrosOperativos?.jardinerosYa : null;
   const contactosImportadosFiltrados = useMemo(() => {
     const busquedaNormalizada = normalizarContactoBusqueda(busquedaContactos);
     const busquedaSinEspacios = busquedaNormalizada.replace(/\s+/g, "");
@@ -2063,6 +2064,13 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
               </div>
               {totalADistribuir < 0 && <p className="mt-2 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-2 py-1 text-xs font-black text-[#743c3c]">Advertencia: el total a distribuir es negativo.</p>}
             </section>
+
+            {parametrosJardinerosYaReporte && <section className="rounded-xl border border-[#bfd3b8] bg-[#fbfdf8] p-3 shadow-sm">
+              <h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Parámetros operativos precargados desde la ficha del Hub</h3>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {[["Valor hora de trabajo", formatoMoneda(parametrosJardinerosYaReporte.valorHoraTrabajo)], ["Comisión cuadrilla", `${parametrosJardinerosYaReporte.comisionResponsableCuadrillaPorcentaje}%`], ["Traslado", formatoMoneda(parametrosJardinerosYaReporte.traslado)], ["Aceite", formatoMoneda(parametrosJardinerosYaReporte.aceite)], ["Nafta", formatoMoneda(parametrosJardinerosYaReporte.nafta)], ["Cortadora", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraCortadoraCesped)}/h`], ["Bordeadora", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraBordeadora)}/h`], ["Máquina de empuje", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraMaquinaEmpuje)}/h`]].map(([etiqueta, valor]) => <div key={etiqueta} className="rounded-lg border border-[#cfd8c6] bg-white p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">{etiqueta}</p><p className="text-sm font-black">{valor}</p></div>)}
+              </div>
+            </section>}
 
             <section className="grid gap-3 lg:grid-cols-2">
               <div className="space-y-3">

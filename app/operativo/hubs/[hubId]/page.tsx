@@ -29,6 +29,7 @@ export default async function HubEntradaPage({ params }: { params: Promise<{ hub
             ["Contactos", "contactos"],
             ["Vínculos", "vinculos"],
             ["Mensajes y respuestas", "mensajes"],
+            ["Parámetros operativos", "parametros"],
           ].map(([label, path]) => (
             <Link key={path} href={`/operativo/hubs/${hub.slug}/${path}`} className="rounded-[2rem] border border-[#d8dfd1] bg-white p-8 text-center text-2xl font-black shadow-sm transition hover:border-[#1f2a1d] hover:bg-[#eef2e8]">
               {label}
