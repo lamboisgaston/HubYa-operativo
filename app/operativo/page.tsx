@@ -12,6 +12,10 @@ export default async function OperativoPage() {
         <header className="rounded-[2rem] border border-[#d8dfd1] bg-white p-6 shadow-sm">
           <h1 className="text-3xl font-black sm:text-4xl">HubYa Operativo</h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold text-[#5f6f55]">Elegí un Hub o administrá la red operativa.</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link href="/operativo/mensajes" className="rounded-2xl bg-[#1f2a1d] px-4 py-3 text-center text-sm font-black text-white">Enviar mensaje</Link>
+            <Link href="/operativo/mensajes#respuestas" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Respuestas recibidas</Link>
+          </div>
         </header>
 
         <CrearHubForm />
