@@ -1,2 +1,19 @@
 import Link from "next/link";
-export function PublicHeader() { return <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#0a0a0f]/85 px-6 py-4 backdrop-blur"><nav className="mx-auto flex max-w-6xl items-center justify-between"><Link href="/" className="font-['Space_Grotesk'] text-2xl font-black tracking-tight text-[#f5f5f0]">hub<span className="text-[#4f46e5]">ya</span></Link><div className="flex gap-5 text-sm font-semibold text-[#9ca3af]"><a href="/#como">¿Cómo funciona?</a><a href="/#hubs">Hubs</a><Link href="/operativo">Operativo</Link></div></nav></header>; }
+
+export function PublicHeader() {
+  return (
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#0a0a0f]/85 px-6 py-4 backdrop-blur">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between">
+        <Link href="/web-publica" className="font-['Space_Grotesk'] text-2xl font-black tracking-tight text-[#f5f5f0]">
+          hub<span className="text-[#4f46e5]">ya</span>
+        </Link>
+        <div className="flex gap-5 text-sm font-semibold text-[#9ca3af]">
+          <a href="/web-publica#servicios-coordinados">¿Cómo funciona?</a>
+          <a href="/web-publica#modulos">Módulos</a>
+          <a href="/web-publica#hubs">Hubs</a>
+          <Link href="/operativo">Operativo</Link>
+        </div>
+      </nav>
+    </header>
+  );
+}
