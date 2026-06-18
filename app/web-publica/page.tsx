@@ -16,6 +16,41 @@ const beneficiosDemandaAgrupada = [
   "más estabilidad para quienes prestan el servicio",
 ];
 
+const modulosOperativos = [
+  {
+    nombre: "JardinerosYa",
+    proceso: "Módulo para mantenimiento de espacios verdes.",
+    descripcion:
+      "Permite organizar trabajos, clientes, reportes, responsables y continuidad operativa en espacios verdes.",
+    conexion:
+      "Puede ser usado por jardineros o equipos técnicos, y también puede gestionar Hubs completos que agrupan demanda de mantenimiento.",
+  },
+  {
+    nombre: "FumigadoresYa",
+    proceso: "Módulo para control de plagas y trazabilidad sanitaria.",
+    descripcion:
+      "Permite organizar servicios, certificados, monitoreo, reportes, vencimientos y comunicación técnica.",
+    conexion:
+      "Puede ser usado por empresas o técnicos de control de plagas, y también puede conectarse con Hubs que necesitan control sanitario recurrente.",
+  },
+  {
+    nombre: "ComerciarYa",
+    proceso: "Módulo para abastecimiento y organización comercial.",
+    descripcion:
+      "Permite ordenar necesidades de compra, abastecimiento, proveedores y procesos comerciales agrupados.",
+    conexion:
+      "Puede conectarse con Hubs que buscan organizar demanda de productos o servicios de manera conjunta.",
+  },
+  {
+    nombre: "PileterosYa",
+    proceso: "Módulo para mantenimiento de piletas.",
+    descripcion:
+      "Permite organizar servicios recurrentes, visitas, responsables, reportes y comunicación con clientes o Hubs.",
+    conexion:
+      "Puede ser usado por pileteros o equipos técnicos, y también puede gestionar Hubs que necesitan mantenimiento de piletas.",
+  },
+];
+
 export default async function WebPublicaPage() {
   const hubs = await getHubs();
 
@@ -123,6 +158,94 @@ export default async function WebPublicaPage() {
         </div>
       </section>
 
+      <section id="modulos" className="mx-auto max-w-6xl px-6 py-20">
+        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.25em] text-[#06b6d4]">Módulos operativos</p>
+            <h2 className="mt-3 text-3xl font-black text-white md:text-5xl">
+              Módulos desarrollados según el proceso
+            </h2>
+            <div className="mt-6 space-y-4 text-base leading-7 text-[#9ca3af]">
+              <p>
+                HubYa organiza la demanda a través de Hubs, pero cada tipo de necesidad requiere herramientas
+                específicas. Por eso desarrollamos módulos operativos adaptados a distintos procesos.
+              </p>
+              <p>
+                <strong className="text-white">HubYa es la tecnología madre.</strong> Los módulos son herramientas
+                especializadas para resolver procesos concretos: registrar información, coordinar responsables, generar
+                reportes y mejorar la continuidad operativa.
+              </p>
+              <p>
+                Un Hub puede necesitar mantenimiento de espacios verdes, control de plagas, abastecimiento, pileta,
+                paisajismo u otros servicios recurrentes. Cada proceso puede conectarse con su módulo correspondiente.
+              </p>
+            </div>
+            <p className="mt-6 rounded-2xl border border-[#06b6d4]/30 bg-[#06b6d4]/10 p-5 text-lg font-black text-[#a5f3fc]">
+              HubYa agrupa la demanda. Sus módulos ordenan el proceso.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-[#06b6d4]/10">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-[#06b6d4]">Conexión con prestadores</p>
+            <h3 className="mt-3 text-2xl font-black text-white">Un Hub reúne la necesidad. Un módulo organiza la ejecución.</h3>
+            <div className="mt-5 space-y-4 text-sm leading-6 text-[#cbd5e1]">
+              <p>
+                Estos módulos también pueden ser utilizados por trabajadores independientes, equipos técnicos o
+                prestadores de servicios que necesitan ordenar su trabajo.
+              </p>
+              <p>
+                Un jardinero, un fumigador, un piletero o un proveedor puede usar su módulo específico para organizar
+                clientes, trabajos, reportes, agenda y comunicación. Al mismo tiempo, esos módulos pueden acoplarse a los
+                Hubs.
+              </p>
+              <p>
+                Eso significa que un Hub completo puede ser gestionado como una unidad de trabajo dentro del módulo
+                correspondiente: un Hub de espacios verdes desde JardinerosYa, o un Hub de control de plagas desde
+                FumigadoresYa.
+              </p>
+            </div>
+            <div className="mt-5 grid gap-3 text-sm font-bold text-[#e5e7eb] sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Personas agrupadas que necesitan resolver una demanda.</div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Prestadores o equipos que organizan la oferta y ejecutan el servicio.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="ejemplos-modulos" className="mx-auto max-w-6xl px-6 py-20">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.25em] text-[#06b6d4]">Ejemplos de módulos</p>
+            <h2 className="mt-3 text-3xl font-black text-white">Ramas funcionales de HubYa</h2>
+          </div>
+          <p className="max-w-2xl text-sm leading-6 text-[#9ca3af]">
+            Cada módulo está diseñado para ordenar un tipo específico de proceso. No son proyectos separados: funcionan
+            bajo la misma lógica madre de agrupar demanda, organizar oferta y generar estabilidad operativa.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-5 md:grid-cols-2">
+          {modulosOperativos.map((modulo) => (
+            <article
+              key={modulo.nombre}
+              className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.025] p-6 shadow-xl shadow-black/20"
+            >
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#06b6d4]">Módulo HubYa</p>
+              <h3 className="mt-3 text-2xl font-black text-white">{modulo.nombre}</h3>
+              <p className="mt-3 text-base font-black text-[#e5e7eb]">{modulo.proceso}</p>
+              <p className="mt-4 text-sm leading-6 text-[#9ca3af]">{modulo.descripcion}</p>
+              <div className="mt-5 rounded-2xl border border-[#4f46e5]/30 bg-[#4f46e5]/10 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c7d2fe]">Conexión con Hubs</p>
+                <p className="mt-2 text-sm leading-6 text-[#c7d2fe]">{modulo.conexion}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+        <p className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm leading-6 text-[#cbd5e1]">
+          Otros módulos pueden desarrollarse según la necesidad de cada Hub. La función de estas herramientas es
+          transformar procesos dispersos en sistemas simples, medibles y coordinados.
+        </p>
+      </section>
+
       <section id="hubs" className="mx-auto max-w-6xl px-6 py-20">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -130,8 +253,8 @@ export default async function WebPublicaPage() {
             <h2 className="mt-3 text-3xl font-black text-white">Ejemplos de demanda organizada</h2>
           </div>
           <p className="max-w-xl text-sm text-[#9ca3af]">
-            JardinerosYa, FumigadoresYa y otras verticales son ejemplos de cómo una necesidad repetida puede organizarse
-            como Hub. No se publican emails, teléfonos ni nombres completos de clientes.
+            Los Hubs agrupan demanda real alrededor de una necesidad compartida. Los módulos operativos pueden acoplarse
+            a esos Hubs para ordenar la ejecución sin exponer emails, teléfonos ni nombres completos de clientes.
           </p>
         </div>
         <div className="mt-8 grid gap-5 md:grid-cols-2">
