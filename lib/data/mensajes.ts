@@ -78,9 +78,15 @@ export async function crearMensajeOperativoDesdeInput(input: CrearMensajeInput) 
   await updatePublicStore((base) => {
     const store = normalizarMensajes(base);
     if (input.acercaDeHubYa !== undefined) store.acerca_de_hubya = texto(input.acercaDeHubYa) || acercaDefault;
-    const contactos = store.clientes.filter((c) => c.estado === "activo" && (alcance === "todos" || hubIds.has(c.hubId) || clienteIds.has(c.id)));
+    const contactos = store.clientes.filter((c) => {
+      if (c.estado !== "activo") return false;
+      if (alcance === "todos") return hubIds.size === 0 || hubIds.has(c.hubId);
+      return clienteIds.has(c.id) && (hubIds.size === 0 || hubIds.has(c.hubId));
+    });
     if (contactos.length === 0) return store;
     const opcionesRespuesta = (input.opcionesRespuesta || []).map(texto).filter(Boolean).map((opcion) => ({ id: uid("opcion"), texto: opcion }));
+    const esEncuesta = opcionesRespuesta.length > 0;
+    if (esEncuesta && !texto(input.preguntaEncuesta)) return store;
     const hubsIncluidos = Array.from(new Set(contactos.map((c) => c.hubId).filter(Boolean)));
     const id = uid("envio");
     const remitenteUsado = obtenerRemitenteResend();
@@ -169,12 +175,21 @@ export async function registrarRespuestaPorToken(token: string) {
       for (const destinatario of mensaje.destinatarios) {
         const tokenInfo = (destinatario.tokensRespuesta || []).find((t) => t.token === token);
         if (!tokenInfo) continue;
-        const existente = store.respuestas_operativas.find((r) => r.mensajeId === mensaje.id && r.clienteId === tokenInfo.clienteId && r.opcionId === tokenInfo.opcionId);
-        if (!existente) {
+        const existente = store.respuestas_operativas.find((r) => r.mensajeId === mensaje.id && r.clienteId === tokenInfo.clienteId);
+        if (existente) {
+          existente.fecha = timestamp;
+          existente.texto = tokenInfo.opcionTexto;
+          existente.opcionId = tokenInfo.opcionId;
+          existente.opcionTexto = tokenInfo.opcionTexto;
+          existente.estado = "nueva";
+          existente.updatedAt = timestamp;
+          mensaje.respuestasAsociadas = Array.from(new Set([...(mensaje.respuestasAsociadas || []), existente.id]));
+        } else {
           const respuesta: RespuestaOperativa = { id: uid("respuesta"), mensajeId: mensaje.id, clienteId: tokenInfo.clienteId, hubId: tokenInfo.hubId, fecha: timestamp, texto: tokenInfo.opcionTexto, opcionId: tokenInfo.opcionId, opcionTexto: tokenInfo.opcionTexto, canal: "email", estado: "nueva", respuestasDelOperador: [], createdAt: timestamp, updatedAt: timestamp };
           store.respuestas_operativas = [respuesta, ...store.respuestas_operativas];
           mensaje.respuestasAsociadas = Array.from(new Set([...(mensaje.respuestasAsociadas || []), respuesta.id]));
         }
+        for (const t of destinatario.tokensRespuesta || []) t.usado = t.token === token;
         tokenInfo.usado = true;
         tokenInfo.usadoEn = timestamp;
         destinatario.estado = "respondido";
