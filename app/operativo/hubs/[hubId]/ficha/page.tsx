@@ -1,5 +1,6 @@
 import { HubNav } from "../HubNav";
 import { getHubOr404 } from "../utils";
+import { HubInformacionImportanteEditor } from "@/components/operativo/HubInformacionImportanteEditor";
 
 export default async function FichaHubPage({ params }: { params: Promise<{ hubId: string }> }) {
   const { hubId } = await params;
@@ -31,6 +32,8 @@ export default async function FichaHubPage({ params }: { params: Promise<{ hubId
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Postulantes</dt><dd className="mt-1 font-black">{postulantes.length}</dd></div>
           </dl>
         </section>
+        <HubInformacionImportanteEditor hubSlug={hub.slug} informacion={hub.informacionImportante} />
+
         <section className="rounded-[2rem] border border-[#d8dfd1] bg-white p-6 shadow-sm">
           <h2 className="text-xl font-black">Integrantes y perfiles</h2>
           <div className="mt-4 grid gap-3">

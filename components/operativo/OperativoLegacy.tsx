@@ -654,7 +654,7 @@ function leerJornadaInicial(): JornadaOperativa {
   return { ...base, datosPorHub: aplicarClientesPorHub(base.datosPorHub, leerClientesPorHub()) };
 }
 
-export default function OperativoLegacy({ initialSection = "reporte", initialHubName, initialClientes = [], simpleMode = false }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string; initialClientes?: Cliente[]; simpleMode?: boolean }) {
+export default function OperativoLegacy({ initialSection = "reporte", initialHubName, initialClientes = [], initialHub, simpleMode = false }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string; initialClientes?: Cliente[]; initialHub?: HubPublico; simpleMode?: boolean }) {
   const [isMounted, setIsMounted] = useState(false);
   const [jornada, setJornada] = useState<JornadaOperativa>(() => initialHubName ? { ...jornadaInicial, hub: initialHubName, datosPorHub: { ...jornadaInicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosHubInicial(initialHubName), initialClientes) } } : jornadaInicial);
   const [hubsCanonicos, setHubsCanonicos] = useState<HubPublico[]>([]);
@@ -707,6 +707,10 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const reporteVisualRef = useRef<HTMLElement>(null);
   const firmaSeleccionReporteRef = useRef("");
   const hubsOperativos = useMemo(() => fusionarNombresHubs(hubsCanonicos), [hubsCanonicos]);
+  const hubActual = useMemo(() => initialHub || hubsCanonicos.find((hub) => hub.nombre === jornada.hub), [hubsCanonicos, initialHub, jornada.hub]);
+  const ramaReporte = `${hubActual?.rama || ""}`.toLowerCase();
+  const tituloReporteHub = /jardiner|jardinería|jardineria|espacios? verdes?/.test(ramaReporte) ? "Reporte de Espacios Verdes" : /fumigadores|control de plagas|plagas/.test(ramaReporte) ? "Reporte de Control de Plagas" : "Reporte del Hub";
+  const informacionReporte = hubActual?.informacionImportante?.mostrarEnReporte && hubActual.informacionImportante.texto ? hubActual.informacionImportante : null;
   const contactosImportadosFiltrados = useMemo(() => {
     const busquedaNormalizada = normalizarContactoBusqueda(busquedaContactos);
     const busquedaSinEspacios = busquedaNormalizada.replace(/\s+/g, "");
@@ -1023,8 +1027,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
 
   const reporteTexto = useMemo(() => [
-    "HubYa — Reporte administrativo del Hub",
-    `Sistema: JardinerosYa / servicio de jardinería`,
+    `HubYa — ${tituloReporteHub}`,
+    `Sistema: ${hubActual?.rama || "HubYa"}`,
     `Hub: ${jornada.hub}`,
     `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
     `Fecha: ${fechaFormateada}`,
@@ -1047,14 +1051,19 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     `Estado operativo: ${datosHub.resumen.estadoOperativo || "Sin cargar"}`,
     `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
     "",
+    ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
+    "CIERRE DEL REPORTE",
+    "Gracias por formar parte de una gestión organizada del espacio verde.",
+    "HubYa · Coordinación humana sobre procesos recurrentes",
+    "",
     "SOBRE HUBYA",
     ...sobreHubYaLineas,
-  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre]);
+  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, hubActual?.rama, informacionReporte, tituloReporteHub]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return [
-      "HubYa — Reporte administrativo del Hub",
-      `Sistema: JardinerosYa / servicio de jardinería`,
+      `HubYa — ${tituloReporteHub}`,
+      `Sistema: ${hubActual?.rama || "HubYa"}`,
       `Hub: ${jornada.hub}`,
       `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
       `Fecha: ${fechaFormateada}`,
@@ -1076,6 +1085,11 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       `Tiempo efectivo: ${datosHub.resumen.tiempoEfectivo || "Sin cargar"}`,
       `Estado operativo: ${datosHub.resumen.estadoOperativo || "Sin cargar"}`,
       `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
+      "",
+      ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
+      "CIERRE DEL REPORTE",
+      "Gracias por formar parte de una gestión organizada del espacio verde.",
+      "HubYa · Coordinación humana sobre procesos recurrentes",
       "",
       "SOBRE HUBYA",
       ...sobreHubYaLineas,
@@ -1113,8 +1127,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     <article style="width:100%;max-width:760px;border:1px solid #6f7968;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;">
       <header style="border-bottom:2px solid #1f2a1d;padding:16px;">
         <p style="margin:0;color:#66745c;font-size:10px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;">HubYa</p>
-        <h1 style="margin:4px 0 0;font-size:20px;line-height:1.2;font-weight:900;text-transform:uppercase;">Reporte administrativo del Hub</h1>
-        <p style="margin:4px 0 0;color:#66745c;font-size:12px;font-weight:700;">Documento emitido por sistema</p>
+        <h1 style="margin:4px 0 0;font-size:20px;line-height:1.2;font-weight:900;text-transform:uppercase;">${escaparHtml(tituloReporteHub)}</h1>
+        <p style="margin:4px 0 0;color:#66745c;font-size:12px;font-weight:700;">Resumen de trabajo coordinado para el cuidado y mantenimiento del espacio verde.</p>
       </header>
 
       <section style="border-bottom:1px solid #9aa78f;padding:16px;">
@@ -1155,7 +1169,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           ${sobreHubYaHtml}
         </section>
       </div>
-    </article>`, [clienteActivoReporte?.importe, clienteActivoReporte?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre]);
+    </article>`, [clienteActivoReporte?.importe, clienteActivoReporte?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, tituloReporteHub]);
 
 
   async function enviarReporteASeleccionados() {
@@ -1904,18 +1918,18 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[#d8dfd1] pb-2">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Vista previa exacta para mail</p>
-                <h2 className="text-lg font-black">Documento administrativo emitido por sistema</h2>
-                <p className="text-xs font-bold text-[#66745c]">La imagen generada usa exactamente este formato de factura / presupuesto / reporte.</p>
+                <h2 className="text-lg font-black">{tituloReporteHub}</h2>
+                <p className="text-xs font-bold text-[#66745c]">La imagen generada usa este informe amable, claro y confiable.</p>
                 <p className={`mt-1 text-xs font-black ${estadoEnvio === "error" ? "text-[#743c3c]" : estadoEnvio === "enviado" ? "text-[#2f6d32]" : "text-[#66745c]"}`}>{mensajeEnvio}</p>
               </div>
               <div className="flex flex-wrap gap-2"><button onClick={() => copiarTexto(reporteTexto, "Reporte")} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar reporte</button><button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar imagen del reporte</button><button onClick={enviarReporteASeleccionados} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar reporte a seleccionados</button></div>
             </div>
 
-            <article ref={reporteVisualRef} className="w-full max-w-[760px] border border-[#6f7968] bg-white p-0 font-sans text-[#182018] shadow-none">
-              <header className="border-b-2 border-[#1f2a1d] p-4">
+            <article ref={reporteVisualRef} className="w-full max-w-[760px] rounded-[28px] border border-[#c7d8bf] bg-[#fbfdf8] p-0 font-sans text-[#182018] shadow-sm">
+              <header className="rounded-t-[28px] border-b border-[#d7e3d0] bg-gradient-to-br from-[#eef7ea] to-white p-5">
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#66745c]">HubYa</p>
-                <h3 className="mt-1 text-xl font-black uppercase leading-tight">Reporte administrativo del Hub</h3>
-                <p className="mt-1 text-xs font-semibold text-[#66745c]">Documento emitido por sistema</p>
+                <h3 className="mt-1 text-xl font-black uppercase leading-tight">{tituloReporteHub}</h3>
+                <p className="mt-1 text-xs font-semibold text-[#66745c]">Resumen de trabajo coordinado para el cuidado y mantenimiento del espacio verde.</p>
               </header>
 
               <section className="border-b border-[#9aa78f] p-4">
@@ -1954,10 +1968,17 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                 </table>
                 <p className="mt-2 border border-[#d8dfd1] bg-[#f8faf5] p-2 text-[10px] font-semibold text-[#66745c]">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados como Cliente 2, Cliente 3, Cliente 4, etc. y no se incluyen emails.</p>
 
-                <section className="mt-3 border border-[#9aa78f] p-3 text-xs leading-5">
+                {informacionReporte && <section className="mt-3 rounded-2xl border border-[#c7d8bf] bg-[#eef7ea] p-3 text-xs leading-5">
+                  <h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Información importante</h4>
+                  <p className="font-black">{informacionReporte.titulo || "Información importante del Hub"}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-[#4f5f47]">{informacionReporte.texto}</p>
+                </section>}
+
+                <section className="mt-3 rounded-2xl border border-[#9aa78f] bg-white p-3 text-xs leading-5">
                   <h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Sobre HubYa</h4>
                   {sobreHubYaLineas.map((linea) => <p key={linea} className="mt-2 first:mt-0">{linea}</p>)}
                 </section>
+                <footer className="mt-3 rounded-2xl bg-[#1f2a1d] p-3 text-center text-xs font-bold leading-5 text-white"><p>Gracias por formar parte de una gestión organizada del espacio verde.</p><p className="text-white/70">HubYa · Coordinación humana sobre procesos recurrentes</p></footer>
               </div>
             </article>
           </section>
