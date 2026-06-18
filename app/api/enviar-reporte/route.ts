@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   const replyTo = obtenerReplyToResend();
 
   if (!resendApiKey) {
-    return Response.json({ error: "Falta configurar RESEND_API_KEY." }, { status: 500 });
+    return Response.json({ error: "Falta configurar RESEND_API_KEY.", from: mailFrom, reply_to: replyTo }, { status: 500 });
   }
 
   let payload: EnviarReportePayload;
@@ -85,8 +85,8 @@ export async function POST(request: Request) {
 
   if (!respuesta.ok) {
     const error = mensajeErrorResend(data);
-    return Response.json({ error }, { status: respuesta.status });
+    return Response.json({ error, from: mailFrom, reply_to: replyTo, providerResponse: data }, { status: respuesta.status });
   }
 
-  return Response.json({ ok: true, id: data?.id ?? null });
+  return Response.json({ ok: true, id: data?.id ?? null, providerMessageId: data?.id ?? null, resendId: data?.id ?? null, from: mailFrom, reply_to: replyTo });
 }
