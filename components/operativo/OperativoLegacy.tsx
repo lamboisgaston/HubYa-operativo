@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EQUIPOS_ACTIVOS_STORAGE_KEY, ESTADOS_EQUIPO_ACTIVO, ESTADOS_INTEGRANTE, ROLES_INTEGRANTE, SOLICITUDES_OFERTA_STORAGE_KEY, TIPOS_EQUIPO_ACTIVO, createEquipoActivo, equiposActivosIniciales, slugEquipo, type ConsultaEquipoActivo, type EquipoActivo, type IntegranteEquipoActivo, type MensajeEquipoActivo, type SolicitudOferta } from "@/lib/data/equiposActivos";
 import { SOLICITUDES_NUEVO_HUB_STORAGE_KEY, type SolicitudNuevoHub } from "@/components/public/RequestHubForm";
 import { ESTADOS_HUB_VINCULO, HUB_VINCULOS_STORAGE_KEY, type EstadoHubVinculo, type HubVinculo } from "@/lib/data/hubVinculosTypes";
-import type { Cliente, HubPublico } from "@/lib/data/hubs";
+import type { Cliente, HubPublico, ReporteHub as ReporteHubPersistido } from "@/lib/data/hubs";
 
 type CampoNumerico = number | "";
 
@@ -388,7 +388,7 @@ function normalizarHistorial(valor: unknown): HistorialResumenesPorHub {
   const historial = historialVacio();
   if (!valor || typeof valor !== "object") return historial;
   const parcial = valor as Partial<Record<HubDisponible, Partial<ResumenGuardadoHub>[]>>;
-  HUBS_DISPONIBLES.forEach((hub) => {
+  Array.from(new Set([...HUBS_DISPONIBLES, ...Object.keys(parcial)])).forEach((hub) => {
     historial[hub] = (parcial[hub] || []).map((resumen) => normalizarResumenGuardado(resumen, hub));
   });
   return historial;
@@ -647,6 +647,24 @@ function vinculosIniciales(): HubVinculo[] {
   ];
 }
 
+function filtrarHistorialPorEstado(historial: HistorialResumenesPorHub, ...estados: EstadoReporteHub[]) {
+  const filtrado = historialVacio();
+  Object.entries(historial).forEach(([hub, reportes]) => {
+    const items = reportes.filter((reporte) => estados.includes(reporte.estado || "GUARDADO"));
+    if (items.length) filtrado[hub] = items;
+  });
+  return filtrado;
+}
+
+function fusionarHistoriales(base: HistorialResumenesPorHub, remoto: HistorialResumenesPorHub) {
+  const fusionado = { ...base };
+  Object.entries(remoto).forEach(([hub, reportes]) => {
+    const ids = new Set((fusionado[hub] || []).map((reporte) => reporte.id));
+    fusionado[hub] = [...reportes.filter((reporte) => !ids.has(reporte.id)), ...(fusionado[hub] || [])];
+  });
+  return fusionado;
+}
+
 function leerJornadaInicial(): JornadaOperativa {
   if (typeof window === "undefined") return jornadaInicial;
   const guardada = window.localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -654,7 +672,7 @@ function leerJornadaInicial(): JornadaOperativa {
   return { ...base, datosPorHub: aplicarClientesPorHub(base.datosPorHub, leerClientesPorHub()) };
 }
 
-export default function OperativoLegacy({ initialSection = "reporte", initialHubName, initialClientes = [], initialHub, simpleMode = false }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string; initialClientes?: Cliente[]; initialHub?: HubPublico; simpleMode?: boolean }) {
+export default function OperativoLegacy({ initialSection = "reporte", initialHubName, initialClientes = [], initialHub, initialReportes = [], simpleMode = false }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string; initialClientes?: Cliente[]; initialHub?: HubPublico; initialReportes?: ReporteHubPersistido[]; simpleMode?: boolean }) {
   const [isMounted, setIsMounted] = useState(false);
   const [jornada, setJornada] = useState<JornadaOperativa>(() => initialHubName ? { ...jornadaInicial, hub: initialHubName, datosPorHub: { ...jornadaInicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosHubInicial(initialHubName), initialClientes) } } : jornadaInicial);
   const [hubsCanonicos, setHubsCanonicos] = useState<HubPublico[]>([]);
@@ -737,8 +755,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       const datosActuales = actual.datosPorHub[initialHubName] || inicial.datosPorHub[initialHubName] || datosHubInicial(initialHubName);
       return { ...inicial, hub: initialHubName, datosPorHub: { ...inicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosActuales, initialClientes) } };
     });
-    setHistorialResumenes(leerHistorialResumenes());
-    try { setBorradoresReportes(normalizarHistorial(JSON.parse(localStorage.getItem(BORRADORES_REPORTES_STORAGE_KEY) || "{}"))); } catch { setBorradoresReportes(historialVacio()); }
+    const reportesIniciales = normalizarHistorial({ [initialHubName || jornadaInicial.hub]: initialReportes });
+    const guardadosLocales = leerHistorialResumenes();
+    let borradoresLocales = historialVacio();
+    try { borradoresLocales = normalizarHistorial(JSON.parse(localStorage.getItem(BORRADORES_REPORTES_STORAGE_KEY) || "{}")); } catch { borradoresLocales = historialVacio(); }
+    setHistorialResumenes(fusionarHistoriales(guardadosLocales, filtrarHistorialPorEstado(reportesIniciales, "GUARDADO", "ENVIADO")));
+    setBorradoresReportes(fusionarHistoriales(borradoresLocales, filtrarHistorialPorEstado(reportesIniciales, "BORRADOR")));
     setContactosSinHub(leerContactosSinHub());
     setContactosImportados(leerContactosTrabajo());
     setAuxiliares(leerAuxiliares());
@@ -770,7 +792,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       });
     }).catch(() => undefined);
     setIsMounted(true);
-  }, [initialHubName, initialClientes]);
+  }, [initialHubName, initialClientes, initialReportes]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -1285,6 +1307,23 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     return jornada.nombreResumen.trim() || `Jornada ${jornada.hub} — ${formatoFecha(jornada.fecha)}`;
   }
 
+
+  function persistirReporteServidor(resumen: ResumenGuardadoHub) {
+    const hubId = initialHub?.id || initialHub?.slug;
+    if (!hubId) return;
+    fetch(`/api/operativo/hubs/${encodeURIComponent(hubId)}/reportes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(resumen),
+    }).catch(() => setMensajeGuardado("El reporte quedó guardado en este navegador, pero no se pudo sincronizar con el servidor."));
+  }
+
+  function eliminarReporteServidor(resumen: ResumenGuardadoHub) {
+    const hubId = initialHub?.id || initialHub?.slug;
+    if (!hubId) return;
+    fetch(`/api/operativo/hubs/${encodeURIComponent(hubId)}/reportes?id=${encodeURIComponent(resumen.id)}`, { method: "DELETE" }).catch(() => undefined);
+  }
+
   function crearResumenGuardado(id = String(crearId()), nombre = nombreResumenActual(), fecha = jornada.fecha): ResumenGuardadoHub {
     return {
       id,
@@ -1309,12 +1348,14 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   function guardarBorradorHub(mensaje = true) {
     const borrador = { ...crearResumenGuardado(`borrador-${jornada.hub}`, nombreResumenActual(), jornada.fecha), estado: "BORRADOR" as EstadoReporteHub, ultimaEdicion: new Date().toISOString() };
     setBorradoresReportes((actual) => ({ ...actual, [jornada.hub]: [borrador, ...(actual[jornada.hub] || []).filter((item) => item.id !== borrador.id)] }));
+    persistirReporteServidor(borrador);
     if (mensaje) setMensajeGuardado(`Borrador guardado para ${jornada.hub}: ${borrador.nombre}`);
   }
 
   function guardarResumenHub(estado: EstadoReporteHub = "GUARDADO") {
     const resumen = { ...crearResumenGuardado(String(crearId()), nombreResumenActual(), jornada.fecha), estado, fechaEnvio: estado === "ENVIADO" ? new Date().toISOString() : "" };
     setHistorialResumenes((actual) => ({ ...actual, [jornada.hub]: [resumen, ...(actual[jornada.hub] || [])] }));
+    persistirReporteServidor(resumen);
     setBorradoresReportes((actual) => ({ ...actual, [jornada.hub]: (actual[jornada.hub] || []).filter((item) => item.id !== `borrador-${jornada.hub}`) }));
     setJornada((actual) => ({ ...actual, nombreResumen: resumen.nombre }));
     setBandejaReportes("guardados");
@@ -1333,6 +1374,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   function cerrarBorradorHub(resumen: ResumenGuardadoHub, estado: Exclude<EstadoReporteHub, "BORRADOR">) {
     const cerrado = normalizarResumenGuardado({ ...resumen, id: String(crearId()), estado, guardadoEn: new Date().toISOString(), ultimaEdicion: new Date().toISOString(), fechaEnvio: estado === "ENVIADO" ? new Date().toISOString() : "" }, resumen.hub);
     setHistorialResumenes((actual) => ({ ...actual, [resumen.hub]: [cerrado, ...(actual[resumen.hub] || [])] }));
+    persistirReporteServidor(cerrado);
     setBorradoresReportes((actual) => ({ ...actual, [resumen.hub]: (actual[resumen.hub] || []).filter((item) => item.id !== resumen.id) }));
     setBandejaReportes("guardados");
     setMensajeGuardado(`Reporte ${estado === "ENVIADO" ? "enviado" : "guardado como definitivo"}: ${resumen.nombre}`);
@@ -1355,6 +1397,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     if (!window.confirm(`¿Eliminar el reporte "${resumen.nombre}"?`)) return;
     if (resumen.estado === "BORRADOR") setBorradoresReportes((actual) => ({ ...actual, [resumen.hub]: (actual[resumen.hub] || []).filter((item) => item.id !== resumen.id) }));
     else setHistorialResumenes((actual) => ({ ...actual, [resumen.hub]: (actual[resumen.hub] || []).filter((item) => item.id !== resumen.id) }));
+    eliminarReporteServidor(resumen);
     setMensajeGuardado(`Reporte eliminado: ${resumen.nombre}`);
   }
 
