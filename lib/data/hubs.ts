@@ -142,6 +142,36 @@ export async function getHubDetalle(hubId: string): Promise<HubDetalleOperativo 
   return { ...hub, ficha: hub, clientes, reportesBorrador: reportes.filter((reporte) => reporte.estado === "BORRADOR"), reportesGuardados: reportes.filter((reporte) => reporte.estado === "GUARDADO"), reportesEnviados: reportes.filter((reporte) => reporte.estado === "ENVIADO"), vinculos, postulantes: vinculos.filter((vinculo) => vinculo.estado === "POSTULANTE") };
 }
 
+export async function upsertReporteHub(hubIdOrSlug: string, reporte: ReporteHub) {
+  const store = await readStore();
+  const hub = store.hubs.find((item) => item.id === hubIdOrSlug || item.slug === hubIdOrSlug || item.nombre === hubIdOrSlug);
+  if (!hub) return null;
+  const timestamp = new Date().toISOString();
+  const normalizado: ReporteHub = {
+    ...reporte,
+    id: String(reporte.id || `reporte-${Date.now()}`),
+    hubId: hub.id,
+    hub: hub.nombre,
+    estado: reporte.estado || "BORRADOR",
+    ultimaEdicion: timestamp,
+    guardadoEn: reporte.guardadoEn || timestamp,
+  };
+  store.reportes = [normalizado, ...(store.reportes || []).filter((item) => item.id !== normalizado.id)];
+  await saveStore(store);
+  return normalizado;
+}
+
+export async function deleteReporteHub(hubIdOrSlug: string, reporteId: string) {
+  const store = await readStore();
+  const hub = store.hubs.find((item) => item.id === hubIdOrSlug || item.slug === hubIdOrSlug || item.nombre === hubIdOrSlug);
+  if (!hub) return false;
+  const antes = (store.reportes || []).length;
+  store.reportes = (store.reportes || []).filter((reporte) => !(reporte.id === reporteId && (reporte.hubId === hub.id || reporte.hub === hub.nombre)));
+  if (store.reportes.length === antes) return false;
+  await saveStore(store);
+  return true;
+}
+
 export async function updateHubInformacionImportante(hubIdOrSlug: string, input: Partial<HubInformacionImportante>) {
   const store = await readStore();
   const timestamp = new Date().toISOString();
@@ -151,10 +181,8 @@ export async function updateHubInformacionImportante(hubIdOrSlug: string, input:
     actualizado = {
       ...hub,
       informacionImportante: normalizarInformacionImportante({
-        titulo: input.titulo,
-        texto: input.texto,
-        mostrarEnWebPublica: input.mostrarEnWebPublica,
-        mostrarEnReporte: input.mostrarEnReporte,
+        ...hub.informacionImportante,
+        ...input,
       }),
       updatedAt: timestamp,
     };
