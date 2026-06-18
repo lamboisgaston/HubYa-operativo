@@ -6,7 +6,8 @@ export type EstadoHubServicioVinculo = "ACTIVO" | "POSTULANTE" | "SUSPENDIDO" | 
 export type TipoDestinoContacto = "cliente" | "actor" | "auxiliar" | "ignorar";
 export type Cliente = { id: string; nombre: string; email: string; whatsapp: string; referencia?: string; hubId: string; tipoDestino: TipoDestinoContacto; estado: "activo" | "inactivo"; createdAt: string; updatedAt: string };
 export type ContactoInput = Partial<Pick<Cliente, "nombre" | "email" | "whatsapp" | "referencia" | "hubId" | "tipoDestino">>;
-export type Hub = { id: string; nombre: string; slug: string; zona: string; estado: HubEstado; descripcionPublica: string; rama: string; equipoOperativo: string; activo: boolean; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
+export type HubInformacionImportante = { titulo: string; texto: string; mostrarEnWebPublica: boolean; mostrarEnReporte: boolean };
+export type Hub = { id: string; nombre: string; slug: string; zona: string; estado: HubEstado; descripcionPublica: string; rama: string; equipoOperativo: string; activo: boolean; informacionImportante?: HubInformacionImportante; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
 export type HubServicio = { id: string; hub_id: string; nombre_servicio: string; descripcion: string; activo: boolean };
 export type HubServicioVinculo = { id: string; hub_servicio_id: string; oferta_nombre: string; estado: EstadoHubServicioVinculo; responsable: string; observaciones: string; created_at: string; updated_at: string };
 export type HubServicioPublico = HubServicio & { vinculoActivo: HubServicioVinculo | null; postulantes: HubServicioVinculo[] };
@@ -81,13 +82,17 @@ function deduplicarHubs(hubsEntrada: Hub[]) {
       continue;
     }
     const slug = slugHub(hub.nombre.replace(/^Hub\s+/i, "") || hub.zona || hub.slug);
-    const canonico = { ...hub, nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim() };
+    const canonico = { ...hub, nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim(), informacionImportante: normalizarInformacionImportante(hub.informacionImportante) };
     idCanonico.set(clave, canonico.id);
     idCanonico.set(canonico.id, canonico.id);
     idCanonico.set(canonico.slug, canonico.id);
     hubs.push(canonico);
   }
   return { hubs, idCanonico };
+}
+
+function normalizarInformacionImportante(info: Hub["informacionImportante"]): HubInformacionImportante {
+  return { titulo: String(info?.titulo || "").trim(), texto: String(info?.texto || "").trim(), mostrarEnWebPublica: Boolean(info?.mostrarEnWebPublica), mostrarEnReporte: Boolean(info?.mostrarEnReporte) };
 }
 
 function normalizeStore(store: Partial<Store>): Store {
@@ -135,4 +140,27 @@ export async function getHubDetalle(hubId: string): Promise<HubDetalleOperativo 
   const reportes = await getReportesPorHub(hub.id);
   const vinculos = hub.servicios.flatMap((servicio) => [servicio.vinculoActivo, ...servicio.postulantes].filter((vinculo): vinculo is HubServicioVinculo => Boolean(vinculo)));
   return { ...hub, ficha: hub, clientes, reportesBorrador: reportes.filter((reporte) => reporte.estado === "BORRADOR"), reportesGuardados: reportes.filter((reporte) => reporte.estado === "GUARDADO"), reportesEnviados: reportes.filter((reporte) => reporte.estado === "ENVIADO"), vinculos, postulantes: vinculos.filter((vinculo) => vinculo.estado === "POSTULANTE") };
+}
+
+export async function updateHubInformacionImportante(hubIdOrSlug: string, input: Partial<HubInformacionImportante>) {
+  const store = await readStore();
+  const timestamp = new Date().toISOString();
+  let actualizado: Hub | null = null;
+  store.hubs = store.hubs.map((hub) => {
+    if (hub.id !== hubIdOrSlug && hub.slug !== hubIdOrSlug) return hub;
+    actualizado = {
+      ...hub,
+      informacionImportante: normalizarInformacionImportante({
+        titulo: input.titulo,
+        texto: input.texto,
+        mostrarEnWebPublica: input.mostrarEnWebPublica,
+        mostrarEnReporte: input.mostrarEnReporte,
+      }),
+      updatedAt: timestamp,
+    };
+    return actualizado;
+  });
+  if (!actualizado) return null;
+  await writeStore(store);
+  return actualizado;
 }
