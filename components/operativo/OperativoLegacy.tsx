@@ -289,6 +289,21 @@ function aplicarClientesIniciales(datos: DatosHub, clientesIniciales: Cliente[] 
   return { ...datos, clientesIngresos, clienteActivoId: clientesIngresos[0]?.id || 0 };
 }
 
+function aplicarParametrosOperativos(datos: DatosHub, hub?: HubPublico): DatosHub {
+  const parametros = hub?.moduloOperativo === "jardinerosya" ? hub.parametrosOperativos?.jardinerosYa : undefined;
+  if (!parametros) return datos;
+  const gastos: FilaGasto[] = [
+    { id: 91001, concepto: "Traslado", importe: parametros.traslado },
+    { id: 91002, concepto: "Aceite", importe: parametros.aceite },
+    { id: 91003, concepto: "Nafta", importe: parametros.nafta },
+    { id: 91004, concepto: "Hora máquina cortadora de césped", importe: parametros.valorHoraCortadoraCesped },
+    { id: 91005, concepto: "Hora bordeadora", importe: parametros.valorHoraBordeadora },
+    { id: 91006, concepto: "Hora máquina de empuje", importe: parametros.valorHoraMaquinaEmpuje },
+  ];
+  const actores = datos.actores.map((actor, index) => index === 0 ? { ...actor, nombre: actor.nombre || "Responsable de cuadrilla", ajusteManual: parametros.valorHoraTrabajo * parametros.comisionResponsableCuadrillaPorcentaje / 100 } : actor);
+  return { ...datos, gastos, actores, resumen: { ...datos.resumen, observacionGeneral: datos.resumen.observacionGeneral || "La ficha del Hub define las reglas base del servicio." } };
+}
+
 function datosHubInicial(hub: HubDisponible): DatosHub {
   const hubIndex = HUBS_DISPONIBLES.indexOf(hub) + 1 || idNumericoEstable(hub);
   const clientesDelHub = clientesBasePorHub[hub] ?? [];
@@ -704,7 +719,7 @@ function leerJornadaInicial(): JornadaOperativa {
 
 export default function OperativoLegacy({ initialSection = "reporte", initialHubName, initialClientes = [], initialHub, initialReportes = [], simpleMode = false }: { initialSection?: "reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos"; initialHubName?: string; initialClientes?: Cliente[]; initialHub?: HubPublico; initialReportes?: ReporteHubPersistido[]; simpleMode?: boolean }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [jornada, setJornada] = useState<JornadaOperativa>(() => initialHubName ? { ...jornadaInicial, hub: initialHubName, datosPorHub: { ...jornadaInicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosHubInicial(initialHubName), initialClientes) } } : jornadaInicial);
+  const [jornada, setJornada] = useState<JornadaOperativa>(() => initialHubName ? { ...jornadaInicial, hub: initialHubName, datosPorHub: { ...jornadaInicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(aplicarParametrosOperativos(datosHubInicial(initialHubName), initialHub), initialClientes) } } : jornadaInicial);
   const [hubsCanonicos, setHubsCanonicos] = useState<HubPublico[]>([]);
   const [hubSeleccionado, setHubSeleccionado] = useState(Boolean(initialHubName));
   const [historialResumenes, setHistorialResumenes] = useState<HistorialResumenesPorHub>(historialVacio);
@@ -785,7 +800,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     setJornada((actual) => {
       if (!initialHubName) return leerJornadaInicial();
       const inicial = leerJornadaInicial();
-      const datosActuales = actual.datosPorHub[initialHubName] || inicial.datosPorHub[initialHubName] || datosHubInicial(initialHubName);
+      const datosActuales = actual.datosPorHub[initialHubName] || inicial.datosPorHub[initialHubName] || aplicarParametrosOperativos(datosHubInicial(initialHubName), initialHub);
       return { ...inicial, hub: initialHubName, datosPorHub: { ...inicial.datosPorHub, [initialHubName]: aplicarClientesIniciales(datosActuales, initialClientes) } };
     });
     const reportesIniciales = normalizarHistorial({ [initialHubName || jornadaInicial.hub]: initialReportes });
@@ -821,12 +836,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       const nombres = fusionarNombresHubs(hubs);
       setJornada((actual) => {
         const datosPorHub = crearDatosParaHubs(actual.datosPorHub, initialHubName ? Array.from(new Set([...nombres, initialHubName])) : nombres);
-        if (initialHubName) datosPorHub[initialHubName] = aplicarClientesIniciales(datosPorHub[initialHubName], initialClientes);
+        if (initialHubName) datosPorHub[initialHubName] = aplicarClientesIniciales(aplicarParametrosOperativos(datosPorHub[initialHubName], initialHub), initialClientes);
         return { ...actual, hub: initialHubName || actual.hub, datosPorHub };
       });
     }).catch(() => undefined);
     setIsMounted(true);
-  }, [initialHubName, initialClientes, initialReportes]);
+  }, [initialHubName, initialClientes, initialReportes, initialHub]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -1096,6 +1111,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const reporteTexto = useMemo(() => [
     `HubYa — ${tituloReporteHub}`,
     `Sistema: ${hubActual?.rama || "HubYa"}`,
+    `Módulo operativo: ${hubActual?.moduloOperativo || "otro"}`,
     `Hub: ${jornada.hub}`,
     `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
     `Fecha: ${fechaFormateada}`,
@@ -1105,6 +1121,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     ...datosHub.clientesIngresos.map((cliente, index) => `${nombrePrivado(cliente, index) || "Sin cliente"} · JardinerosYa · ${formatoPlano(cliente.importe) || formatoMoneda(0)}`),
     `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
     "",
+    ...(hubActual?.moduloOperativo === "jardinerosya" ? ["PARÁMETROS JARDINEROSYA DEL HUB", `Valor hora de trabajo: ${formatoMoneda(hubActual.parametrosOperativos?.jardinerosYa?.valorHoraTrabajo || 0)}`, `Comisión responsable de cuadrilla: ${hubActual.parametrosOperativos?.jardinerosYa?.comisionResponsableCuadrillaPorcentaje || 0}%`, ""] : []),
     "GASTOS",
     ...datosHub.gastos.map((gasto) => `${gasto.concepto || "Sin concepto"}: ${formatoPlano(gasto.importe) || formatoMoneda(0)}`),
     `Total gastos: ${formatoMoneda(totalGastos)}`,
@@ -1466,7 +1483,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function crearNuevoReporteHub() {
     const hubActual = jornada.hub;
-    setJornada((actual) => ({ ...actual, hub: hubActual, fecha: fechaInicial, nombreResumen: "", datosPorHub: { ...actual.datosPorHub, [hubActual]: datosHubInicial(hubActual) } }));
+    setJornada((actual) => ({ ...actual, hub: hubActual, fecha: fechaInicial, nombreResumen: "", datosPorHub: { ...actual.datosPorHub, [hubActual]: aplicarParametrosOperativos(datosHubInicial(hubActual), initialHub) } }));
     setHubSeleccionado(true);
     setBandejaReportes("borradores");
     setMensajeGuardado(`Nuevo reporte iniciado para ${hubActual}. Se guardará automáticamente como borrador.`);
