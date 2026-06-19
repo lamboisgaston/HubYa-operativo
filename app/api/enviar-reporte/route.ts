@@ -88,9 +88,9 @@ function escaparHtml(valor: string) {
 }
 
 function armarHtml(cuerpoMail: string, reporteHtml: string, reporteTexto: string, consultaHtml = "") {
-  const reporte = reporteHtml || `<pre style="margin:0;white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;color:#182018;">${escaparHtml(reporteTexto)}</pre>`;
+  const reporte = reporteHtml || `<section style="border:1px solid #9aa78f;background:#ffffff;padding:16px;"><h2 style="margin:0 0 10px;font-size:18px;">Reporte formal del Hub</h2><pre style="margin:0;white-space:pre-wrap;font:12px/1.5 Arial,Helvetica,sans-serif;color:#182018;">${escaparHtml(reporteTexto)}</pre></section>`;
 
-  return `<!doctype html><html><body style="margin:0;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:760px;margin:0 auto;padding:24px;"><section style="margin-bottom:16px;"><h1 style="margin:0 0 10px;font-size:20px;">Reporte del día</h1><p style="margin:0;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(cuerpoMail)}</p></section><section style="margin-top:16px;"><h2 style="margin:0 0 10px;font-size:16px;">Gastos reales del día</h2><p style="margin:0 0 10px;color:#66745c;font-size:12px;font-weight:700;">Los gastos listados son únicamente valores reales cargados en este reporte. ${escaparHtml(MENSAJE_SIN_GASTOS_REALES)} si no hay importes reales cargados.</p>${reporte}</section>${consultaHtml}</div></body></html>`;
+  return `<!doctype html><html><body style="margin:0;background:#f6f8f3;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:820px;margin:0 auto;padding:24px;"><section style="margin-bottom:16px;border:1px solid #d8dfd1;background:#ffffff;padding:14px;"><p style="margin:0;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(cuerpoMail)}</p></section>${reporte}${consultaHtml}</div></body></html>`;
 }
 
 export async function POST(request: Request) {

@@ -18,7 +18,16 @@ type FilaClienteIngreso = {
   importe: CampoNumerico;
   trabajoRealizado: string;
   trabajoPendiente: string;
+  tarifaCliente: TarifaCliente;
 };
+
+type TarifaCliente = "tarifa_1" | "tarifa_2" | "tarifa_3" | "sin_tarifa";
+const TARIFAS_CLIENTE: Array<{ value: TarifaCliente; label: string }> = [
+  { value: "tarifa_1", label: "Tarifa 1" },
+  { value: "tarifa_2", label: "Tarifa 2" },
+  { value: "tarifa_3", label: "Tarifa 3" },
+  { value: "sin_tarifa", label: "Sin tarifa asignada" },
+];
 
 type FilaGasto = { id: number; concepto: string; importe: CampoNumerico };
 type FilaActor = { id: number; nombre: string; activo: boolean; participacion: CampoNumerico; ajusteManual: CampoNumerico; email?: string; whatsapp?: string; rol?: string; recibeReportes?: boolean; participaDistribucion?: boolean; observacion?: string };
@@ -274,6 +283,7 @@ function clienteIngresoInicial(nombre: string, index = 0, baseId = 1000): FilaCl
     importe: 0,
     trabajoRealizado: trabajoRealizadoInicial,
     trabajoPendiente: trabajoPendienteInicial,
+    tarifaCliente: "sin_tarifa",
   };
 }
 
@@ -289,6 +299,7 @@ function clientePublicoAIngreso(cliente: Cliente, index = 0): FilaClienteIngreso
     importe: 0,
     trabajoRealizado: trabajoRealizadoInicial,
     trabajoPendiente: trabajoPendienteInicial,
+    tarifaCliente: cliente.tarifaCliente || "sin_tarifa",
   };
 }
 
@@ -365,6 +376,7 @@ function normalizarCliente(cliente: Partial<FilaClienteIngreso>): FilaClienteIng
     importe: cliente.importe ?? 0,
     trabajoRealizado: cliente.trabajoRealizado || trabajoRealizadoInicial,
     trabajoPendiente: cliente.trabajoPendiente || trabajoPendienteInicial,
+    tarifaCliente: cliente.tarifaCliente || "sin_tarifa",
   };
 }
 
@@ -380,6 +392,28 @@ function normalizarActor(actor: Partial<FilaActor> & { actor?: string; importe?:
 
 function numero(valor: CampoNumerico | undefined) {
   return Number(valor || 0);
+}
+
+function etiquetaTarifa(tarifa: TarifaCliente | undefined) {
+  return TARIFAS_CLIENTE.find((item) => item.value === tarifa)?.label || "Sin tarifa asignada";
+}
+
+function importeCliente(cliente: Pick<FilaClienteIngreso, "importe"> | undefined) {
+  return numero(cliente?.importe);
+}
+
+function estadoVisitaCliente(cliente: Pick<FilaClienteIngreso, "importe"> | undefined) {
+  return importeCliente(cliente) > 0 ? "Visitado" : "Saltea visita";
+}
+
+function observacionCliente(cliente: Pick<FilaClienteIngreso, "importe" | "trabajoRealizado"> | undefined) {
+  if (!cliente || importeCliente(cliente) <= 0) return "No se realizó visita en este reporte.";
+  return cliente.trabajoRealizado || "Mantenimiento correspondiente al reporte del día.";
+}
+
+function conceptoTarifaCliente(cliente: Pick<FilaClienteIngreso, "importe" | "tarifaCliente"> | undefined) {
+  const etiqueta = etiquetaTarifa(cliente?.tarifaCliente);
+  return importeCliente(cliente) > 0 ? `Tarifa aplicada: ${etiqueta}` : `Tarifa de referencia: ${etiqueta}`;
 }
 
 function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partial<FilaActor> & { actor?: string; importe?: CampoNumerico })[] }) | undefined, hub: HubDisponible): DatosHub {
@@ -773,7 +807,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const [asuntoFichaHub, setAsuntoFichaHub] = useState("Actualización de la ficha del Hub");
   const [mensajeFichaHub, setMensajeFichaHub] = useState("Hola, compartimos una actualización de la ficha operativa del Hub.");
   const [incluirPostulantesFicha, setIncluirPostulantesFicha] = useState(true);
-  const reporteVisualRef = useRef<HTMLElement>(null);
+  const reporteVisualRef = useRef<HTMLDivElement>(null);
   const firmaSeleccionReporteRef = useRef("");
   const seleccionReporteEditadaManualmenteRef = useRef(false);
   const hubsOperativos = useMemo(() => fusionarNombresHubs(hubsCanonicos), [hubsCanonicos]);
@@ -1160,7 +1194,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     `Cliente seleccionado: ${clienteActivo?.nombre || "Sin cliente seleccionado"}`,
     "",
     "CLIENTES / INGRESOS",
-    ...datosHub.clientesIngresos.map((cliente, index) => `${nombrePrivado(cliente, index) || "Sin cliente"} · JardinerosYa · ${formatoPlano(cliente.importe) || formatoMoneda(0)}`),
+    ...datosHub.clientesIngresos.map((cliente, index) => `${nombrePrivado(cliente, index) || "Sin cliente"} · ${estadoVisitaCliente(cliente)} · ${conceptoTarifaCliente(cliente)} · Importe: ${formatoPlano(cliente.importe) || formatoMoneda(0)}`),
     `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
     "",
     "GASTOS",
@@ -1195,7 +1229,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       `Cliente seleccionado: ${clienteObjetivo.nombre || "Sin cliente seleccionado"}`,
       "",
       "CLIENTES / INGRESOS",
-      ...datosHub.clientesIngresos.map((cliente, index) => `${cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : `Cliente ${index + 1}`} · JardinerosYa · ${formatoPlano(cliente.importe) || formatoMoneda(0)}`),
+      ...datosHub.clientesIngresos.map((cliente, index) => `${cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : `Cliente ${index + 1}`} · ${estadoVisitaCliente(cliente)} · ${conceptoTarifaCliente(cliente)} · Importe: ${formatoPlano(cliente.importe) || formatoMoneda(0)}`),
       `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
       "",
       "GASTOS",
@@ -1240,8 +1274,24 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const clientesDelHub = datosHub.clientesIngresos;
   const clienteActivoReporte = clientesDelHub.find((cliente) => cliente.id === datosHub.clienteActivoId) || clientesDelHub[0] || clienteActivo;
 
-  const filasClientesHtml = clientesDelHub.map((cliente, index) => `
-                    <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(cliente.origen || "Sin origen")}</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(nombrePrivado(cliente, index) || "Sin cliente")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(cliente.importe))}</td></tr>`).join("");
+  function filasClientesHtmlPara(clienteObjetivo: FilaClienteIngreso | undefined) {
+    return clientesDelHub.map((cliente, index) => {
+      const nombreVisible = clienteObjetivo && cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : nombrePrivado(cliente, index) || "Sin cliente";
+      const estadoVisita = estadoVisitaCliente(cliente);
+      const importe = formatoPlano(cliente.importe) || formatoMoneda(0);
+      return `
+                    <tr>
+                      <td style="border:1px solid #d8dfd1;padding:8px;font-weight:700;">${escaparHtml(nombreVisible)}</td>
+                      <td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(jornada.hub)}</td>
+                      <td style="border:1px solid #d8dfd1;padding:8px;font-weight:800;color:${estadoVisita === "Saltea visita" ? "#8a6a16" : "#2f6d32"};">${escaparHtml(estadoVisita)}</td>
+                      <td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(conceptoTarifaCliente(cliente))}</td>
+                      <td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</td>
+                      <td style="border:1px solid #d8dfd1;padding:8px;text-align:right;font-weight:900;">${escaparHtml(importe)}</td>
+                    </tr>
+                    <tr><td colspan="6" style="border:1px solid #d8dfd1;border-top:0;background:#fbfcf9;padding:8px;color:#4f5f47;"><strong>Observación:</strong> ${escaparHtml(observacionCliente(cliente))}</td></tr>`;
+    }).join("");
+  }
+  const filasClientesHtml = filasClientesHtmlPara(clienteActivoReporte);
   const filasGastosHtml = gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto) => `
                     <tr><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(gasto.concepto || "Sin concepto")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(gasto.importe))}</td></tr>`).join("") : `
                     <tr><td colspan="3" style="border:1px solid #d8dfd1;padding:8px;color:#66745c;font-weight:700;">${escaparHtml(MENSAJE_SIN_GASTOS_REALES)}</td></tr>`;
@@ -1249,53 +1299,61 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                     <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(actor.nombre || "Sin actor")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:center;">${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoMoneda(actor.importeFinal))}</td></tr>`).join("");
   const sobreHubYaHtml = sobreHubYaLineas.map((linea) => `<p style="margin:8px 0 0;">${escaparHtml(linea)}</p>`).join("");
 
-  const reporteHtml = useMemo(() => `
+  function armarReporteHtmlParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
+    const clienteReporte = clienteObjetivo || clienteActivoReporte;
+    const importe = formatoPlano(clienteReporte?.importe) || formatoMoneda(0);
+    const estadoVisita = estadoVisitaCliente(clienteReporte);
+    const tarifa = conceptoTarifaCliente(clienteReporte);
+    // Preparado para segunda etapa: este HTML formal puede reutilizarse como fuente de PDF/imagen adjunta sin cambiar el envío actual.
+    return `
     <article style="width:100%;max-width:760px;border:1px solid #6f7968;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;">
-      <header style="border-bottom:2px solid #1f2a1d;padding:16px;">
-        <p style="margin:0;color:#66745c;font-size:10px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;">HubYa</p>
-        <h1 style="margin:4px 0 0;font-size:20px;line-height:1.2;font-weight:900;text-transform:uppercase;">${escaparHtml(tituloReporteHub)}</h1>
-        <p style="margin:4px 0 0;color:#66745c;font-size:12px;font-weight:700;">Resumen de trabajo coordinado para el cuidado y mantenimiento del espacio verde.</p>
+      <header style="border-bottom:2px solid #1f2a1d;padding:18px;background:#f8faf5;">
+        <p style="margin:0;color:#66745c;font-size:11px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;">HUNYA</p>
+        <h1 style="margin:4px 0 0;font-size:22px;line-height:1.2;font-weight:900;text-transform:uppercase;">Reporte del Hub</h1>
+        <p style="margin:8px 0 0;color:#4f5f47;font-size:13px;font-weight:700;">Detalle del trabajo coordinado dentro del Hub.</p>
       </header>
-
-      <section style="border-bottom:1px solid #9aa78f;padding:16px;">
-        <h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Resumen rápido para el cliente</h2>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <tbody>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Cliente seleccionado</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(clienteActivoReporte?.nombre || "Sin cliente seleccionado")}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Hub de demanda</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(jornada.hub)}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Equipo activo vinculado</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(equipoVinculadoAlHub?.nombre || "Sin equipo vinculado")}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Fecha</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(fechaFormateada)}</td></tr>
-            <tr><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;font-weight:900;text-transform:uppercase;">Importe correspondiente a su espacio verde</td><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:8px;color:#1f2a1d;font-size:18px;font-weight:900;">${escaparHtml(formatoPlano(clienteActivoReporte?.importe) || formatoMoneda(0))}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:6px;font-weight:900;text-transform:uppercase;">Estado operativo</td><td style="border:1px solid #d8dfd1;padding:6px;font-weight:700;">${escaparHtml(datosHub.resumen.estadoOperativo || "Sin cargar")}</td></tr>
-          </tbody>
-        </table>
-      </section>
-
-      <div style="padding:16px;">
-        <table style="width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;">
-          <tbody>
-            <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Clientes / ingresos</th></tr>
-            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Origen / sistema</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Nombre cliente</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasClientesHtml}
-            <tr style="background:#fbfcf9;font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total facturado al Hub</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalFacturadoHub))}</td></tr>
-            <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Gastos</th></tr>
-            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th colspan="2" style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Concepto</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasGastosHtml}
-            <tr style="font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total gastos</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalGastos))}</td></tr>
-            <tr style="background:#fbfcf9;font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total a distribuir</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalADistribuir))}</td></tr>
-            <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Resultado por actor operativo</th></tr>
-            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Actor</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:center;">Participación / activo</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasActoresHtml}
-            <tr style="background:#fbfcf9;font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total distribuido</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalDistribuido))}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f8faf5;padding:6px;font-weight:900;">Tiempo efectivo</td><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f8faf5;padding:6px;font-weight:900;">Estado operativo</td><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(datosHub.resumen.estadoOperativo || "Sin cargar")}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f8faf5;padding:6px;font-weight:900;">Observación</td><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(datosHub.resumen.observacionGeneral || "Sin cargar")}</td></tr>
-          </tbody>
-        </table>
-        <p style="margin:8px 0 0;border:1px solid #d8dfd1;background:#f8faf5;padding:8px;color:#66745c;font-size:10px;font-weight:700;">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados como Cliente 2, Cliente 3, Cliente 4, etc. y no se incluyen emails.</p>
-        <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;">
-          <h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Sobre HubYa</h2>
-          ${sobreHubYaHtml}
+      <section style="padding:16px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>
+          <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Hub</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(jornada.hub)}</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Fecha</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(fechaFormateada)}</td></tr>
+          <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Zona</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(hubActual?.zona || jornada.hub)}</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Servicio</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(hubActual?.rama || "JardinerosYa")}</td></tr>
+        </tbody></table>
+        <section style="margin-top:14px;border:1px solid #1f2a1d;background:#fbfcf9;padding:14px;">
+          <h2 style="margin:0 0 10px;font-size:15px;">Resumen del cliente</h2>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Cliente</td><td style="border:1px solid #d8dfd1;padding:8px;font-weight:800;">${escaparHtml(clienteReporte?.nombre || "Sin cliente seleccionado")}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Estado de visita</td><td style="border:1px solid #d8dfd1;padding:8px;font-weight:900;">${escaparHtml(estadoVisita)}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Tarifa</td><td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(tarifa)}</td></tr>
+            <tr><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:9px;font-weight:900;">Importe</td><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:9px;font-size:18px;font-weight:900;">${escaparHtml(importe)}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Observación</td><td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(observacionCliente(clienteReporte))}</td></tr>
+          </tbody></table>
         </section>
-      </div>
-    </article>`, [clienteActivoReporte?.importe, clienteActivoReporte?.nombre, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasClientesHtml, filasGastosHtml, jornada.hub, sobreHubYaHtml, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, tituloReporteHub]);
+        <table style="margin-top:14px;width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;">
+          <tbody>
+            <tr style="background:#eef2e8;"><th colspan="6" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Detalle por cliente</th></tr>
+            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Cliente</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Hub</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Estado de visita</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Tarifa</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Horas / frecuencia</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasClientesHtmlPara(clienteReporte)}
+            <tr style="background:#fbfcf9;font-weight:900;"><td colspan="5" style="border:1px solid #9aa78f;padding:6px;">Total facturado al Hub</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</td></tr>
+          </tbody>
+        </table>
+        <table style="margin-top:14px;width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;"><tbody>
+          <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Gastos reales del día</th></tr>
+          <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th colspan="2" style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Concepto</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasGastosHtml}
+          <tr style="font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total gastos</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</td></tr>
+        </tbody></table>
+        <table style="margin-top:14px;width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;"><tbody>
+          <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Distribución operativa</th></tr>
+          <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Actor</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:center;">Participación / activo</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasActoresHtml}
+          <tr style="background:#fbfcf9;font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total distribuido</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalDistribuido) || formatoMoneda(0))}</td></tr>
+        </tbody></table>
+        <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:12px;font-size:12px;line-height:1.5;"><strong>Detalle del trabajo:</strong><br>${escaparHtml(datosHub.resumen.observacionGeneral || "Sin cargar")}</section>
+        ${informacionReporte ? `<section style="margin-top:14px;border:1px solid #c7d8bf;background:#eef7ea;padding:12px;font-size:12px;line-height:1.5;"><strong>${escaparHtml(informacionReporte.titulo || "Información importante del Hub")}</strong><br>${escaparHtml(informacionReporte.texto)}</section>` : ""}
+        <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Sobre HubYa</h2>${sobreHubYaHtml}</section>
+        <footer style="margin-top:14px;background:#1f2a1d;color:#fff;padding:14px;text-align:center;font-size:12px;line-height:1.5;font-weight:700;">Gracias por formar parte de una gestión organizada del Hub. Este reporte busca ordenar la información, mejorar la continuidad del servicio y mantener claridad entre todos los integrantes.</footer>
+      </section>
+    </article>`;
+  }
+
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasGastosHtml, hubActual?.rama, hubActual?.zona, informacionReporte, jornada.hub, sobreHubYaHtml, totalDistribuido, totalFacturadoHub, totalGastos]);
+
 
 
   async function ejecutarEnvioReporte(destinatarios: FilaClienteIngreso[], tipo: "definitivo" | "prueba" = "definitivo") {
@@ -1332,7 +1390,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             fecha: fechaFormateada,
             asunto: tipo === "prueba" ? `[Envío de prueba] ${asuntoReporte}` : asuntoReporte,
             cuerpoMail,
-            reporteHtml: "",
+            reporteHtml: armarReporteHtmlParaCliente(cliente),
             reporteTexto: reporteTextoParaCliente(cliente),
             hubId: initialHub?.id,
             reportId: `reporte-${jornada.hub}-${jornada.fecha}`,
@@ -2096,7 +2154,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         {seccionActiva === "reporte" && <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-3">
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black uppercase tracking-wide">Zona A · Carga operativa</h2><span className="text-xs font-bold text-[#66745c]">Planilla compacta</span></div>
-              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Clientes / importes</h3><div className="mb-2 space-y-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs"><div className="flex flex-wrap items-center gap-2"><span className="font-black">Clientes: {clientesSeleccionadosReporte.length} de {clientesConEmailValidoReporte.length} · Hub Operativo: {actoresSeleccionadosReporte.length} de {actoresConEmailValidoReporte.length}</span><button onClick={seleccionarTodosClientesConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar clientes</button><button onClick={seleccionarTodosActoresConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar Hub Operativo</button><button onClick={seleccionarTodosDestinatariosConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar todos con email válido</button><button onClick={desmarcarTodosClientesReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Desmarcar todos</button><button onClick={enviarReporteASeleccionados} disabled={estadoEnvio === "enviando" || destinatariosSeleccionadosReporte.length === 0} className="h-7 rounded-md bg-[#1f2a1d] px-2 font-black text-white disabled:opacity-50">Enviar reporte a seleccionados</button></div><div className="flex flex-wrap items-center gap-2"><label className="font-black text-[#66745c]">Enviar prueba</label><input value={emailPruebaReporte} onChange={(e) => setEmailPruebaReporte(e.target.value)} className="h-7 min-w-56 rounded-md border border-[#cfd8c6] bg-white px-2" /><button onClick={enviarPruebaReporte} disabled={estadoEnvio === "enviando"} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black disabled:opacity-50">Enviar prueba</button></div><div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#cfd8c6] bg-white p-2"><span className="font-black text-[#66745c]">Incluir consulta de parámetros del Hub</span><button type="button" onClick={() => setIncluirConsultaParametros(false)} className={`h-7 rounded-md px-2 font-black ${!incluirConsultaParametros ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6]"}`}>No incluir</button><button type="button" onClick={() => setIncluirConsultaParametros(true)} className={`h-7 rounded-md px-2 font-black ${incluirConsultaParametros ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6]"}`}>Incluir parámetros principales</button></div><p className={`text-xs font-black ${estadoEnvio === "error" ? "text-[#743c3c]" : estadoEnvio === "enviado" ? "text-[#2f6d32]" : "text-[#66745c]"}`}>{mensajeEnvio}</p></div>{confirmacionEnvioReporte && <div className="mb-2 rounded-xl border border-[#1f2a1d] bg-white p-3 text-xs shadow-sm"><h4 className="text-sm font-black">Vas a enviar este reporte a {destinatariosSeleccionadosReporte.length} personas.</h4><ul className="mt-2 max-h-40 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.map((cliente, index) => <li key={`confirmar-${cliente.id}-${index}`} className="font-semibold">{cliente.nombre || `Cliente ${index + 1}`} — <a className="underline" href={`mailto:${cliente.email}`}>{cliente.email}</a></li>)}</ul>{clientesSinEmailReporte.length > 0 && <p className="mt-2 font-black text-[#743c3c]">{clientesSinEmailReporte.length} cliente{clientesSinEmailReporte.length === 1 ? "" : "s"} no recibirá{clientesSinEmailReporte.length === 1 ? "" : "n"} el reporte porque no tiene{clientesSinEmailReporte.length === 1 ? "" : "n"} email cargado.</p>}{clientesEmailInvalidoReporte.length > 0 && <p className="mt-1 font-black text-[#743c3c]">{clientesEmailInvalidoReporte.length} cliente{clientesEmailInvalidoReporte.length === 1 ? "" : "s"} tiene{clientesEmailInvalidoReporte.length === 1 ? "" : "n"} email inválido y no se seleccionó automáticamente.</p>}<div className="mt-3 flex flex-wrap gap-2"><button onClick={() => ejecutarEnvioReporte(destinatariosSeleccionadosReporte)} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 font-black text-white disabled:opacity-50">Confirmar envío</button><button onClick={() => setConfirmacionEnvioReporte(false)} className="h-8 rounded-lg border border-[#cfd8c6] px-3 font-black">Cancelar</button></div></div>}<div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1 text-center">✓</th><th className="border p-1">Origen / sistema</th><th className="border p-1">Cliente</th><th className="border p-1">Email privado</th><th className="border p-1">Teléfono WhatsApp</th><th className="border p-1">Importe manual</th><th className="border p-1">Estado de email</th><th className="border p-1">Acciones</th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente, index) => { const tieneEmailValido = emailValido(cliente.email); const seleccionadoReporte = clientesReporteSeleccionados.includes(cliente.id) && tieneEmailValido; return <tr key={`cliente-edit-${cliente.id}-${index}`} className={seleccionadoReporte ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={seleccionadoReporte} disabled={!tieneEmailValido} aria-label={`Seleccionar ${cliente.nombre || `cliente ${index + 1}`}`} onChange={(e) => actualizarSeleccionReporte(cliente.id, e.target.checked)} /></td><td className="border border-[#e1e6dc] p-1"><span className="block min-w-32 px-1 font-semibold">{cliente.origen || "JardinerosYa"}</span></td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.email, (valor) => actualizarCliente(cliente.id, { email: valor }), "min-w-48")}{!cliente.email.trim() && <p className="px-1 text-[10px] font-black text-[#743c3c]">Sin email cargado</p>}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.telefono, (valor) => actualizarCliente(cliente.id, { telefono: valor }), "min-w-36")}</td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className={`border border-[#e1e6dc] p-1 font-black ${tieneEmailValido ? seleccionadoReporte ? "text-[#2f6d32]" : "text-[#66745c]" : "text-[#743c3c]"}`}>{estadoEmailClienteReporte(cliente, seleccionadoReporte)}</td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => actualizarDatosHub({ clienteActivoId: cliente.id })} className="mr-2 font-black text-[#1f2a1d]">Previsualizar</button><button onClick={() => actualizarDatosHub({ clientesIngresos: datosHub.clientesIngresos.filter((fila) => fila.id !== cliente.id) })} className="font-black text-[#743c3c]">×</button></td></tr>; })}</tbody></table></div><button onClick={() => actualizarDatosHub({ clientesIngresos: [...datosHub.clientesIngresos, { ...clienteIngresoInicial(""), id: crearId() }] })} className="mt-2 h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Agregar cliente</button>{ultimoEnvioReporte && <div className="mt-3 rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs"><h4 className="text-sm font-black">{ultimoEnvioReporte.tipo === "prueba" ? "Envío de prueba" : "Envío generado"}</h4><p className="mt-1 font-semibold">Este reporte se intentó enviar a estas personas.</p><div className="mt-2 grid gap-2 md:grid-cols-4"><div><p className="font-black text-[#66745c]">Fecha y hora</p><p>{new Date(ultimoEnvioReporte.fechaHora).toLocaleString("es-AR")}</p></div><div><p className="font-black text-[#66745c]">Hub</p><p>{ultimoEnvioReporte.hub}</p></div><div><p className="font-black text-[#66745c]">Reporte</p><p>{ultimoEnvioReporte.reporte}</p></div><div><p className="font-black text-[#66745c]">Destinatarios seleccionados</p><p>{ultimoEnvioReporte.destinatariosSeleccionados}</p></div><div><p className="font-black text-[#66745c]">Enviados a proveedor</p><p>{ultimoEnvioReporte.enviadosAProveedor}</p></div><div><p className="font-black text-[#66745c]">Errores</p><p>{ultimoEnvioReporte.errores}</p></div><div><p className="font-black text-[#66745c]">Sin email</p><p>{ultimoEnvioReporte.sinEmail}</p></div><div><p className="font-black text-[#66745c]">Pendientes de respuesta</p><p>{ultimoEnvioReporte.pendientesRespuesta}</p></div><div><p className="font-black text-[#66745c]">From usado</p><p>{ultimoEnvioReporte.fromUsado || "—"}</p></div><div><p className="font-black text-[#66745c]">Reply-To usado</p><p>{ultimoEnvioReporte.replyToUsado || "—"}</p></div></div><div className="mt-3 overflow-x-auto rounded-lg border border-[#d8dfd1] bg-white"><table className="w-full border-collapse"><thead className="bg-[#f1f4ec] text-left uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Email</th><th className="border p-1">Estado</th><th className="border p-1">Error</th><th className="border p-1">Fecha/hora</th><th className="border p-1">Provider ID / Resend ID</th><th className="border p-1">Acción</th></tr></thead><tbody>{ultimoEnvioReporte.destinatarios.map((destinatario, index) => <tr key={`envio-reporte-${ultimoEnvioReporte.id}-${destinatario.id}-${index}`}><td className="border p-1 font-black">{destinatario.nombre}</td><td className="border p-1">{destinatario.email || "Sin email cargado"}</td><td className="border p-1 font-black">{destinatario.estado}</td><td className="border p-1 text-[#743c3c]">{destinatario.error || "—"}</td><td className="border p-1">{destinatario.fechaHora ? new Date(destinatario.fechaHora).toLocaleString("es-AR") : "—"}</td><td className="border p-1">{destinatario.providerMessageId || destinatario.resendId || "—"}</td><td className="border p-1"><button onClick={() => ejecutarEnvioReporte(datosHub.clientesIngresos.filter((cliente) => cliente.id === destinatario.id && emailValido(cliente.email)))} disabled={estadoEnvio === "enviando" || !emailValido(destinatario.email)} className="rounded border border-[#cfd8c6] px-2 py-1 font-black disabled:opacity-50">Reenviar</button></td></tr>)}</tbody></table></div></div>}
+              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Clientes / importes</h3><div className="mb-2 space-y-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs"><div className="flex flex-wrap items-center gap-2"><span className="font-black">Clientes: {clientesSeleccionadosReporte.length} de {clientesConEmailValidoReporte.length} · Hub Operativo: {actoresSeleccionadosReporte.length} de {actoresConEmailValidoReporte.length}</span><button onClick={seleccionarTodosClientesConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar clientes</button><button onClick={seleccionarTodosActoresConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar Hub Operativo</button><button onClick={seleccionarTodosDestinatariosConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar todos con email válido</button><button onClick={desmarcarTodosClientesReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Desmarcar todos</button><button onClick={enviarReporteASeleccionados} disabled={estadoEnvio === "enviando" || destinatariosSeleccionadosReporte.length === 0} className="h-7 rounded-md bg-[#1f2a1d] px-2 font-black text-white disabled:opacity-50">Enviar reporte a seleccionados</button></div><div className="flex flex-wrap items-center gap-2"><label className="font-black text-[#66745c]">Enviar prueba</label><input value={emailPruebaReporte} onChange={(e) => setEmailPruebaReporte(e.target.value)} className="h-7 min-w-56 rounded-md border border-[#cfd8c6] bg-white px-2" /><button onClick={enviarPruebaReporte} disabled={estadoEnvio === "enviando"} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black disabled:opacity-50">Enviar prueba</button></div><div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#cfd8c6] bg-white p-2"><span className="font-black text-[#66745c]">Incluir consulta de parámetros del Hub</span><button type="button" onClick={() => setIncluirConsultaParametros(false)} className={`h-7 rounded-md px-2 font-black ${!incluirConsultaParametros ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6]"}`}>No incluir</button><button type="button" onClick={() => setIncluirConsultaParametros(true)} className={`h-7 rounded-md px-2 font-black ${incluirConsultaParametros ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6]"}`}>Incluir parámetros principales</button></div><p className={`text-xs font-black ${estadoEnvio === "error" ? "text-[#743c3c]" : estadoEnvio === "enviado" ? "text-[#2f6d32]" : "text-[#66745c]"}`}>{mensajeEnvio}</p></div>{confirmacionEnvioReporte && <div className="mb-2 rounded-xl border border-[#1f2a1d] bg-white p-3 text-xs shadow-sm"><h4 className="text-sm font-black">Vas a enviar este reporte a {destinatariosSeleccionadosReporte.length} personas.</h4><ul className="mt-2 max-h-40 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.map((cliente, index) => <li key={`confirmar-${cliente.id}-${index}`} className="font-semibold">{cliente.nombre || `Cliente ${index + 1}`} — <a className="underline" href={`mailto:${cliente.email}`}>{cliente.email}</a></li>)}</ul>{clientesSinEmailReporte.length > 0 && <p className="mt-2 font-black text-[#743c3c]">{clientesSinEmailReporte.length} cliente{clientesSinEmailReporte.length === 1 ? "" : "s"} no recibirá{clientesSinEmailReporte.length === 1 ? "" : "n"} el reporte porque no tiene{clientesSinEmailReporte.length === 1 ? "" : "n"} email cargado.</p>}{clientesEmailInvalidoReporte.length > 0 && <p className="mt-1 font-black text-[#743c3c]">{clientesEmailInvalidoReporte.length} cliente{clientesEmailInvalidoReporte.length === 1 ? "" : "s"} tiene{clientesEmailInvalidoReporte.length === 1 ? "" : "n"} email inválido y no se seleccionó automáticamente.</p>}<div className="mt-3 flex flex-wrap gap-2"><button onClick={() => ejecutarEnvioReporte(destinatariosSeleccionadosReporte)} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 font-black text-white disabled:opacity-50">Confirmar envío</button><button onClick={() => setConfirmacionEnvioReporte(false)} className="h-8 rounded-lg border border-[#cfd8c6] px-3 font-black">Cancelar</button></div></div>}<div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1 text-center">✓</th><th className="border p-1">Origen / sistema</th><th className="border p-1">Cliente</th><th className="border p-1">Email privado</th><th className="border p-1">Teléfono WhatsApp</th><th className="border p-1">Tarifa del cliente</th><th className="border p-1">Importe manual</th><th className="border p-1">Estado de visita</th><th className="border p-1">Estado de email</th><th className="border p-1">Acciones</th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente, index) => { const tieneEmailValido = emailValido(cliente.email); const seleccionadoReporte = clientesReporteSeleccionados.includes(cliente.id) && tieneEmailValido; return <tr key={`cliente-edit-${cliente.id}-${index}`} className={seleccionadoReporte ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={seleccionadoReporte} disabled={!tieneEmailValido} aria-label={`Seleccionar ${cliente.nombre || `cliente ${index + 1}`}`} onChange={(e) => actualizarSeleccionReporte(cliente.id, e.target.checked)} /></td><td className="border border-[#e1e6dc] p-1"><span className="block min-w-32 px-1 font-semibold">{cliente.origen || "JardinerosYa"}</span></td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.email, (valor) => actualizarCliente(cliente.id, { email: valor }), "min-w-48")}{!cliente.email.trim() && <p className="px-1 text-[10px] font-black text-[#743c3c]">Sin email cargado</p>}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.telefono, (valor) => actualizarCliente(cliente.id, { telefono: valor }), "min-w-36")}</td><td className="border border-[#e1e6dc] p-1"><select value={cliente.tarifaCliente} onChange={(e) => actualizarCliente(cliente.id, { tarifaCliente: e.target.value as TarifaCliente })} className="min-w-36 rounded border bg-white px-2 py-1">{TARIFAS_CLIENTE.map((tarifa) => <option key={tarifa.value} value={tarifa.value}>{tarifa.label}</option>)}</select></td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className={`border border-[#e1e6dc] p-1 font-black ${estadoVisitaCliente(cliente) === "Saltea visita" ? "text-[#8a6a16]" : "text-[#2f6d32]"}`}>{estadoVisitaCliente(cliente)}</td><td className={`border border-[#e1e6dc] p-1 font-black ${tieneEmailValido ? seleccionadoReporte ? "text-[#2f6d32]" : "text-[#66745c]" : "text-[#743c3c]"}`}>{estadoEmailClienteReporte(cliente, seleccionadoReporte)}</td><td className="border border-[#e1e6dc] p-1 text-center"><button onClick={() => actualizarDatosHub({ clienteActivoId: cliente.id })} className="mr-2 font-black text-[#1f2a1d]">Previsualizar</button><button onClick={() => actualizarDatosHub({ clientesIngresos: datosHub.clientesIngresos.filter((fila) => fila.id !== cliente.id) })} className="font-black text-[#743c3c]">×</button></td></tr>; })}</tbody></table></div><button onClick={() => actualizarDatosHub({ clientesIngresos: [...datosHub.clientesIngresos, { ...clienteIngresoInicial(""), id: crearId() }] })} className="mt-2 h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Agregar cliente</button>{ultimoEnvioReporte && <div className="mt-3 rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs"><h4 className="text-sm font-black">{ultimoEnvioReporte.tipo === "prueba" ? "Envío de prueba" : "Envío generado"}</h4><p className="mt-1 font-semibold">Este reporte se intentó enviar a estas personas.</p><div className="mt-2 grid gap-2 md:grid-cols-4"><div><p className="font-black text-[#66745c]">Fecha y hora</p><p>{new Date(ultimoEnvioReporte.fechaHora).toLocaleString("es-AR")}</p></div><div><p className="font-black text-[#66745c]">Hub</p><p>{ultimoEnvioReporte.hub}</p></div><div><p className="font-black text-[#66745c]">Reporte</p><p>{ultimoEnvioReporte.reporte}</p></div><div><p className="font-black text-[#66745c]">Destinatarios seleccionados</p><p>{ultimoEnvioReporte.destinatariosSeleccionados}</p></div><div><p className="font-black text-[#66745c]">Enviados a proveedor</p><p>{ultimoEnvioReporte.enviadosAProveedor}</p></div><div><p className="font-black text-[#66745c]">Errores</p><p>{ultimoEnvioReporte.errores}</p></div><div><p className="font-black text-[#66745c]">Sin email</p><p>{ultimoEnvioReporte.sinEmail}</p></div><div><p className="font-black text-[#66745c]">Pendientes de respuesta</p><p>{ultimoEnvioReporte.pendientesRespuesta}</p></div><div><p className="font-black text-[#66745c]">From usado</p><p>{ultimoEnvioReporte.fromUsado || "—"}</p></div><div><p className="font-black text-[#66745c]">Reply-To usado</p><p>{ultimoEnvioReporte.replyToUsado || "—"}</p></div></div><div className="mt-3 overflow-x-auto rounded-lg border border-[#d8dfd1] bg-white"><table className="w-full border-collapse"><thead className="bg-[#f1f4ec] text-left uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Email</th><th className="border p-1">Estado</th><th className="border p-1">Error</th><th className="border p-1">Fecha/hora</th><th className="border p-1">Provider ID / Resend ID</th><th className="border p-1">Acción</th></tr></thead><tbody>{ultimoEnvioReporte.destinatarios.map((destinatario, index) => <tr key={`envio-reporte-${ultimoEnvioReporte.id}-${destinatario.id}-${index}`}><td className="border p-1 font-black">{destinatario.nombre}</td><td className="border p-1">{destinatario.email || "Sin email cargado"}</td><td className="border p-1 font-black">{destinatario.estado}</td><td className="border p-1 text-[#743c3c]">{destinatario.error || "—"}</td><td className="border p-1">{destinatario.fechaHora ? new Date(destinatario.fechaHora).toLocaleString("es-AR") : "—"}</td><td className="border p-1">{destinatario.providerMessageId || destinatario.resendId || "—"}</td><td className="border p-1"><button onClick={() => ejecutarEnvioReporte(datosHub.clientesIngresos.filter((cliente) => cliente.id === destinatario.id && emailValido(cliente.email)))} disabled={estadoEnvio === "enviando" || !emailValido(destinatario.email)} className="rounded border border-[#cfd8c6] px-2 py-1 font-black disabled:opacity-50">Reenviar</button></td></tr>)}</tbody></table></div></div>}
             </section>
 
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
@@ -2141,62 +2199,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
               <div className="flex flex-wrap gap-2"><button onClick={() => copiarTexto(reporteTexto, "Reporte")} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar reporte</button><button onClick={descargarImagenReporte} className="h-8 rounded-lg bg-[#5d7032] px-3 text-xs font-black text-white">Generar imagen del reporte</button></div>
             </div>
 
-            <article ref={reporteVisualRef} className="w-full max-w-[760px] rounded-[28px] border border-[#c7d8bf] bg-[#fbfdf8] p-0 font-sans text-[#182018] shadow-sm">
-              <header className="rounded-t-[28px] border-b border-[#d7e3d0] bg-gradient-to-br from-[#eef7ea] to-white p-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#66745c]">HubYa</p>
-                <h3 className="mt-1 text-xl font-black uppercase leading-tight">{tituloReporteHub}</h3>
-                <p className="mt-1 text-xs font-semibold text-[#66745c]">Resumen de trabajo coordinado para el cuidado y mantenimiento del espacio verde.</p>
-              </header>
-
-              <section className="border-b border-[#9aa78f] p-4">
-                <h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Resumen rápido para el cliente</h4>
-                <table className="w-full border-collapse text-xs">
-                  <tbody>
-                    <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Cliente seleccionado</td><td className="border border-[#d8dfd1] p-1.5 font-bold">{clienteActivo?.nombre || "Sin cliente seleccionado"}</td></tr>
-                    <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Hub</td><td className="border border-[#d8dfd1] p-1.5">{jornada.hub}</td></tr>
-                    <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Fecha</td><td className="border border-[#d8dfd1] p-1.5">{fechaFormateada}</td></tr>
-                    <tr><td className="border border-[#1f2a1d] bg-[#eef2e8] p-2 font-black uppercase">Importe correspondiente a su espacio verde</td><td className="border border-[#1f2a1d] bg-[#eef2e8] p-2 text-lg font-black text-[#1f2a1d]">{formatoPlano(clienteActivo?.importe) || formatoMoneda(0)}</td></tr>
-                    <tr><td className="border border-[#d8dfd1] bg-[#f6f8f3] p-1.5 font-black uppercase">Estado operativo</td><td className="border border-[#d8dfd1] p-1.5 font-bold">{datosHub.resumen.estadoOperativo || "Sin cargar"}</td></tr>
-                  </tbody>
-                </table>
-              </section>
-
-              <div className="p-4">
-                <table className="w-full border-collapse bg-white text-xs">
-                  <tbody>
-                    <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Clientes / ingresos</th></tr>
-                    <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th className="border border-[#d8dfd1] p-1.5 text-left">Origen / sistema</th><th className="border border-[#d8dfd1] p-1.5 text-left">Nombre cliente</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
-                    {datosHub.clientesIngresos.map((cliente, index) => <tr key={`cliente-reporte-${cliente.id}-${index}`}><td className="border border-[#d8dfd1] p-1.5">{cliente.origen || "Sin origen"}</td><td className="border border-[#d8dfd1] p-1.5">{nombrePrivado(cliente, index) || "Sin cliente"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(cliente.importe)}</td></tr>)}
-                    <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total facturado al Hub</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalFacturadoHub)}</td></tr>
-                    <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Gastos</th></tr>
-                    <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th colSpan={2} className="border border-[#d8dfd1] p-1.5 text-left">Concepto</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
-                    {gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto, index) => <tr key={`gasto-real-${gasto.id}-${index}`}><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{gasto.concepto || "Sin concepto"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(gasto.importe)}</td></tr>) : <tr><td colSpan={3} className="border border-[#d8dfd1] p-2 font-bold text-[#66745c]">{MENSAJE_SIN_GASTOS_REALES}</td></tr>}
-                    <tr className="font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total gastos</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalGastos)}</td></tr>
-                    <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total a distribuir</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalADistribuir)}</td></tr>
-                    <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Resultado por actor operativo</th></tr>
-                    <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th className="border border-[#d8dfd1] p-1.5 text-left">Actor</th><th className="border border-[#d8dfd1] p-1.5 text-center">Participación / activo</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
-                    {distribucionCalculada.map((actor, index) => <tr key={`actor-${actor.id}-${index}`}><td className="border border-[#d8dfd1] p-1.5">{actor.nombre || "Sin actor"}</td><td className="border border-[#d8dfd1] p-1.5 text-center">{numero(actor.participacion)} / {actor.activo ? "activo" : "inactivo"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoMoneda(actor.importeFinal)}</td></tr>)}
-                    <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total distribuido</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalDistribuido)}</td></tr>
-                    <tr><td className="border border-[#d8dfd1] bg-[#f8faf5] p-1.5 font-black">Tiempo efectivo</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.tiempoEfectivo || "Sin cargar"}</td></tr>
-                    <tr><td className="border border-[#d8dfd1] bg-[#f8faf5] p-1.5 font-black">Estado operativo</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.estadoOperativo || "Sin cargar"}</td></tr>
-                    <tr><td className="border border-[#d8dfd1] bg-[#f8faf5] p-1.5 font-black">Observación</td><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{datosHub.resumen.observacionGeneral || "Sin cargar"}</td></tr>
-                  </tbody>
-                </table>
-                <p className="mt-2 border border-[#d8dfd1] bg-[#f8faf5] p-2 text-[10px] font-semibold text-[#66745c]">Privacidad: solo el cliente seleccionado se muestra con nombre real. Los demás clientes están anonimizados como Cliente 2, Cliente 3, Cliente 4, etc. y no se incluyen emails.</p>
-
-                {informacionReporte && <section className="mt-3 rounded-2xl border border-[#c7d8bf] bg-[#eef7ea] p-3 text-xs leading-5">
-                  <h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Información importante</h4>
-                  <p className="font-black">{informacionReporte.titulo || "Información importante del Hub"}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-[#4f5f47]">{informacionReporte.texto}</p>
-                </section>}
-
-                <section className="mt-3 rounded-2xl border border-[#9aa78f] bg-white p-3 text-xs leading-5">
-                  <h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Sobre HubYa</h4>
-                  {sobreHubYaLineas.map((linea) => <p key={linea} className="mt-2 first:mt-0">{linea}</p>)}
-                </section>
-                {incluirConsultaParametros && parametrosJardinerosYaReporte && <section className="mt-3 rounded-2xl border border-[#c7d8bf] bg-[#fbfdf8] p-3 text-xs leading-5"><h4 className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#1f2a1d]">Parámetros de referencia del Hub</h4><p className="font-semibold text-[#4f5f47]">Estos valores no son gastos del día. Son referencias que usa el sistema para organizar el Hub. Tu sugerencia ayuda a mantenerlos actualizados y será revisada por el equipo operativo antes de cambiar cualquier parámetro.</p><div className="mt-2 grid gap-2 md:grid-cols-2">{[["Jornal 6 horas efectivas", formatoMoneda(parametrosJardinerosYaReporte.valorHoraTrabajo * 6)], ["Traslado", formatoMoneda(parametrosJardinerosYaReporte.traslado)], ["Nafta + aceite", formatoMoneda(parametrosJardinerosYaReporte.nafta + parametrosJardinerosYaReporte.aceite)], ["Comisión capataz", `${parametrosJardinerosYaReporte.comisionResponsableCuadrillaPorcentaje}%`], ["Hora de máquina", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraCortadoraCesped)}/h`]].map(([etiqueta, valor]) => <div key={etiqueta} className="rounded-xl border border-[#d8dfd1] bg-white p-2"><p className="font-black">{etiqueta}</p><p>Valor actual de referencia: <strong>{valor}</strong></p><p className="mt-1 text-[10px] font-black text-[#66745c]">Confirmar valor · Sugerir otro valor · Sugerir subir · Sugerir bajar · Necesito aclaración</p></div>)}</div></section>}<footer className="mt-3 rounded-2xl bg-[#1f2a1d] p-3 text-center text-xs font-bold leading-5 text-white"><p>Gracias por formar parte de una gestión organizada del espacio verde.</p><p className="text-white/70">HubYa · Coordinación humana sobre procesos recurrentes</p></footer>
-              </div>
-            </article>
+            <div ref={reporteVisualRef} className="w-full overflow-hidden rounded-[28px] bg-[#fbfdf8]" dangerouslySetInnerHTML={{ __html: reporteHtml }} />
           </section>
 
           <details className="rounded-xl border border-[#1f2a1d] bg-[#1f2a1d] p-3 text-white shadow-sm"><summary className="cursor-pointer text-sm font-black uppercase tracking-wide">Mail corto para enviar con el documento</summary><div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]"><select value={datosHub.clienteActivoId} onChange={(e) => actualizarDatosHub({ clienteActivoId: Number(e.target.value) })} className="h-8 rounded-lg bg-white px-2 text-sm font-semibold text-[#182018]">{datosHub.clientesIngresos.map((cliente, index) => <option key={`cliente-activo-${cliente.id}-${index}`} value={cliente.id}>{cliente.nombre || "Sin cliente"}</option>)}</select><button onClick={() => copiarTexto(emailPrivado, "Email privado")} className="h-8 rounded-lg bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar texto del mail</button></div><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/10 p-3 text-xs leading-5">{emailPrivado}</pre></details>

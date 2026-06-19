@@ -3,10 +3,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import type { Cliente, HubOperativo, TipoDestinoContacto } from "@/lib/data/hubs";
+import type { Cliente, HubOperativo, TarifaClienteHub, TipoDestinoContacto } from "@/lib/data/hubs";
 
 type Props = { hubs: HubOperativo[]; contactos: Cliente[] };
 type ContactoEditable = Cliente & { seleccionado?: boolean; sucio?: boolean; eliminando?: boolean };
+
+const tarifasCliente: Array<{ value: TarifaClienteHub; label: string }> = [
+  { value: "tarifa_1", label: "Tarifa 1" },
+  { value: "tarifa_2", label: "Tarifa 2" },
+  { value: "tarifa_3", label: "Tarifa 3" },
+  { value: "sin_tarifa", label: "Sin tarifa asignada" },
+];
 
 const tipos: Array<{ value: TipoDestinoContacto; label: string }> = [
   { value: "cliente", label: "Cliente / vecino" },
@@ -67,7 +74,7 @@ export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
     const guardados = await Promise.all(pendientes.map((fila) => fetch(`/api/contactos/${fila.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre: fila.nombre, email: fila.email, whatsapp: fila.whatsapp, referencia: fila.referencia || "", hubId: fila.hubId, tipoDestino: fila.tipoDestino }),
+      body: JSON.stringify({ nombre: fila.nombre, email: fila.email, whatsapp: fila.whatsapp, referencia: fila.referencia || "", tarifaCliente: fila.tarifaCliente, hubId: fila.hubId, tipoDestino: fila.tipoDestino }),
     }).then((res) => { if (!res.ok) throw new Error(`No se pudo guardar ${fila.nombre}`); return res.json() as Promise<Cliente>; })));
 
     const guardadosPorId = new Map(guardados.map((contacto) => [contacto.id, contacto]));
@@ -117,13 +124,14 @@ export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
       {mensaje && <p className="mt-3 rounded-xl bg-[#eef4ea] px-4 py-2 text-sm font-black text-[#1f2a1d]">{mensaje}</p>}
       <div className="mt-5 overflow-x-auto rounded-2xl border border-[#d8dfd1]">
         <table className="w-full min-w-[1280px] border-collapse text-sm">
-          <thead className="bg-[#f1f4ec] text-left text-[10px] uppercase tracking-wide text-[#66745c]"><tr>{["Marcar", "Nombre", "Email", "WhatsApp / teléfono", "Referencia", "Hub asignado", "Tipo de destino", "Estado", "Acciones"].map((h) => <th key={h} className="border border-[#d8dfd1] p-2">{h}</th>)}</tr></thead>
-          <tbody>{filasFiltradas.length === 0 ? <tr><td colSpan={9} className="border p-6 text-center font-bold text-[#66745c]">No hay contactos que coincidan con la búsqueda.</td></tr> : filasFiltradas.map((fila) => <tr key={fila.id} className={fila.sucio ? "bg-[#fff8df]" : "bg-white"}>
+          <thead className="bg-[#f1f4ec] text-left text-[10px] uppercase tracking-wide text-[#66745c]"><tr>{["Marcar", "Nombre", "Email", "WhatsApp / teléfono", "Referencia", "Tarifa del cliente", "Hub asignado", "Tipo de destino", "Estado", "Acciones"].map((h) => <th key={h} className="border border-[#d8dfd1] p-2">{h}</th>)}</tr></thead>
+          <tbody>{filasFiltradas.length === 0 ? <tr><td colSpan={10} className="border p-6 text-center font-bold text-[#66745c]">No hay contactos que coincidan con la búsqueda.</td></tr> : filasFiltradas.map((fila) => <tr key={fila.id} className={fila.sucio ? "bg-[#fff8df]" : "bg-white"}>
             <td className="border p-2 text-center"><input type="checkbox" checked={Boolean(fila.seleccionado)} onChange={(e) => actualizar(fila.id, { seleccionado: e.target.checked })} /></td>
             <td className="border p-1"><input value={fila.nombre} onChange={(e) => actualizar(fila.id, { nombre: e.target.value })} className="min-w-40 rounded border px-2 py-1 font-bold" /></td>
             <td className="border p-1"><input value={fila.email} onChange={(e) => actualizar(fila.id, { email: e.target.value })} className="min-w-52 rounded border px-2 py-1" /></td>
             <td className="border p-1"><input value={fila.whatsapp} onChange={(e) => actualizar(fila.id, { whatsapp: e.target.value })} className="min-w-40 rounded border px-2 py-1" /></td>
             <td className="border p-1"><input value={fila.referencia || ""} onChange={(e) => actualizar(fila.id, { referencia: e.target.value })} className="min-w-48 rounded border px-2 py-1" /></td>
+            <td className="border p-1"><select value={fila.tarifaCliente || "sin_tarifa"} onChange={(e) => actualizar(fila.id, { tarifaCliente: e.target.value as TarifaClienteHub })} className="min-w-40 rounded border bg-white px-2 py-1">{tarifasCliente.map((tarifa) => <option key={tarifa.value} value={tarifa.value}>{tarifa.label}</option>)}</select></td>
             <td className="border p-1"><select value={fila.hubId} onChange={(e) => actualizar(fila.id, { hubId: e.target.value })} className="min-w-48 rounded border bg-white px-2 py-1"><option value="">Sin Hub asignado</option>{hubs.map((hub) => <option key={hub.id} value={hub.id}>{hub.nombre}</option>)}</select></td>
             <td className="border p-1"><select value={fila.tipoDestino || "cliente"} onChange={(e) => actualizar(fila.id, { tipoDestino: e.target.value as TipoDestinoContacto })} className="min-w-40 rounded border bg-white px-2 py-1">{tipos.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}</select></td>
             <td className="border p-2 font-bold capitalize text-[#66745c]">{fila.estado}</td>
