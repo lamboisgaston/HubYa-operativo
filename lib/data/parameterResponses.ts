@@ -36,6 +36,12 @@ function secret() { return process.env.PARAMETER_RESPONSE_TOKEN_SECRET || proces
 function sign(data: string) { return createHmac("sha256", secret()).update(data).digest("base64url"); }
 function uid() { return `param-resp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`; }
 function texto(v: unknown) { return typeof v === "string" ? v.trim() : ""; }
+function valorSugeridoSeguro(v: unknown) {
+  const valor = texto(v);
+  if (!valor) return undefined;
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : valor.slice(0, 200);
+}
 
 function normalizar(base: unknown) {
   const store = base as StoreConParametros & { parameterResponses?: unknown[] };
@@ -55,9 +61,13 @@ export function verificarTokenRespuestaParametro(token: string): ParameterConsul
   const a = Buffer.from(signature);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  const payload = JSON.parse(fromB64url(data)) as ParameterConsultationTokenPayload;
-  if (!payload.hubId || !payload.reportId || !payload.contactId || !payload.parameterKey || !payload.parameterLabel || !choices.has(payload.responseType)) return null;
-  return payload;
+  try {
+    const payload = JSON.parse(fromB64url(data)) as ParameterConsultationTokenPayload;
+    if (!payload.hubId || !payload.reportId || !payload.contactId || !payload.parameterKey || !payload.parameterLabel || !choices.has(payload.responseType)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 export async function registrarRespuestaParametroPorToken(token: string, input?: { comment?: string; suggestedValue?: string }) {
@@ -72,7 +82,23 @@ export async function registrarRespuestaParametroPorToken(token: string, input?:
     hub = store.hubs.find((h) => h.id === payload.hubId);
     contact = store.clientes.find((c) => c.id === payload.contactId);
     const existing = store.parameterResponses.find((r) => r.hubId === payload.hubId && r.reportId === payload.reportId && r.contactId === payload.contactId && r.parameterKey === payload.parameterKey && r.responseType === payload.responseType);
-    response = { id: existing?.id || uid(), ...payload, response: payload.responseType, suggestedValue: texto(input?.suggestedValue) || existing?.suggestedValue, comment: texto(input?.comment) || existing?.comment, status: existing?.status || "nueva", createdAt: existing?.createdAt || timestamp, internalNote: existing?.internalNote };
+    response = {
+      id: existing?.id || uid(),
+      hubId: payload.hubId,
+      reportId: payload.reportId,
+      contactId: payload.contactId,
+      parameterKey: payload.parameterKey,
+      parameterLabel: payload.parameterLabel,
+      currentValue: payload.currentValue,
+      currentValueType: payload.currentValueType,
+      responseType: payload.responseType,
+      response: payload.responseType,
+      suggestedValue: valorSugeridoSeguro(input?.suggestedValue) ?? existing?.suggestedValue,
+      comment: texto(input?.comment).slice(0, 1000) || existing?.comment,
+      status: existing?.status || "nueva",
+      createdAt: existing?.createdAt || timestamp,
+      internalNote: existing?.internalNote,
+    };
     store.parameterResponses = [response, ...store.parameterResponses.filter((r) => r.id !== response!.id)];
     return store;
   });

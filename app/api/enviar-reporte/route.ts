@@ -38,6 +38,9 @@ function baseUrl(valor?: string) { return (campoTexto(valor) || process.env.NEXT
 
 type ParametroConsultable = { key: string; label: string; value: number; type: ParameterValueType; formatted: string };
 
+const MENSAJE_SIN_GASTOS_REALES = "No se registraron gastos adicionales en este reporte.";
+const TEXTO_ACLARATORIO_PARAMETROS = "Estos valores no son gastos del día. Son referencias que utiliza el sistema para organizar el funcionamiento del Hub.";
+
 function parametrosPrincipalesJardinerosYa(hub: Awaited<ReturnType<typeof getPublicStore>>["hubs"][number] | undefined): ParametroConsultable[] {
   if (!hub || hub.moduloOperativo !== "jardinerosya") return [];
   const p = hub.parametrosOperativos?.jardinerosYa;
@@ -58,7 +61,7 @@ async function armarConsultaParametros(payload: EnviarReportePayload) {
   const hub = store.hubs.find((item) => item.id === campoTexto(payload.hubId) || item.nombre === campoTexto(payload.hub));
   const parametros = parametrosPrincipalesJardinerosYa(hub);
   if (!hub || hub.moduloOperativo !== "jardinerosya") return { html: "", text: "" };
-  if (parametros.length === 0) return { html: `<section style="margin-top:16px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:16px;"><h2 style="margin:0 0 8px;font-size:16px;">Parámetros de referencia del Hub</h2><p style="margin:0;">Este Hub todavía no tiene parámetros operativos configurados.</p></section>`, text: "\n\nPARÁMETROS DE REFERENCIA DEL HUB\nEste Hub todavía no tiene parámetros operativos configurados." };
+  if (parametros.length === 0) return { html: `<section style="margin-top:16px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:16px;"><h2 style="margin:0 0 8px;font-size:16px;">Parámetros de referencia del Hub</h2><p style="margin:0 0 8px;color:#4f5f47;line-height:1.5;">${escaparHtml(TEXTO_ACLARATORIO_PARAMETROS)}</p><p style="margin:0;">Este Hub todavía no tiene parámetros operativos configurados.</p></section>`, text: `\n\nPARÁMETROS DE REFERENCIA DEL HUB\n${TEXTO_ACLARATORIO_PARAMETROS}\nEste Hub todavía no tiene parámetros operativos configurados.` };
   const reportId = campoTexto(payload.reportId) || `reporte-${Date.now()}`;
   const contactId = campoTexto(payload.contactId) || campoTexto(payload.emailDestino);
   const base = baseUrl(payload.baseUrl);
@@ -70,8 +73,8 @@ async function armarConsultaParametros(payload: EnviarReportePayload) {
     }).join("");
     return `<div style="margin-top:10px;border:1px solid #d8dfd1;background:#fff;padding:12px;border-radius:14px;"><h3 style="margin:0 0 6px;font-size:15px;">${escaparHtml(parametro.label)}</h3><p style="margin:0 0 8px;color:#66745c;">Valor actual de referencia: <strong style="color:#1f2a1d;">${escaparHtml(parametro.formatted)}</strong></p><p style="margin:0 0 4px;font-weight:700;">¿Qué opinás de este valor?</p>${links}</div>`;
   }).join("");
-  const html = `<section style="margin-top:16px;border:1px solid #9aa78f;background:#fbfdf8;padding:14px;border-radius:16px;"><h2 style="margin:0 0 8px;font-size:16px;">Parámetros de referencia del Hub</h2><p style="margin:0;color:#4f5f47;line-height:1.5;">Además del reporte del día, compartimos los valores de referencia que usa el Hub para organizar el servicio. Estos valores no son gastos del día. Si considerás que alguno debería ajustarse, podés ayudarnos dejando tu sugerencia. El valor no cambia automáticamente: primero será revisado por el equipo operativo.</p>${cards}</section>`;
-  const text = `\n\nPARÁMETROS DE REFERENCIA DEL HUB\nEstos valores no son gastos del día: son referencias que usa el sistema para organizar el Hub. Respondé desde los botones del mail; el equipo operativo revisará las sugerencias antes de cambiar cualquier parámetro.\n${parametros.map((p) => `${p.label}: ${p.formatted}`).join("\n")}`;
+  const html = `<section style="margin-top:16px;border:1px solid #9aa78f;background:#fbfdf8;padding:14px;border-radius:16px;"><h2 style="margin:0 0 8px;font-size:16px;">Parámetros de referencia del Hub</h2><p style="margin:0;color:#4f5f47;line-height:1.5;">${escaparHtml(TEXTO_ACLARATORIO_PARAMETROS)} Si considerás que alguno debería ajustarse, podés ayudarnos dejando tu sugerencia. El valor no cambia automáticamente: primero será revisado por el equipo operativo.</p>${cards}</section>`;
+  const text = `\n\nPARÁMETROS DE REFERENCIA DEL HUB\n${TEXTO_ACLARATORIO_PARAMETROS} Respondé desde los botones del mail; el equipo operativo revisará las sugerencias antes de cambiar cualquier parámetro.\n${parametros.map((p) => `${p.label}: ${p.formatted}`).join("\n")}`;
   return { html, text };
 }
 
@@ -87,7 +90,7 @@ function escaparHtml(valor: string) {
 function armarHtml(cuerpoMail: string, reporteHtml: string, reporteTexto: string, consultaHtml = "") {
   const reporte = reporteHtml || `<pre style="margin:0;white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;color:#182018;">${escaparHtml(reporteTexto)}</pre>`;
 
-  return `<!doctype html><html><body style="margin:0;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:760px;margin:0 auto;padding:24px;"><p style="margin:0 0 18px;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(cuerpoMail)}</p>${reporte}${consultaHtml}</div></body></html>`;
+  return `<!doctype html><html><body style="margin:0;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:760px;margin:0 auto;padding:24px;"><section style="margin-bottom:16px;"><h1 style="margin:0 0 10px;font-size:20px;">Reporte del día</h1><p style="margin:0;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(cuerpoMail)}</p></section><section style="margin-top:16px;"><h2 style="margin:0 0 10px;font-size:16px;">Gastos reales del día</h2><p style="margin:0 0 10px;color:#66745c;font-size:12px;font-weight:700;">Los gastos listados son únicamente valores reales cargados en este reporte. ${escaparHtml(MENSAJE_SIN_GASTOS_REALES)} si no hay importes reales cargados.</p>${reporte}</section>${consultaHtml}</div></body></html>`;
 }
 
 export async function POST(request: Request) {
@@ -137,7 +140,7 @@ export async function POST(request: Request) {
       to: [emailDestino],
       subject: asunto,
       html: armarHtml(cuerpoMail, reporteHtml, reporteTexto, consulta.html),
-      text: `${cuerpoMail}\n\n${reporteTexto}${consulta.text}`,
+      text: `REPORTE DEL DÍA\n${cuerpoMail}\n\nGASTOS REALES DEL DÍA\n${reporteTexto || MENSAJE_SIN_GASTOS_REALES}${consulta.text}`,
     }),
   });
 
