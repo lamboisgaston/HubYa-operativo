@@ -1,9 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getPublicStore, updatePublicStore, type Hub, type Cliente } from "@/lib/data/hubs";
 
-export type ParameterResponseChoice = "confirmar" | "sugerir_subir" | "sugerir_bajar" | "necesito_aclaracion";
+export type ParameterResponseChoice = "confirmar_valor" | "sugerir_otro_valor" | "sugerir_subir" | "sugerir_bajar" | "necesito_aclaracion";
 export type ParameterResponseStatus = "nueva" | "leida" | "considerada" | "aplicada" | "archivada";
-export type ParameterValueType = "money" | "percent" | "text";
+export type ParameterValueType = "money" | "percent" | "hours" | "text";
 
 export type ParameterResponse = {
   id: string;
@@ -15,17 +15,19 @@ export type ParameterResponse = {
   currentValue: number | string;
   currentValueType: ParameterValueType;
   response: ParameterResponseChoice;
+  responseType: ParameterResponseChoice;
+  suggestedValue?: number | string;
   comment?: string;
   status: ParameterResponseStatus;
   createdAt: string;
   internalNote?: string;
 };
 
-export type ParameterConsultationTokenPayload = Omit<ParameterResponse, "id" | "status" | "createdAt" | "comment" | "internalNote"> & { createdFor: string };
+export type ParameterConsultationTokenPayload = Omit<ParameterResponse, "id" | "status" | "createdAt" | "comment" | "internalNote" | "suggestedValue" | "responseType"> & { createdFor: string };
 
 type StoreConParametros = Omit<Awaited<ReturnType<typeof getPublicStore>>, "parameterResponses"> & { parameterResponses: ParameterResponse[] };
 
-const choices = new Set<ParameterResponseChoice>(["confirmar", "sugerir_subir", "sugerir_bajar", "necesito_aclaracion"]);
+const choices = new Set<ParameterResponseChoice>(["confirmar_valor", "sugerir_otro_valor", "sugerir_subir", "sugerir_bajar", "necesito_aclaracion"]);
 const statuses = new Set<ParameterResponseStatus>(["nueva", "leida", "considerada", "aplicada", "archivada"]);
 
 function b64url(input: string | Buffer) { return Buffer.from(input).toString("base64url"); }
@@ -35,9 +37,17 @@ function sign(data: string) { return createHmac("sha256", secret()).update(data)
 function uid() { return `param-resp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`; }
 function texto(v: unknown) { return typeof v === "string" ? v.trim() : ""; }
 
+function normalizarChoice(value: unknown): ParameterResponseChoice {
+  return value === "confirmar" ? "confirmar_valor" : choices.has(value as ParameterResponseChoice) ? value as ParameterResponseChoice : "necesito_aclaracion";
+}
+
 function normalizar(base: unknown) {
   const store = base as StoreConParametros & { parameterResponses?: unknown[] };
-  store.parameterResponses = Array.isArray(store.parameterResponses) ? store.parameterResponses.map((item) => { const r = item as Partial<ParameterResponse>; return { ...r, status: statuses.has(r.status as ParameterResponseStatus) ? r.status as ParameterResponseStatus : "nueva" } as ParameterResponse; }) : [];
+  store.parameterResponses = Array.isArray(store.parameterResponses) ? store.parameterResponses.map((item) => {
+    const r = item as Partial<ParameterResponse> & { responseType?: ParameterResponseChoice };
+    const responseType = normalizarChoice(r.responseType || r.response);
+    return { ...r, response: responseType, responseType, status: statuses.has(r.status as ParameterResponseStatus) ? r.status as ParameterResponseStatus : "nueva" } as ParameterResponse;
+  }) : [];
   return store as StoreConParametros;
 }
 
@@ -54,11 +64,12 @@ export function verificarTokenRespuestaParametro(token: string): ParameterConsul
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   const payload = JSON.parse(fromB64url(data)) as ParameterConsultationTokenPayload;
-  if (!payload.hubId || !payload.reportId || !payload.contactId || !payload.parameterKey || !payload.parameterLabel || !choices.has(payload.response)) return null;
-  return payload;
+  const response = normalizarChoice(payload.response);
+  if (!payload.hubId || !payload.reportId || !payload.contactId || !payload.parameterKey || !payload.parameterLabel || !choices.has(response)) return null;
+  return { ...payload, response };
 }
 
-export async function registrarRespuestaParametroPorToken(token: string, comment?: string) {
+export async function registrarRespuestaParametroPorToken(token: string, input?: { comment?: string; suggestedValue?: string | number }) {
   const payload = verificarTokenRespuestaParametro(token);
   if (!payload) return { ok: false, message: "El link no es válido o está vencido." };
   const timestamp = new Date().toISOString();
@@ -69,12 +80,13 @@ export async function registrarRespuestaParametroPorToken(token: string, comment
     const store = normalizar(base);
     hub = store.hubs.find((h) => h.id === payload.hubId);
     contact = store.clientes.find((c) => c.id === payload.contactId);
-    const existing = store.parameterResponses.find((r) => r.hubId === payload.hubId && r.reportId === payload.reportId && r.contactId === payload.contactId && r.parameterKey === payload.parameterKey && r.response === payload.response);
-    response = { id: existing?.id || uid(), ...payload, comment: texto(comment) || existing?.comment, status: existing?.status || "nueva", createdAt: existing?.createdAt || timestamp, internalNote: existing?.internalNote };
+    const responseType = normalizarChoice(payload.response);
+    const existing = store.parameterResponses.find((r) => r.hubId === payload.hubId && r.reportId === payload.reportId && r.contactId === payload.contactId && r.parameterKey === payload.parameterKey && r.responseType === responseType);
+    response = { id: existing?.id || uid(), ...payload, response: responseType, responseType, suggestedValue: texto(input?.suggestedValue) || existing?.suggestedValue, comment: texto(input?.comment) || existing?.comment, status: existing?.status || "nueva", createdAt: existing?.createdAt || timestamp, internalNote: existing?.internalNote };
     store.parameterResponses = [response, ...store.parameterResponses.filter((r) => r.id !== response!.id)];
     return store;
   });
-  return { ok: true, message: `Registramos tu respuesta sobre el parámetro ${payload.parameterLabel} del Hub.`, response, hubNombre: hub?.nombre, contactNombre: contact?.nombre };
+  return { ok: true, message: `Registramos tu sugerencia sobre ${payload.parameterLabel}. El valor no cambia automáticamente: primero será revisado por el equipo operativo.`, response, hubNombre: hub?.nombre, contactNombre: contact?.nombre };
 }
 
 export async function getParameterResponses(hubId?: string) {
