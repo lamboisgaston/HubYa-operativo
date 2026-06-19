@@ -1,11 +1,14 @@
 import { HubNav } from "../HubNav";
 import { getHubOr404 } from "../utils";
+import { getClientesByHubId } from "@/lib/data/hubs";
 import { HubInformacionImportanteEditor } from "@/components/operativo/HubInformacionImportanteEditor";
 import { HubParametrosOperativosEditor } from "@/components/operativo/HubParametrosOperativosEditor";
+import { HubOperativoEditor } from "@/components/operativo/HubOperativoEditor";
 
 export default async function FichaHubPage({ params }: { params: Promise<{ hubId: string }> }) {
   const { hubId } = await params;
   const hub = await getHubOr404(hubId);
+  const clientesHub = await getClientesByHubId(hub.id);
   const activos = hub.servicios.map((servicio) => servicio.vinculoActivo).filter(Boolean);
   const postulantes = hub.servicios.flatMap((servicio) => servicio.postulantes);
   const paisajistas = activos.filter((vinculo) => /paisaj/i.test(`${vinculo?.oferta_nombre} ${vinculo?.responsable} ${vinculo?.observaciones}`));
@@ -33,6 +36,12 @@ export default async function FichaHubPage({ params }: { params: Promise<{ hubId
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Postulantes</dt><dd className="mt-1 font-black">{postulantes.length}</dd></div>
           </dl>
         </section>
+        <section className="rounded-[2rem] border border-[#d8dfd1] bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-black">Hub de demanda</h2>
+          <p className="mt-2 text-sm font-semibold text-[#66745c]">Clientes / vecinos / usuarios que reciben o pagan el servicio.</p>
+          <div className="mt-4 grid gap-2 md:grid-cols-2">{clientesHub.map((cliente) => <div key={cliente.id} className="rounded-2xl bg-[#f8faf5] p-3 text-sm"><p className="font-black">{cliente.nombre}</p><p className="font-semibold text-[#66745c]">{cliente.email || "Sin email cargado"} · {cliente.whatsapp || "Sin WhatsApp"}</p></div>)}</div>
+        </section>
+        <HubOperativoEditor hubSlug={hub.slug} integrantes={hub.hubOperativo || []} />
         <HubParametrosOperativosEditor hub={hub} />
         <HubInformacionImportanteEditor hubSlug={hub.slug} informacion={hub.informacionImportante} />
 
