@@ -774,6 +774,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const [incluirPostulantesFicha, setIncluirPostulantesFicha] = useState(true);
   const reporteVisualRef = useRef<HTMLElement>(null);
   const firmaSeleccionReporteRef = useRef("");
+  const seleccionReporteEditadaManualmenteRef = useRef(false);
   const hubsOperativos = useMemo(() => fusionarNombresHubs(hubsCanonicos), [hubsCanonicos]);
   const hubActual = useMemo(() => initialHub || hubsCanonicos.find((hub) => hub.nombre === jornada.hub), [hubsCanonicos, initialHub, jornada.hub]);
   const ramaReporte = `${hubActual?.rama || ""}`.toLowerCase();
@@ -942,19 +943,29 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const equipoActivo = equipos.find((equipo) => equipo.id === equipoActivoId) || equipos[0];
   const integrantesEquipoActivo = equipoActivo?.integrantes ?? [];
   const integrantesDestinoMensaje = integrantesEquipoActivo.filter((integrante) => integrantesMensajeSeleccionados.includes(integrante.id));
-  const datosHub = normalizarDatosHub(jornada.datosPorHub[jornada.hub], jornada.hub);
+  const datosHub = useMemo(() => normalizarDatosHub(jornada.datosPorHub[jornada.hub], jornada.hub), [jornada.datosPorHub, jornada.hub]);
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
+  const idsClientesValidosReporte = useMemo(() => datosHub.clientesIngresos
+    .filter((cliente) => emailValido(cliente.email))
+    .map((cliente) => cliente.id)
+    .sort((a, b) => a - b), [datosHub.clientesIngresos]);
+  const firmaSeleccionReporte = useMemo(() => `${jornada.hub}|${idsClientesValidosReporte.join(",")}`, [jornada.hub, idsClientesValidosReporte]);
   const clientesConEmailValidoReporte = datosHub.clientesIngresos.filter((cliente) => emailValido(cliente.email));
   const clientesSeleccionadosReporte = datosHub.clientesIngresos.filter((cliente) => clientesReporteSeleccionados.includes(cliente.id) && emailValido(cliente.email));
 
   useEffect(() => {
+    if (firmaSeleccionReporteRef.current === firmaSeleccionReporte) return;
+    firmaSeleccionReporteRef.current = firmaSeleccionReporte;
+    if (seleccionReporteEditadaManualmenteRef.current) return;
+
     setClientesReporteSeleccionados((actuales) => {
-      const idsValidos = datosHub.clientesIngresos.filter((cliente) => emailValido(cliente.email)).map((cliente) => cliente.id);
-      const firmaSeleccion = `${jornada.hub}|${idsValidos.join(",")}`;
-      if (firmaSeleccionReporteRef.current !== firmaSeleccion) firmaSeleccionReporteRef.current = firmaSeleccion;
-      return actuales.filter((id) => idsValidos.includes(id));
+      const actualesOrdenados = [...actuales].sort((a, b) => a - b);
+      const sonIguales = actualesOrdenados.length === idsClientesValidosReporte.length
+        && actualesOrdenados.every((id, index) => id === idsClientesValidosReporte[index]);
+
+      return sonIguales ? actuales : idsClientesValidosReporte;
     });
-  }, [datosHub.clientesIngresos, jornada.hub]);
+  }, [firmaSeleccionReporte, idsClientesValidosReporte]);
   const fechaFormateada = formatoFecha(jornada.fecha);
   const totalFacturadoHub = datosHub.clientesIngresos.reduce((total, cliente) => total + numero(cliente.importe), 0);
   const gastosRealesDelDia = useMemo(() => datosHub.gastos.filter(esGastoRealDelDia), [datosHub.gastos]);
@@ -1004,14 +1015,17 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   }
 
   function actualizarSeleccionReporte(id: number, seleccionado: boolean) {
+    seleccionReporteEditadaManualmenteRef.current = true;
     setClientesReporteSeleccionados((actuales) => seleccionado ? Array.from(new Set([...actuales, id])) : actuales.filter((clienteId) => clienteId !== id));
   }
 
   function seleccionarTodosClientesConEmailValidoReporte() {
+    seleccionReporteEditadaManualmenteRef.current = true;
     setClientesReporteSeleccionados(clientesConEmailValidoReporte.map((cliente) => cliente.id));
   }
 
   function desmarcarTodosClientesReporte() {
+    seleccionReporteEditadaManualmenteRef.current = true;
     setClientesReporteSeleccionados([]);
   }
 
