@@ -232,6 +232,15 @@ function formatoPlano(valor: CampoNumerico | undefined) {
   return valor === "" || valor === undefined ? "" : formatoMoneda(valor);
 }
 
+const MENSAJE_SIN_GASTOS_REALES = "No se registraron gastos adicionales en este reporte.";
+const conceptosReferenciaHub = ["referencia", "parametro", "parámetro", "jornal", "comision", "comisión", "valor hora", "hora cortadora", "hora bordeadora", "maquina de empuje", "máquina de empuje"];
+
+function esGastoRealDelDia(gasto: FilaGasto) {
+  const concepto = normalizarTextoBusqueda(gasto.concepto || "");
+  if (!concepto || numero(gasto.importe) <= 0) return false;
+  return !conceptosReferenciaHub.some((referencia) => concepto.includes(normalizarTextoBusqueda(referencia)));
+}
+
 function escaparHtml(valor: string) {
   return valor
     .replaceAll("&", "&amp;")
@@ -948,7 +957,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   }, [datosHub.clientesIngresos, jornada.hub]);
   const fechaFormateada = formatoFecha(jornada.fecha);
   const totalFacturadoHub = datosHub.clientesIngresos.reduce((total, cliente) => total + numero(cliente.importe), 0);
-  const totalGastos = datosHub.gastos.reduce((total, gasto) => total + numero(gasto.importe), 0);
+  const gastosRealesDelDia = useMemo(() => datosHub.gastos.filter(esGastoRealDelDia), [datosHub.gastos]);
+  const totalGastos = gastosRealesDelDia.reduce((total, gasto) => total + numero(gasto.importe), 0);
   const totalADistribuir = totalFacturadoHub - totalGastos;
   const actoresActivos = datosHub.actores.filter((actor) => actor.activo);
   const cantidadActoresActivos = actoresActivos.length;
@@ -1116,7 +1126,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
     "",
     "GASTOS",
-    ...datosHub.gastos.map((gasto) => `${gasto.concepto || "Sin concepto"}: ${formatoPlano(gasto.importe) || formatoMoneda(0)}`),
+    ...(gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto) => `${gasto.concepto || "Sin concepto"}: ${formatoPlano(gasto.importe) || formatoMoneda(0)}`) : [MENSAJE_SIN_GASTOS_REALES]),
     `Total gastos: ${formatoMoneda(totalGastos)}`,
     `Total a distribuir: ${formatoMoneda(totalADistribuir)}`,
     "",
@@ -1135,7 +1145,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     "",
     "SOBRE HUBYA",
     ...sobreHubYaLineas,
-  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, datosHub.gastos, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, hubActual?.rama, informacionReporte, tituloReporteHub]);
+  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, gastosRealesDelDia, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, hubActual?.rama, informacionReporte, tituloReporteHub]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return [
@@ -1151,7 +1161,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
       "",
       "GASTOS",
-      ...datosHub.gastos.map((gasto) => `${gasto.concepto || "Sin concepto"}: ${formatoPlano(gasto.importe) || formatoMoneda(0)}`),
+      ...(gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto) => `${gasto.concepto || "Sin concepto"}: ${formatoPlano(gasto.importe) || formatoMoneda(0)}`) : [MENSAJE_SIN_GASTOS_REALES]),
       `Total gastos: ${formatoMoneda(totalGastos)}`,
       `Total a distribuir: ${formatoMoneda(totalADistribuir)}`,
       "",
@@ -1194,8 +1204,9 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   const filasClientesHtml = clientesDelHub.map((cliente, index) => `
                     <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(cliente.origen || "Sin origen")}</td><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(nombrePrivado(cliente, index) || "Sin cliente")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(cliente.importe))}</td></tr>`).join("");
-  const filasGastosHtml = datosHub.gastos.map((gasto) => `
-                    <tr><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(gasto.concepto || "Sin concepto")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(gasto.importe))}</td></tr>`).join("");
+  const filasGastosHtml = gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto) => `
+                    <tr><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(gasto.concepto || "Sin concepto")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(gasto.importe))}</td></tr>`).join("") : `
+                    <tr><td colspan="3" style="border:1px solid #d8dfd1;padding:8px;color:#66745c;font-weight:700;">${escaparHtml(MENSAJE_SIN_GASTOS_REALES)}</td></tr>`;
   const filasActoresHtml = distribucionCalculada.map((actor) => `
                     <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(actor.nombre || "Sin actor")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:center;">${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoMoneda(actor.importeFinal))}</td></tr>`).join("");
   const sobreHubYaHtml = sobreHubYaLineas.map((linea) => `<p style="margin:8px 0 0;">${escaparHtml(linea)}</p>`).join("");
@@ -2063,7 +2074,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             </section>
 
             {parametrosJardinerosYaReporte && <section className="rounded-xl border border-[#bfd3b8] bg-[#fbfdf8] p-3 shadow-sm">
-              <h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Parámetros operativos precargados desde la ficha del Hub</h3>
+              <h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Parámetros de referencia del Hub</h3>
+              <p className="mb-2 text-xs font-bold text-[#4f5f47]">Estos valores no son gastos del día. Son referencias que utiliza el sistema para organizar el funcionamiento del Hub.</p>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                 {[["Valor hora de trabajo", formatoMoneda(parametrosJardinerosYaReporte.valorHoraTrabajo)], ["Comisión cuadrilla", `${parametrosJardinerosYaReporte.comisionResponsableCuadrillaPorcentaje}%`], ["Traslado", formatoMoneda(parametrosJardinerosYaReporte.traslado)], ["Aceite", formatoMoneda(parametrosJardinerosYaReporte.aceite)], ["Nafta", formatoMoneda(parametrosJardinerosYaReporte.nafta)], ["Cortadora", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraCortadoraCesped)}/h`], ["Bordeadora", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraBordeadora)}/h`], ["Máquina de empuje", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraMaquinaEmpuje)}/h`]].map(([etiqueta, valor]) => <div key={etiqueta} className="rounded-lg border border-[#cfd8c6] bg-white p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">{etiqueta}</p><p className="text-sm font-black">{valor}</p></div>)}
               </div>
@@ -2120,7 +2132,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                     <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total facturado al Hub</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalFacturadoHub)}</td></tr>
                     <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Gastos</th></tr>
                     <tr className="bg-[#f8faf5] text-[10px] uppercase text-[#66745c]"><th colSpan={2} className="border border-[#d8dfd1] p-1.5 text-left">Concepto</th><th className="border border-[#d8dfd1] p-1.5 text-right">Importe</th></tr>
-                    {datosHub.gastos.map((gasto, index) => <tr key={`gasto-${gasto.id}-${index}`}><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{gasto.concepto || "Sin concepto"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(gasto.importe)}</td></tr>)}
+                    {gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto, index) => <tr key={`gasto-real-${gasto.id}-${index}`}><td colSpan={2} className="border border-[#d8dfd1] p-1.5">{gasto.concepto || "Sin concepto"}</td><td className="border border-[#d8dfd1] p-1.5 text-right">{formatoPlano(gasto.importe)}</td></tr>) : <tr><td colSpan={3} className="border border-[#d8dfd1] p-2 font-bold text-[#66745c]">{MENSAJE_SIN_GASTOS_REALES}</td></tr>}
                     <tr className="font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total gastos</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalGastos)}</td></tr>
                     <tr className="bg-[#fbfcf9] font-black"><td colSpan={2} className="border border-[#9aa78f] p-1.5">Total a distribuir</td><td className="border border-[#9aa78f] p-1.5 text-right">{formatoPlano(totalADistribuir)}</td></tr>
                     <tr className="bg-[#eef2e8]"><th colSpan={3} className="border border-[#9aa78f] p-2 text-left text-[11px] uppercase tracking-wide">Distribución automática por actor</th></tr>
