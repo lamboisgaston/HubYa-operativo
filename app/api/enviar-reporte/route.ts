@@ -26,7 +26,8 @@ function campoTexto(valor: unknown) {
 
 
 const respuestasParametro: Array<{ key: ParameterResponseChoice; label: string }> = [
-  { key: "confirmar", label: "Confirmar valor" },
+  { key: "confirmar_valor", label: "Confirmar valor" },
+  { key: "sugerir_otro_valor", label: "Sugerir otro valor" },
   { key: "sugerir_subir", label: "Sugerir subir" },
   { key: "sugerir_bajar", label: "Sugerir bajar" },
   { key: "necesito_aclaracion", label: "Necesito aclaración" },
@@ -57,20 +58,20 @@ async function armarConsultaParametros(payload: EnviarReportePayload) {
   const hub = store.hubs.find((item) => item.id === campoTexto(payload.hubId) || item.nombre === campoTexto(payload.hub));
   const parametros = parametrosPrincipalesJardinerosYa(hub);
   if (!hub || hub.moduloOperativo !== "jardinerosya") return { html: "", text: "" };
-  if (parametros.length === 0) return { html: `<section style="margin-top:16px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:16px;"><h2 style="margin:0 0 8px;font-size:16px;">Parámetros operativos del Hub</h2><p style="margin:0;">Este Hub todavía no tiene parámetros operativos configurados.</p></section>`, text: "\n\nPARÁMETROS OPERATIVOS DEL HUB\nEste Hub todavía no tiene parámetros operativos configurados." };
+  if (parametros.length === 0) return { html: `<section style="margin-top:16px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:16px;"><h2 style="margin:0 0 8px;font-size:16px;">Parámetros de referencia del Hub</h2><p style="margin:0;">Este Hub todavía no tiene parámetros operativos configurados.</p></section>`, text: "\n\nPARÁMETROS DE REFERENCIA DEL HUB\nEste Hub todavía no tiene parámetros operativos configurados." };
   const reportId = campoTexto(payload.reportId) || `reporte-${Date.now()}`;
   const contactId = campoTexto(payload.contactId) || campoTexto(payload.emailDestino);
   const base = baseUrl(payload.baseUrl);
   const cards = parametros.map((parametro) => {
     const links = respuestasParametro.map((opcion) => {
-      const tokenPayload: ParameterConsultationTokenPayload = { hubId: hub.id, reportId, contactId, parameterKey: parametro.key, parameterLabel: parametro.label, currentValue: parametro.value, currentValueType: parametro.type, response: opcion.key, createdFor: new Date().toISOString() };
+      const tokenPayload: ParameterConsultationTokenPayload = { hubId: hub.id, reportId, contactId, parameterKey: parametro.key, parameterLabel: parametro.label, currentValue: parametro.value, currentValueType: parametro.type, responseType: opcion.key, createdFor: new Date().toISOString() };
       const href = `${base}/parametros/${encodeURIComponent(crearTokenRespuestaParametro(tokenPayload))}`;
       return `<a href="${href}" style="display:inline-block;margin:4px 4px 0 0;background:#1f2a1d;color:#fff;padding:9px 11px;border-radius:10px;text-decoration:none;font-size:12px;font-weight:800;">${escaparHtml(opcion.label)}</a>`;
     }).join("");
-    return `<div style="margin-top:10px;border:1px solid #d8dfd1;background:#fff;padding:12px;border-radius:14px;"><h3 style="margin:0 0 6px;font-size:15px;">${escaparHtml(parametro.label)}</h3><p style="margin:0 0 8px;color:#66745c;">Valor actual: <strong style="color:#1f2a1d;">${escaparHtml(parametro.formatted)}</strong></p><p style="margin:0 0 4px;font-weight:700;">¿Qué opinás de este valor?</p>${links}</div>`;
+    return `<div style="margin-top:10px;border:1px solid #d8dfd1;background:#fff;padding:12px;border-radius:14px;"><h3 style="margin:0 0 6px;font-size:15px;">${escaparHtml(parametro.label)}</h3><p style="margin:0 0 8px;color:#66745c;">Valor actual de referencia: <strong style="color:#1f2a1d;">${escaparHtml(parametro.formatted)}</strong></p><p style="margin:0 0 4px;font-weight:700;">¿Qué opinás de este valor?</p>${links}</div>`;
   }).join("");
-  const html = `<section style="margin-top:16px;border:1px solid #9aa78f;background:#fbfdf8;padding:14px;border-radius:16px;"><h2 style="margin:0 0 8px;font-size:16px;">Parámetros operativos del Hub</h2><p style="margin:0;color:#4f5f47;line-height:1.5;">Queremos mantener actualizados los valores de trabajo del Hub. Revisá los parámetros y respondé si estás de acuerdo o si considerás que alguno debería actualizarse.</p>${cards}</section>`;
-  const text = `\n\nPARÁMETROS OPERATIVOS DEL HUB\nQueremos mantener actualizados los valores de trabajo del Hub. Revisá los parámetros y respondé desde los botones del mail.\n${parametros.map((p) => `${p.label}: ${p.formatted}`).join("\n")}`;
+  const html = `<section style="margin-top:16px;border:1px solid #9aa78f;background:#fbfdf8;padding:14px;border-radius:16px;"><h2 style="margin:0 0 8px;font-size:16px;">Parámetros de referencia del Hub</h2><p style="margin:0;color:#4f5f47;line-height:1.5;">Además del reporte del día, compartimos los valores de referencia que usa el Hub para organizar el servicio. Estos valores no son gastos del día. Si considerás que alguno debería ajustarse, podés ayudarnos dejando tu sugerencia. El valor no cambia automáticamente: primero será revisado por el equipo operativo.</p>${cards}</section>`;
+  const text = `\n\nPARÁMETROS DE REFERENCIA DEL HUB\nEstos valores no son gastos del día: son referencias que usa el sistema para organizar el Hub. Respondé desde los botones del mail; el equipo operativo revisará las sugerencias antes de cambiar cualquier parámetro.\n${parametros.map((p) => `${p.label}: ${p.formatted}`).join("\n")}`;
   return { html, text };
 }
 
