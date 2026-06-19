@@ -1,6 +1,8 @@
-import { getClientesByHubId } from "@/lib/data/hubs";
+import { getClientesByHubId, type TarifaClienteHub } from "@/lib/data/hubs";
 import { HubNav } from "../HubNav";
 import { getHubOr404 } from "../utils";
+
+const tarifasCliente: Record<TarifaClienteHub, string> = { tarifa_1: "Tarifa 1", tarifa_2: "Tarifa 2", tarifa_3: "Tarifa 3", sin_tarifa: "Sin tarifa asignada" };
 
 export default async function ContactosHubPage({ params }: { params: Promise<{ hubId: string }> }) {
   const { hubId } = await params;
@@ -27,8 +29,8 @@ export default async function ContactosHubPage({ params }: { params: Promise<{ h
           </label>
           <div className="mt-5 overflow-x-auto rounded-2xl border border-[#d8dfd1]">
             <table className="w-full border-collapse text-sm">
-              <thead className="bg-[#f1f4ec] text-left text-xs uppercase text-[#66745c]"><tr><th className="border p-3">Nombre</th><th className="border p-3">Email</th><th className="border p-3">WhatsApp</th><th className="border p-3">Tipo</th><th className="border p-3">Hub asignado</th><th className="border p-3">Editar</th><th className="border p-3">Eliminar</th></tr></thead>
-              <tbody>{clientes.length === 0 ? <tr><td colSpan={7} className="border p-6 text-center font-bold text-[#66745c]">Sin contactos cargados para este Hub.</td></tr> : clientes.map((cliente) => <tr key={cliente.id}><td className="border p-3 font-black">{cliente.nombre}</td><td className="border p-3">{cliente.email || "—"}</td><td className="border p-3">{cliente.whatsapp || "—"}</td><td className="border p-3">Vecino</td><td className="border p-3">{hub.nombre}</td><td className="border p-3"><button className="font-black text-[#1f2a1d]">Editar</button></td><td className="border p-3"><button className="font-black text-[#743c3c]">Eliminar</button></td></tr>)}</tbody>
+              <thead className="bg-[#f1f4ec] text-left text-xs uppercase text-[#66745c]"><tr><th className="border p-3">Nombre</th><th className="border p-3">Email</th><th className="border p-3">WhatsApp</th><th className="border p-3">Tipo</th><th className="border p-3">Tarifa del cliente</th><th className="border p-3">Hub asignado</th><th className="border p-3">Editar</th><th className="border p-3">Eliminar</th></tr></thead>
+              <tbody>{clientes.length === 0 ? <tr><td colSpan={8} className="border p-6 text-center font-bold text-[#66745c]">Sin contactos cargados para este Hub.</td></tr> : clientes.map((cliente) => <tr key={cliente.id}><td className="border p-3 font-black">{cliente.nombre}</td><td className="border p-3">{cliente.email || "—"}</td><td className="border p-3">{cliente.whatsapp || "—"}</td><td className="border p-3">Vecino</td><td className="border p-3 font-black">{tarifasCliente[cliente.tarifaCliente] || "Sin tarifa asignada"}</td><td className="border p-3">{hub.nombre}</td><td className="border p-3"><button className="font-black text-[#1f2a1d]">Editar</button></td><td className="border p-3"><button className="font-black text-[#743c3c]">Eliminar</button></td></tr>)}</tbody>
             </table>
           </div>
         </section>

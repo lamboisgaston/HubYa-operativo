@@ -127,7 +127,7 @@ export async function responderSolicitudHub(id: string, decision: DecisionSolici
       const clienteYaCreado = Boolean(solicitud.clienteId) || store.clientes.some((cliente) => cliente.hubId === solicitud.hubSolicitadoId && (cliente.email && cliente.email === solicitud.email || cliente.whatsapp && cliente.whatsapp === solicitud.whatsapp));
       let clienteId = solicitud.clienteId;
       if (decision === "aprobada" && !clienteYaCreado) {
-        const nuevo: Cliente = { id: `cliente-${Date.now()}`, hubId: solicitud.hubSolicitadoId, estado: "activo", createdAt: timestamp, updatedAt: timestamp, nombre: nombreCompleto(solicitud), email: solicitud.email, whatsapp: solicitud.whatsapp, referencia: solicitud.direccion || solicitud.barrio || "Solicitud web", tipoDestino: "cliente" };
+        const nuevo: Cliente = { id: `cliente-${Date.now()}`, hubId: solicitud.hubSolicitadoId, estado: "activo", createdAt: timestamp, updatedAt: timestamp, nombre: nombreCompleto(solicitud), email: solicitud.email, whatsapp: solicitud.whatsapp, referencia: solicitud.direccion || solicitud.barrio || "Solicitud web", tarifaCliente: "sin_tarifa", tipoDestino: "cliente" };
         store.clientes = [nuevo, ...store.clientes];
         clienteId = nuevo.id;
         clienteCreado = true;
