@@ -10,6 +10,7 @@ type CampoNumerico = number | "";
 
 type FilaClienteIngreso = {
   id: number;
+  contactoId?: string;
   origen: string;
   nombre: string;
   referencia?: string;
@@ -291,6 +292,7 @@ function clienteIngresoInicial(nombre: string, index = 0, baseId = 1000): FilaCl
 function clientePublicoAIngreso(cliente: Cliente, index = 0): FilaClienteIngreso {
   return {
     id: idNumericoEstable(cliente.id || `${cliente.nombre}-${index}`),
+    contactoId: cliente.id,
     origen: "HubYa",
     nombre: cliente.nombre || `Cliente ${index + 1}`,
     referencia: cliente.referencia || "Cliente real del Hub",
@@ -368,6 +370,7 @@ function leerBorradorInformacion() {
 function normalizarCliente(cliente: Partial<FilaClienteIngreso>): FilaClienteIngreso {
   return {
     id: cliente.id || crearId(),
+    contactoId: cliente.contactoId,
     origen: "JardinerosYa",
     nombre: cliente.nombre || "",
     referencia: cliente.referencia || "",
@@ -1058,7 +1061,15 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   }
 
   function actualizarCliente(id: number, cambios: Partial<FilaClienteIngreso>) {
+    const clienteActual = datosHub.clientesIngresos.find((cliente) => cliente.id === id);
     actualizarDatosHub({ clientesIngresos: datosHub.clientesIngresos.map((cliente) => cliente.id === id ? { ...cliente, ...cambios } : cliente) });
+    if (clienteActual?.contactoId && cambios.tarifaCliente) {
+      void fetch(`/api/contactos/${encodeURIComponent(clienteActual.contactoId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tarifaCliente: cambios.tarifaCliente }),
+      });
+    }
   }
 
   function actualizarSeleccionReporte(id: number, seleccionado: boolean) {
@@ -1394,7 +1405,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             reporteTexto: reporteTextoParaCliente(cliente),
             hubId: initialHub?.id,
             reportId: `reporte-${jornada.hub}-${jornada.fecha}`,
-            contactId: String(cliente.id),
+            contactId: cliente.contactoId || String(cliente.id),
             incluirConsultaParametros: tipo === "definitivo" && incluirConsultaParametros,
             baseUrl: window.location.origin,
           }),
