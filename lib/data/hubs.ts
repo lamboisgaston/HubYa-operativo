@@ -21,7 +21,7 @@ export type HubOperativo = HubPublico & { cantidadClientes: number; cantidadRepo
 export type HubDetalleOperativo = HubOperativo & { ficha: HubPublico; clientes: Cliente[]; reportesBorrador: ReporteHub[]; reportesGuardados: ReporteHub[]; reportesEnviados: ReporteHub[]; vinculos: HubServicioVinculo[]; postulantes: HubServicioVinculo[] };
 export type NuevoHubDemandaInput = { nombre: string; zona: string; descripcionPublica?: string; rama?: string; equipoOperativo?: string };
 
-type Store = { hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[]; reportes?: ReporteHub[]; mensajes_operativos?: unknown[]; respuestas_operativas?: unknown[] };
+type Store = { hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[]; reportes?: ReporteHub[]; mensajes_operativos?: unknown[]; respuestas_operativas?: unknown[]; parameterResponses?: unknown[] };
 const DATA_FILE = path.join(process.cwd(), "data", "hubya-public.json");
 const now = new Date().toISOString();
 const seedHubs: Hub[] = ["Tipal", "Punto", "Praderas", "Valle Escondido", "Chacras de Santa María", "La Aguada", "Prado", "La Reserva"].map((zona, index) => ({ id: `hub-${index + 1}`, nombre: `Hub ${zona}`, slug: zona.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), zona, estado: "activo", descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente, equipo disponible y trabajos programados sin exponer datos privados de clientes.`, rama: "JardinerosYa", equipoOperativo: "JardinerosYa01", moduloOperativo: "jardinerosya", parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, activo: true, trabajosRealizados: 0, ultimaActividad: now, createdAt: now, updatedAt: now }));
@@ -113,7 +113,7 @@ function normalizeStore(store: Partial<Store>): Store {
   const clientes = (store.clientes || seedClientes).map((cliente) => ({ ...cliente, tipoDestino: cliente.tipoDestino || "cliente", hubId: idCanonico.get(cliente.hubId) || hubPorClave.get(normalizarClaveHub(cliente.hubId || "")) || cliente.hubId || "" }));
   const reportes = (store.reportes || []).map((reporte) => ({ ...reporte, hubId: (reporte.hubId && (idCanonico.get(reporte.hubId) || hubPorClave.get(normalizarClaveHub(reporte.hubId)))) || (reporte.hub && hubPorClave.get(normalizarClaveHub(reporte.hub))) || reporte.hubId }));
 
-  return { hubs, clientes, solicitudes: store.solicitudes || [], hub_servicios, hub_servicio_vinculos, reportes, mensajes_operativos: store.mensajes_operativos || [], respuestas_operativas: store.respuestas_operativas || [] };
+  return { hubs, clientes, solicitudes: store.solicitudes || [], hub_servicios, hub_servicio_vinculos, reportes, mensajes_operativos: store.mensajes_operativos || [], respuestas_operativas: store.respuestas_operativas || [], parameterResponses: store.parameterResponses || [] };
 }
 export async function readStore(): Promise<Store> { try { return normalizeStore(JSON.parse(await readFile(DATA_FILE, "utf8"))); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; const store = normalizeStore({}); await saveStore(store); return store; } }
 export async function saveStore(store: Store) { await mkdir(path.dirname(DATA_FILE), { recursive: true }); await writeFile(DATA_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf8"); }
