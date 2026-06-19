@@ -1,0 +1,9 @@
+import Link from "next/link";
+import { registrarRespuestaParametroPorToken } from "@/lib/data/parameterResponses";
+
+export default async function ResponderParametroPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams?: Promise<{ comment?: string }> }) {
+  const { token } = await params;
+  const query = await searchParams;
+  const resultado = await registrarRespuestaParametroPorToken(token, query?.comment);
+  return <main className="flex min-h-screen items-center justify-center bg-[#f6f8f3] p-6 text-[#1f2a1d]"><section className="max-w-xl rounded-[2rem] border border-[#d8dfd1] bg-white p-8 text-center shadow-sm"><p className="text-xs font-black uppercase tracking-[0.2em] text-[#66745c]">Parámetros operativos del Hub</p><h1 className="mt-3 text-3xl font-black">{resultado.ok ? "Gracias, tu respuesta fue registrada." : "No pudimos registrar esta respuesta."}</h1>{resultado.hubNombre && <p className="mt-3 text-sm font-bold text-[#66745c]">Respuesta registrada para {resultado.hubNombre}.</p>}<p className="mt-5 text-sm font-semibold text-[#66745c]">{resultado.message}</p><details className="mt-6 rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] p-4 text-left"><summary className="cursor-pointer text-sm font-black">¿Querés agregar un comentario?</summary><form className="mt-3 grid gap-3" action={`/parametros/${encodeURIComponent(token)}`}><textarea name="comment" placeholder="Escribí una observación opcional." className="min-h-24 rounded-xl border border-[#cfd8c6] p-3 text-sm font-semibold" /><button className="rounded-2xl bg-[#1f2a1d] px-5 py-3 text-sm font-black text-white">Guardar comentario</button></form></details><Link href="/" className="mt-6 inline-flex rounded-2xl border border-[#cfd8c6] px-5 py-3 text-sm font-black">Volver</Link></section></main>;
+}
