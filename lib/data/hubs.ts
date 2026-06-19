@@ -10,7 +10,9 @@ export type HubInformacionImportante = { titulo: string; texto: string; mostrarE
 export type ModuloOperativoHub = "jardinerosya" | "fumigadoresya" | "comerciarya" | "pileterosya" | "otro";
 export type ParametrosJardinerosYaHub = { valorHoraTrabajo: number; comisionResponsableCuadrillaPorcentaje: number; traslado: number; aceite: number; nafta: number; valorHoraCortadoraCesped: number; valorHoraBordeadora: number; valorHoraMaquinaEmpuje: number; mostrarEnWebPublica: boolean };
 export type ParametrosOperativosHub = { jardinerosYa?: ParametrosJardinerosYaHub };
-export type Hub = { id: string; nombre: string; slug: string; zona: string; estado: HubEstado; descripcionPublica: string; rama: string; equipoOperativo: string; moduloOperativo?: ModuloOperativoHub; parametrosOperativos?: ParametrosOperativosHub; activo: boolean; informacionImportante?: HubInformacionImportante; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
+export type RolHubOperativo = "Capataz" | "Responsable de cuadrilla" | "Jardinero" | "Ayudante" | "Técnico" | "Paisajista" | "Coordinador" | "Otro";
+export type IntegranteHubOperativo = { id: string; nombre: string; email: string; whatsapp: string; rol: RolHubOperativo; tipoParticipacion: string; activo: boolean; recibeReportes: boolean; participaDistribucion: boolean; porcentajeOCriterio: string; notaInterna: string; createdAt: string; updatedAt: string };
+export type Hub = { id: string; nombre: string; slug: string; zona: string; estado: HubEstado; descripcionPublica: string; rama: string; equipoOperativo: string; moduloOperativo?: ModuloOperativoHub; parametrosOperativos?: ParametrosOperativosHub; hubOperativo?: IntegranteHubOperativo[]; activo: boolean; informacionImportante?: HubInformacionImportante; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
 export type HubServicio = { id: string; hub_id: string; nombre_servicio: string; descripcion: string; activo: boolean };
 export type HubServicioVinculo = { id: string; hub_servicio_id: string; oferta_nombre: string; estado: EstadoHubServicioVinculo; responsable: string; observaciones: string; created_at: string; updated_at: string };
 export type HubServicioPublico = HubServicio & { vinculoActivo: HubServicioVinculo | null; postulantes: HubServicioVinculo[] };
@@ -24,7 +26,7 @@ export type NuevoHubDemandaInput = { nombre: string; zona: string; descripcionPu
 type Store = { hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[]; reportes?: ReporteHub[]; mensajes_operativos?: unknown[]; respuestas_operativas?: unknown[]; parameterResponses?: unknown[] };
 const DATA_FILE = path.join(process.cwd(), "data", "hubya-public.json");
 const now = new Date().toISOString();
-const seedHubs: Hub[] = ["Tipal", "Punto", "Praderas", "Valle Escondido", "Chacras de Santa María", "La Aguada", "Prado", "La Reserva"].map((zona, index) => ({ id: `hub-${index + 1}`, nombre: `Hub ${zona}`, slug: zona.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), zona, estado: "activo", descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente, equipo disponible y trabajos programados sin exponer datos privados de clientes.`, rama: "JardinerosYa", equipoOperativo: "JardinerosYa01", moduloOperativo: "jardinerosya", parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, activo: true, trabajosRealizados: 0, ultimaActividad: now, createdAt: now, updatedAt: now }));
+const seedHubs: Hub[] = ["Tipal", "Punto", "Praderas", "Valle Escondido", "Chacras de Santa María", "La Aguada", "Prado", "La Reserva"].map((zona, index) => ({ id: `hub-${index + 1}`, nombre: `Hub ${zona}`, slug: zona.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), zona, estado: "activo", descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente, equipo disponible y trabajos programados sin exponer datos privados de clientes.`, rama: "JardinerosYa", equipoOperativo: "JardinerosYa01", moduloOperativo: "jardinerosya", parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, hubOperativo: [], activo: true, trabajosRealizados: 0, ultimaActividad: now, createdAt: now, updatedAt: now }));
 const seedClientes: Cliente[] = Array.from({ length: 9 }, (_, index) => ({ id: `cliente-tipal-${index + 1}`, nombre: `Cliente ${index + 1}`, email: "", whatsapp: "", referencia: "Alta inicial", hubId: "hub-1", tipoDestino: "cliente", estado: "activo", createdAt: now, updatedAt: now }));
 const servicioBasePorHub = [
   { nombre: "Mantenimiento de espacios verdes", descripcion: "Demanda recurrente de corte, limpieza y mantenimiento de jardines." },
@@ -85,7 +87,7 @@ function deduplicarHubs(hubsEntrada: Hub[]) {
       continue;
     }
     const slug = slugHub(hub.nombre.replace(/^Hub\s+/i, "") || hub.zona || hub.slug);
-    const canonico = { ...hub, nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim(), informacionImportante: normalizarInformacionImportante(hub.informacionImportante), moduloOperativo: normalizarModuloOperativo(hub.moduloOperativo || hub.rama), parametrosOperativos: { ...hub.parametrosOperativos, jardinerosYa: normalizarParametrosJardinerosYa(hub.parametrosOperativos?.jardinerosYa) } };
+    const canonico = { ...hub, nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim(), informacionImportante: normalizarInformacionImportante(hub.informacionImportante), moduloOperativo: normalizarModuloOperativo(hub.moduloOperativo || hub.rama), parametrosOperativos: { ...hub.parametrosOperativos, jardinerosYa: normalizarParametrosJardinerosYa(hub.parametrosOperativos?.jardinerosYa) }, hubOperativo: normalizarHubOperativo(hub.hubOperativo) };
     idCanonico.set(clave, canonico.id);
     idCanonico.set(canonico.id, canonico.id);
     idCanonico.set(canonico.slug, canonico.id);
@@ -102,6 +104,33 @@ function normalizarModuloOperativo(valor: unknown): ModuloOperativoHub { const n
 
 function normalizarInformacionImportante(info: Partial<HubInformacionImportante> | undefined): HubInformacionImportante {
   return { titulo: String(info?.titulo || "").trim(), texto: String(info?.texto || "").trim(), mostrarEnWebPublica: Boolean(info?.mostrarEnWebPublica), mostrarEnReporte: Boolean(info?.mostrarEnReporte) };
+}
+
+function normalizarRolHubOperativo(valor: unknown): RolHubOperativo {
+  const rol = String(valor || "Otro").trim();
+  return (["Capataz", "Responsable de cuadrilla", "Jardinero", "Ayudante", "Técnico", "Paisajista", "Coordinador", "Otro"] as RolHubOperativo[]).includes(rol as RolHubOperativo) ? rol as RolHubOperativo : "Otro";
+}
+
+function normalizarHubOperativo(integrantes: Partial<IntegranteHubOperativo>[] | undefined): IntegranteHubOperativo[] {
+  const timestamp = new Date().toISOString();
+  return (integrantes || []).map((integrante, index) => {
+    const id = String(integrante.id || `hub-operativo-${Date.now()}-${index}`);
+    return {
+      id,
+      nombre: String(integrante.nombre || "").trim(),
+      email: String(integrante.email || "").trim(),
+      whatsapp: String(integrante.whatsapp || "").trim(),
+      rol: normalizarRolHubOperativo(integrante.rol),
+      tipoParticipacion: String(integrante.tipoParticipacion || "").trim(),
+      activo: integrante.activo !== false,
+      recibeReportes: Boolean(integrante.recibeReportes),
+      participaDistribucion: integrante.participaDistribucion !== false,
+      porcentajeOCriterio: String(integrante.porcentajeOCriterio || "").trim(),
+      notaInterna: String(integrante.notaInterna || "").trim(),
+      createdAt: String(integrante.createdAt || timestamp),
+      updatedAt: String(integrante.updatedAt || timestamp),
+    };
+  });
 }
 
 function normalizeStore(store: Partial<Store>): Store {
@@ -122,7 +151,7 @@ export async function getHubs(): Promise<HubPublico[]> { const store = await rea
 export async function getHubBySlug(slug: string): Promise<HubPublico | null> { return (await getHubs()).find((hub) => hub.slug === slug) || null; }
 export async function getClientesByHubId(hubId: string): Promise<Cliente[]> { const store = await readStore(); return store.clientes.filter((cliente) => cliente.hubId === hubId && cliente.estado === "activo"); }
 export function slugHub(valor: string) { return valor.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `hub-${Date.now()}`; }
-export async function createHubDemanda(input: NuevoHubDemandaInput) { const store = await readStore(); const timestamp = new Date().toISOString(); const nombre = nombreHubCanonico(input.nombre.trim() || input.zona.trim() || "nuevo"); const zona = input.zona.trim() || nombre.replace(/^Hub\s+/i, ""); const claveNueva = normalizarClaveHub(nombre); const existente = store.hubs.find((hub) => normalizarClaveHub(hub.nombre) === claveNueva || normalizarClaveHub(hub.zona) === claveNueva); if (existente) return { ...existente, clientesActivos: store.clientes.filter((cliente) => cliente.hubId === existente.id && cliente.estado === "activo").length, servicios: serviciosPublicos(store, existente.id) }; const baseSlug = slugHub(nombre.replace(/^Hub\s+/i, "")); let slug = baseSlug; let suffix = 2; while (store.hubs.some((hub) => hub.slug === slug)) { slug = `${baseSlug}-${suffix}`; suffix += 1; } const nuevo: Hub = { id: `hub-${Date.now()}`, nombre, slug, zona, estado: "activo", descripcionPublica: input.descripcionPublica?.trim() || `Hub de demanda de ${zona} para agrupar clientes y coordinar oferta operativa disponible.`, rama: input.rama?.trim() || "General", equipoOperativo: input.equipoOperativo?.trim() || "Equipo a asignar", moduloOperativo: "jardinerosya", parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, activo: true, trabajosRealizados: 0, ultimaActividad: timestamp, createdAt: timestamp, updatedAt: timestamp }; store.hubs = [nuevo, ...store.hubs]; await saveStore(store); return { ...nuevo, clientesActivos: 0, servicios: [] }; }
+export async function createHubDemanda(input: NuevoHubDemandaInput) { const store = await readStore(); const timestamp = new Date().toISOString(); const nombre = nombreHubCanonico(input.nombre.trim() || input.zona.trim() || "nuevo"); const zona = input.zona.trim() || nombre.replace(/^Hub\s+/i, ""); const claveNueva = normalizarClaveHub(nombre); const existente = store.hubs.find((hub) => normalizarClaveHub(hub.nombre) === claveNueva || normalizarClaveHub(hub.zona) === claveNueva); if (existente) return { ...existente, clientesActivos: store.clientes.filter((cliente) => cliente.hubId === existente.id && cliente.estado === "activo").length, servicios: serviciosPublicos(store, existente.id) }; const baseSlug = slugHub(nombre.replace(/^Hub\s+/i, "")); let slug = baseSlug; let suffix = 2; while (store.hubs.some((hub) => hub.slug === slug)) { slug = `${baseSlug}-${suffix}`; suffix += 1; } const nuevo: Hub = { id: `hub-${Date.now()}`, nombre, slug, zona, estado: "activo", descripcionPublica: input.descripcionPublica?.trim() || `Hub de demanda de ${zona} para agrupar clientes y coordinar oferta operativa disponible.`, rama: input.rama?.trim() || "General", equipoOperativo: input.equipoOperativo?.trim() || "Equipo a asignar", moduloOperativo: "jardinerosya", parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, hubOperativo: [], activo: true, trabajosRealizados: 0, ultimaActividad: timestamp, createdAt: timestamp, updatedAt: timestamp }; store.hubs = [nuevo, ...store.hubs]; await saveStore(store); return { ...nuevo, clientesActivos: 0, servicios: [] }; }
 export async function addClienteToHub(hubId: string, cliente: Omit<Cliente, "id" | "hubId" | "tipoDestino" | "estado" | "createdAt" | "updatedAt"> & { tipoDestino?: TipoDestinoContacto }) { return createContacto({ ...cliente, hubId }); }
 
 export async function getContactos(): Promise<Cliente[]> { const store = await readStore(); return store.clientes.filter((cliente) => cliente.estado === "activo"); }
@@ -220,6 +249,20 @@ export async function updateHubParametrosOperativos(hubIdOrSlug: string, input: 
       },
       updatedAt: timestamp,
     };
+    return actualizado;
+  });
+  if (!actualizado) return null;
+  await saveStore(store);
+  return actualizado;
+}
+
+export async function updateHubOperativo(hubIdOrSlug: string, integrantes: Partial<IntegranteHubOperativo>[]) {
+  const store = await readStore();
+  const timestamp = new Date().toISOString();
+  let actualizado: Hub | null = null;
+  store.hubs = store.hubs.map((hub) => {
+    if (hub.id !== hubIdOrSlug && hub.slug !== hubIdOrSlug) return hub;
+    actualizado = { ...hub, hubOperativo: normalizarHubOperativo(integrantes).map((integrante) => ({ ...integrante, updatedAt: timestamp })), updatedAt: timestamp };
     return actualizado;
   });
   if (!actualizado) return null;
