@@ -124,6 +124,8 @@ type DestinatarioSeleccionado = {
   incluido: boolean;
 };
 
+type DestinatarioReporte = FilaClienteIngreso & { grupo: "cliente" | "operativo"; rol?: string };
+
 function emailValido(valor: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor.trim());
 }
@@ -196,12 +198,15 @@ const HUBS_DISPONIBLES = [
 const trabajoRealizadoInicial = "Mantenimiento integral de espacios verdes, corte, bordes y limpieza general.";
 const trabajoPendienteInicial = "Validación final con cada cliente y próximos repasos programados.";
 const observacionGeneralInicial = "Resumen cargado manualmente. Sin cálculos automáticos obligatorios.";
+const contactoDudasReporte = "Por cualquier duda, comunicarse al 3874142770.";
 const sobreHubYaLineas = [
-  "HUBYA es una tecnología cooperativista de inteligencia salteña.",
-  "Agrupa demanda para coordinar mejor la oferta disponible y ejecutar procesos específicos según cada rama de servicio.",
-  "La lógica es simple: una demanda agrupada permite organizar mejor horarios, tareas, personal, traslados y recursos. Por eso un Hub es más eficiente que clientes aislados y dispersos.",
-  "En JardinerosYa hablamos de usuarios del sistema. En HUBYA hablamos de clientes, porque el Hub se construye desde la demanda.",
-  "Filosofía HUBYA: el agrupamiento de la demanda mejora el agrupamiento de la oferta, y el agrupamiento de la oferta mejora la capacidad de abastecer la demanda.",
+  "HUBYA TECH es inteligencia salteña al servicio de una cooperación colaborativa y meritocrática.",
+  "Parte de una convicción: cuando las necesidades dispersas se agrupan y las capacidades productivas se ordenan, aparece una fuerza nueva.",
+  "Esa fuerza no nace solo de estar juntos, sino de organizar mejor lo que cada persona puede aportar.",
+  "HUBYA busca transformar lo individual en cooperación, lo aislado en comunidad operativa y el mérito del trabajo bien hecho en estabilidad para todos los integrantes del Hub.",
+  "“El todo es más que la suma de sus partes.”",
+  "Aristóteles",
+  "www.hubya.tech",
 ];
 const clientesBasePorHub: Record<HubDisponible, string[]> = {
   "Hub Tipal": [],
@@ -996,7 +1001,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const clientesSeleccionadosReporte = datosHub.clientesIngresos.filter((cliente) => clientesReporteSeleccionados.includes(cliente.id) && emailValido(cliente.email));
   const actoresConEmailValidoReporte = datosHub.actores.filter((actor) => emailValido(actor.email || ""));
   const actoresSeleccionadosReporte = datosHub.actores.filter((actor) => actoresReporteSeleccionados.includes(actor.id) && emailValido(actor.email || ""));
-  const destinatariosSeleccionadosReporte = [...clientesSeleccionadosReporte, ...actoresSeleccionadosReporte.map((actor) => ({ id: actor.id, origen: "Hub Operativo", nombre: actor.nombre, email: actor.email || "", telefono: actor.whatsapp || "", importe: "" as CampoNumerico, trabajoRealizado: actor.rol || "Hub Operativo", trabajoPendiente: "" }))];
+  const destinatariosSeleccionadosReporte: DestinatarioReporte[] = [...clientesSeleccionadosReporte.map((cliente) => ({ ...cliente, grupo: "cliente" as const })), ...actoresSeleccionadosReporte.map((actor) => ({ id: actor.id, origen: "Hub Operativo", grupo: "operativo" as const, rol: actor.rol || "Integrante operativo", nombre: actor.nombre, email: actor.email || "", telefono: actor.whatsapp || "", importe: "" as CampoNumerico, trabajoRealizado: actor.rol || "Hub Operativo", trabajoPendiente: "", tarifaCliente: "sin_tarifa" as TarifaCliente }))];
 
   useEffect(() => {
     if (firmaSeleccionReporteRef.current === firmaSeleccionReporte) return;
@@ -1239,9 +1244,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
     "",
     ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
-    "CIERRE DEL REPORTE",
-    "Gracias por formar parte de una gestión organizada del espacio verde.",
-    "HUBYA · Coordinación humana sobre procesos recurrentes",
+    "CONTACTO POR DUDAS",
+    contactoDudasReporte,
     "",
     "SOBRE HUBYA",
     ...sobreHubYaLineas,
@@ -1278,9 +1282,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
       "",
       ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
-      "CIERRE DEL REPORTE",
-      "Gracias por formar parte de una gestión organizada del espacio verde.",
-      "HUBYA · Coordinación humana sobre procesos recurrentes",
+      "CONTACTO POR DUDAS",
+      contactoDudasReporte,
       "",
       "SOBRE HUBYA",
       ...sobreHubYaLineas,
@@ -1292,6 +1295,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   const emailPrivado = useMemo(() => [
     `Hola ${clienteActivo?.nombre || "cliente"}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}. Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.`,
+    "",
+    contactoDudasReporte,
     "",
     "Saludos,",
     "HUBYA",
@@ -1308,7 +1313,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function filasClientesHtmlPara(clienteObjetivo: FilaClienteIngreso | undefined) {
     return clientesDelHub.map((cliente, index) => {
-      const nombreVisible = clienteObjetivo && cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : aliasVecino(index);
+      const nombreVisible = !clienteObjetivo ? (cliente.nombre || "Sin cliente") : cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : aliasVecino(index);
       const estadoVisita = estadoVisitaCliente(cliente);
       const importe = formatoPlano(cliente.importe) || formatoMoneda(0);
       return `
@@ -1366,7 +1371,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         <table style="margin-top:14px;width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;">
           <tbody>
             <tr style="background:#eef2e8;"><th colspan="6" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Detalle por cliente</th></tr>
-            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Cliente</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Hub</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Estado de visita</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Tarifa</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Horas / frecuencia</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasClientesHtmlPara(clienteReporte)}
+            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Cliente</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Hub</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Estado de visita</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Tarifa</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Horas / frecuencia</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasClientesHtmlPara(clienteObjetivo ? clienteReporte : undefined)}
             <tr style="background:#fbfcf9;font-weight:900;"><td colspan="5" style="border:1px solid #9aa78f;padding:6px;">Total facturado al Hub</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</td></tr>
           </tbody>
         </table>
@@ -1382,8 +1387,9 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         </tbody></table>
         <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:12px;font-size:12px;line-height:1.5;"><strong>Detalle del trabajo:</strong><br>${escaparHtml(datosHub.resumen.observacionGeneral || "Sin cargar")}</section>
         ${informacionReporte ? `<section style="margin-top:14px;border:1px solid #c7d8bf;background:#eef7ea;padding:12px;font-size:12px;line-height:1.5;"><strong>${escaparHtml(informacionReporte.titulo || "Información importante del Hub")}</strong><br>${escaparHtml(informacionReporte.texto)}</section>` : ""}
+        <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Contacto por dudas</h2><p style="margin:0;font-weight:900;">${escaparHtml(contactoDudasReporte)}</p></section>
         <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Sobre HUBYA</h2>${sobreHubYaHtml}</section>
-        <footer style="margin-top:14px;background:#1f2a1d;color:#fff;padding:14px;text-align:center;font-size:12px;line-height:1.5;font-weight:700;">Gracias por formar parte de una gestión organizada del Hub. Este reporte busca ordenar la información, mejorar la continuidad del servicio y mantener claridad entre todos los integrantes.</footer>
+        <footer style="margin-top:14px;background:#1f2a1d;color:#fff;padding:14px;text-align:center;font-size:12px;line-height:1.5;font-weight:700;">HUBYA TECH · www.hubya.tech</footer>
       </section>
     </article>`;
   }
@@ -1392,7 +1398,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
 
 
-  async function ejecutarEnvioReporte(destinatarios: FilaClienteIngreso[], tipo: "definitivo" | "prueba" = "definitivo") {
+  async function ejecutarEnvioReporte(destinatarios: DestinatarioReporte[], tipo: "definitivo" | "prueba" = "definitivo") {
     if (destinatarios.length === 0) {
       setEstadoEnvio("error");
       setMensajeEnvio("Error al enviar: seleccioná al menos un destinatario con email válido.");
@@ -1400,7 +1406,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     }
 
     setEstadoEnvio("enviando");
-    setMensajeEnvio(tipo === "prueba" ? `Enviando prueba a ${destinatarios[0]?.email}...` : `Enviando reporte a ${destinatarios.length} clientes...`);
+    setMensajeEnvio(tipo === "prueba" ? `Enviando prueba a ${destinatarios[0]?.email}...` : `Enviando reporte a ${destinatarios.length} personas...`);
     setConfirmacionEnvioReporte(false);
 
     const fechaHoraEnvio = new Date().toISOString();
@@ -1411,6 +1417,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     for (const cliente of destinatarios) {
       const cuerpoMail = [
         tipo === "prueba" ? `Hola, este es un envío de prueba del reporte de ${jornada.hub} del día ${fechaFormateada}.` : `Hola ${cliente.nombre || "cliente"}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}. Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.`,
+        "",
+        contactoDudasReporte,
         "",
         "Saludos,",
         "HUBYA",
@@ -1426,8 +1434,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             fecha: fechaFormateada,
             asunto: tipo === "prueba" ? `[Envío de prueba] ${asuntoReporte}` : asuntoReporte,
             cuerpoMail,
-            reporteHtml: armarReporteHtmlParaCliente(cliente),
-            reporteTexto: reporteTextoParaCliente(cliente),
+            reporteHtml: cliente.grupo === "operativo" ? armarReporteHtmlParaCliente(undefined) : armarReporteHtmlParaCliente(cliente),
+            reporteTexto: cliente.grupo === "operativo" ? reporteTexto : reporteTextoParaCliente(cliente),
             hubId: initialHub?.id,
             reportId: `reporte-${jornada.hub}-${jornada.fecha}`,
             contactId: cliente.contactoId || String(cliente.id),
@@ -1500,7 +1508,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       return;
     }
     const clienteBase = clienteActivo || datosHub.clientesIngresos[0] || clienteIngresoInicial(jornada.hub);
-    ejecutarEnvioReporte([{ ...clienteBase, id: -1, nombre: "Envío de prueba", email }], "prueba");
+    ejecutarEnvioReporte([{ ...clienteBase, id: -1, grupo: "cliente", nombre: "Envío de prueba", email }], "prueba");
   }
 
   async function descargarImagenReporte() {
@@ -2190,7 +2198,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         {seccionActiva === "reporte" && <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-3">
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black uppercase tracking-wide">Zona A · Carga operativa</h2><span className="text-xs font-bold text-[#66745c]">Planilla compacta</span></div>
-              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 1 — Carga del reporte</h3><div className="mb-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs"><p className="font-bold text-[#66745c]">Cargá solo lo que corresponde a este reporte. La selección de destinatarios y el envío quedan más adelante.</p></div>{confirmacionEnvioReporte && <div className="mb-2 rounded-xl border border-[#1f2a1d] bg-white p-3 text-xs shadow-sm"><h4 className="text-sm font-black">Vas a enviar este reporte a {destinatariosSeleccionadosReporte.length} personas.</h4><ul className="mt-2 max-h-40 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.map((cliente, index) => <li key={`confirmar-${cliente.id}-${index}`} className="font-semibold">{cliente.nombre || `Cliente ${index + 1}`} — <a className="underline" href={`mailto:${cliente.email}`}>{cliente.email}</a></li>)}</ul>{clientesSinEmailReporte.length > 0 && <p className="mt-2 font-black text-[#743c3c]">{clientesSinEmailReporte.length} cliente{clientesSinEmailReporte.length === 1 ? "" : "s"} no recibirá{clientesSinEmailReporte.length === 1 ? "" : "n"} el reporte porque no tiene{clientesSinEmailReporte.length === 1 ? "" : "n"} email cargado.</p>}{clientesEmailInvalidoReporte.length > 0 && <p className="mt-1 font-black text-[#743c3c]">{clientesEmailInvalidoReporte.length} cliente{clientesEmailInvalidoReporte.length === 1 ? "" : "s"} tiene{clientesEmailInvalidoReporte.length === 1 ? "" : "n"} email inválido y no se seleccionó automáticamente.</p>}<div className="mt-3 flex flex-wrap gap-2"><button onClick={() => ejecutarEnvioReporte(destinatariosSeleccionadosReporte)} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 font-black text-white disabled:opacity-50">Confirmar envío</button><button onClick={() => setConfirmacionEnvioReporte(false)} className="h-8 rounded-lg border border-[#cfd8c6] px-3 font-black">Cancelar</button></div></div>}<div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Cliente</th><th className="border p-1">Tarifa del cliente</th><th className="border p-1">Importe</th><th className="border p-1">Estado de visita</th><th className="border p-1">Observación simple</th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente, index) => { const tieneEmailValido = emailValido(cliente.email); const seleccionadoReporte = clientesReporteSeleccionados.includes(cliente.id) && tieneEmailValido; return <tr key={`cliente-edit-${cliente.id}-${index}`} className={seleccionadoReporte ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1"><select value={cliente.tarifaCliente} onChange={(e) => actualizarCliente(cliente.id, { tarifaCliente: e.target.value as TarifaCliente })} className="min-w-36 rounded border bg-white px-2 py-1">{TARIFAS_CLIENTE.map((tarifa) => <option key={tarifa.value} value={tarifa.value}>{tarifa.label}</option>)}</select></td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className={`border border-[#e1e6dc] p-1 font-black ${estadoVisitaCliente(cliente) === "Saltea visita" ? "text-[#8a6a16]" : "text-[#2f6d32]"}`}>{estadoVisitaCliente(cliente)}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.trabajoRealizado || "", (valor) => actualizarCliente(cliente.id, { trabajoRealizado: valor }), "min-w-48")}</td></tr>; })}</tbody></table></div><div className="mt-2 flex flex-wrap gap-2"><button onClick={guardarJornada} className="h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar carga</button><a href="#paso-gastos" className="h-7 rounded-md border border-[#cfd8c6] px-3 py-1 text-xs font-black">Continuar</a></div>{ultimoEnvioReporte && <div className="mt-3 rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs"><h4 className="text-sm font-black">{ultimoEnvioReporte.tipo === "prueba" ? "Envío de prueba" : "Envío generado"}</h4><p className="mt-1 font-semibold">Este reporte se intentó enviar a estas personas.</p><div className="mt-2 grid gap-2 md:grid-cols-4"><div><p className="font-black text-[#66745c]">Fecha y hora</p><p>{new Date(ultimoEnvioReporte.fechaHora).toLocaleString("es-AR")}</p></div><div><p className="font-black text-[#66745c]">Hub</p><p>{ultimoEnvioReporte.hub}</p></div><div><p className="font-black text-[#66745c]">Reporte</p><p>{ultimoEnvioReporte.reporte}</p></div><div><p className="font-black text-[#66745c]">Destinatarios seleccionados</p><p>{ultimoEnvioReporte.destinatariosSeleccionados}</p></div><div><p className="font-black text-[#66745c]">Enviados a proveedor</p><p>{ultimoEnvioReporte.enviadosAProveedor}</p></div><div><p className="font-black text-[#66745c]">Errores</p><p>{ultimoEnvioReporte.errores}</p></div><div><p className="font-black text-[#66745c]">Sin email</p><p>{ultimoEnvioReporte.sinEmail}</p></div><div><p className="font-black text-[#66745c]">Pendientes de respuesta</p><p>{ultimoEnvioReporte.pendientesRespuesta}</p></div><div><p className="font-black text-[#66745c]">From usado</p><p>{ultimoEnvioReporte.fromUsado || "—"}</p></div><div><p className="font-black text-[#66745c]">Reply-To usado</p><p>{ultimoEnvioReporte.replyToUsado || "—"}</p></div></div><div className="mt-3 overflow-x-auto rounded-lg border border-[#d8dfd1] bg-white"><table className="w-full border-collapse"><thead className="bg-[#f1f4ec] text-left uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Email</th><th className="border p-1">Estado</th><th className="border p-1">Error</th><th className="border p-1">Fecha/hora</th><th className="border p-1">Provider ID / Resend ID</th><th className="border p-1">Acción</th></tr></thead><tbody>{ultimoEnvioReporte.destinatarios.map((destinatario, index) => <tr key={`envio-reporte-${ultimoEnvioReporte.id}-${destinatario.id}-${index}`}><td className="border p-1 font-black">{destinatario.nombre}</td><td className="border p-1">{destinatario.email || "Sin email cargado"}</td><td className="border p-1 font-black">{destinatario.estado}</td><td className="border p-1 text-[#743c3c]">{destinatario.error || "—"}</td><td className="border p-1">{destinatario.fechaHora ? new Date(destinatario.fechaHora).toLocaleString("es-AR") : "—"}</td><td className="border p-1">{destinatario.providerMessageId || destinatario.resendId || "—"}</td><td className="border p-1"><button onClick={() => ejecutarEnvioReporte(datosHub.clientesIngresos.filter((cliente) => cliente.id === destinatario.id && emailValido(cliente.email)))} disabled={estadoEnvio === "enviando" || !emailValido(destinatario.email)} className="rounded border border-[#cfd8c6] px-2 py-1 font-black disabled:opacity-50">Reenviar</button></td></tr>)}</tbody></table></div></div>}
+              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 1 — Carga del reporte</h3><div className="mb-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs"><p className="font-bold text-[#66745c]">Cargá solo lo que corresponde a este reporte. La selección de destinatarios y el envío quedan más adelante.</p></div>{confirmacionEnvioReporte && <div className="mb-2 rounded-xl border border-[#1f2a1d] bg-white p-3 text-xs shadow-sm"><h4 className="text-sm font-black">Vas a enviar este reporte a {destinatariosSeleccionadosReporte.length} personas.</h4><div className="mt-2 grid gap-3 md:grid-cols-2"><div><h5 className="font-black">Clientes del Hub</h5><ul className="mt-1 max-h-36 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.filter((d) => d.grupo === "cliente").map((cliente, index) => <li key={`confirmar-cliente-${cliente.id}-${index}`} className="font-semibold">{cliente.nombre || `Cliente ${index + 1}`} — <a className="underline" href={`mailto:${cliente.email}`}>{cliente.email}</a></li>)}{clientesSinEmailReporte.map((cliente) => <li key={`sin-email-cliente-${cliente.id}`} className="font-black text-[#743c3c]">{cliente.nombre || "Cliente sin nombre"} — Sin email cargado — no recibirá el reporte.</li>)}</ul></div><div><h5 className="font-black">Hub Operativo</h5><ul className="mt-1 max-h-36 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.filter((d) => d.grupo === "operativo").map((actor, index) => <li key={`confirmar-actor-${actor.id}-${index}`} className="font-semibold">{actor.nombre || `Integrante ${index + 1}`} — {actor.rol || "Rol operativo"} — <a className="underline" href={`mailto:${actor.email}`}>{actor.email}</a></li>)}{datosHub.actores.filter((actor) => !emailValido(actor.email || "")).map((actor) => <li key={`sin-email-actor-${actor.id}`} className="font-black text-[#743c3c]">{actor.nombre || "Integrante sin nombre"} — {actor.rol || "Rol operativo"} — Sin email cargado — no recibirá el reporte.</li>)}</ul></div></div>{clientesEmailInvalidoReporte.length > 0 && <p className="mt-1 font-black text-[#743c3c]">{clientesEmailInvalidoReporte.length} cliente{clientesEmailInvalidoReporte.length === 1 ? "" : "s"} tiene{clientesEmailInvalidoReporte.length === 1 ? "" : "n"} email inválido y no se seleccionó automáticamente.</p>}<div className="mt-3 flex flex-wrap gap-2"><button onClick={() => ejecutarEnvioReporte(destinatariosSeleccionadosReporte)} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 font-black text-white disabled:opacity-50">Confirmar envío</button><button onClick={() => setConfirmacionEnvioReporte(false)} className="h-8 rounded-lg border border-[#cfd8c6] px-3 font-black">Cancelar</button></div></div>}<div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Cliente</th><th className="border p-1">Tarifa del cliente</th><th className="border p-1">Importe</th><th className="border p-1">Estado de visita</th><th className="border p-1">Observación simple</th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente, index) => { const tieneEmailValido = emailValido(cliente.email); const seleccionadoReporte = clientesReporteSeleccionados.includes(cliente.id) && tieneEmailValido; return <tr key={`cliente-edit-${cliente.id}-${index}`} className={seleccionadoReporte ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1"><select value={cliente.tarifaCliente} onChange={(e) => actualizarCliente(cliente.id, { tarifaCliente: e.target.value as TarifaCliente })} className="min-w-36 rounded border bg-white px-2 py-1">{TARIFAS_CLIENTE.map((tarifa) => <option key={tarifa.value} value={tarifa.value}>{tarifa.label}</option>)}</select></td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className={`border border-[#e1e6dc] p-1 font-black ${estadoVisitaCliente(cliente) === "Saltea visita" ? "text-[#8a6a16]" : "text-[#2f6d32]"}`}>{estadoVisitaCliente(cliente)}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.trabajoRealizado || "", (valor) => actualizarCliente(cliente.id, { trabajoRealizado: valor }), "min-w-48")}</td></tr>; })}</tbody></table></div><div className="mt-2 flex flex-wrap gap-2"><button onClick={guardarJornada} className="h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar carga</button><a href="#paso-gastos" className="h-7 rounded-md border border-[#cfd8c6] px-3 py-1 text-xs font-black">Continuar</a></div>{ultimoEnvioReporte && <div className="mt-3 rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs"><h4 className="text-sm font-black">{ultimoEnvioReporte.tipo === "prueba" ? "Envío de prueba" : "Envío generado"}</h4><p className="mt-1 font-semibold">Este reporte se intentó enviar a estas personas.</p><div className="mt-2 grid gap-2 md:grid-cols-4"><div><p className="font-black text-[#66745c]">Fecha y hora</p><p>{new Date(ultimoEnvioReporte.fechaHora).toLocaleString("es-AR")}</p></div><div><p className="font-black text-[#66745c]">Hub</p><p>{ultimoEnvioReporte.hub}</p></div><div><p className="font-black text-[#66745c]">Reporte</p><p>{ultimoEnvioReporte.reporte}</p></div><div><p className="font-black text-[#66745c]">Destinatarios seleccionados</p><p>{ultimoEnvioReporte.destinatariosSeleccionados}</p></div><div><p className="font-black text-[#66745c]">Enviados a proveedor</p><p>{ultimoEnvioReporte.enviadosAProveedor}</p></div><div><p className="font-black text-[#66745c]">Errores</p><p>{ultimoEnvioReporte.errores}</p></div><div><p className="font-black text-[#66745c]">Sin email</p><p>{ultimoEnvioReporte.sinEmail}</p></div><div><p className="font-black text-[#66745c]">Pendientes de respuesta</p><p>{ultimoEnvioReporte.pendientesRespuesta}</p></div><div><p className="font-black text-[#66745c]">From usado</p><p>{ultimoEnvioReporte.fromUsado || "—"}</p></div><div><p className="font-black text-[#66745c]">Reply-To usado</p><p>{ultimoEnvioReporte.replyToUsado || "—"}</p></div></div><div className="mt-3 overflow-x-auto rounded-lg border border-[#d8dfd1] bg-white"><table className="w-full border-collapse"><thead className="bg-[#f1f4ec] text-left uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Email</th><th className="border p-1">Estado</th><th className="border p-1">Error</th><th className="border p-1">Fecha/hora</th><th className="border p-1">Provider ID / Resend ID</th><th className="border p-1">Acción</th></tr></thead><tbody>{ultimoEnvioReporte.destinatarios.map((destinatario, index) => <tr key={`envio-reporte-${ultimoEnvioReporte.id}-${destinatario.id}-${index}`}><td className="border p-1 font-black">{destinatario.nombre}</td><td className="border p-1">{destinatario.email || "Sin email cargado"}</td><td className="border p-1 font-black">{destinatario.estado}</td><td className="border p-1 text-[#743c3c]">{destinatario.error || "—"}</td><td className="border p-1">{destinatario.fechaHora ? new Date(destinatario.fechaHora).toLocaleString("es-AR") : "—"}</td><td className="border p-1">{destinatario.providerMessageId || destinatario.resendId || "—"}</td><td className="border p-1"><button onClick={() => ejecutarEnvioReporte(datosHub.clientesIngresos.filter((cliente) => cliente.id === destinatario.id && emailValido(cliente.email)).map((cliente) => ({ ...cliente, grupo: "cliente" as const })))} disabled={estadoEnvio === "enviando" || !emailValido(destinatario.email)} className="rounded border border-[#cfd8c6] px-2 py-1 font-black disabled:opacity-50">Reenviar</button></td></tr>)}</tbody></table></div></div>}
             </section>
 
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
