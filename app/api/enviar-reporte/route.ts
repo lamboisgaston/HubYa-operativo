@@ -89,8 +89,9 @@ function escaparHtml(valor: string) {
 
 function armarHtml(cuerpoMail: string, reporteHtml: string, reporteTexto: string, consultaHtml = "") {
   const reporte = reporteHtml || `<section style="border:1px solid #9aa78f;background:#ffffff;padding:16px;"><h2 style="margin:0 0 10px;font-size:18px;">Reporte formal del Hub</h2><pre style="margin:0;white-space:pre-wrap;font:12px/1.5 Arial,Helvetica,sans-serif;color:#182018;">${escaparHtml(reporteTexto)}</pre></section>`;
-
-  return `<!doctype html><html><body style="margin:0;background:#f6f8f3;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:820px;margin:0 auto;padding:24px;"><section style="margin-bottom:16px;border:1px solid #d8dfd1;background:#ffffff;padding:14px;"><p style="margin:0;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(cuerpoMail)}</p></section>${reporte}${consultaHtml}</div></body></html>`;
+  const introduccion = reporteHtml ? "" : `<section style="margin-bottom:16px;border:1px solid #d8dfd1;background:#ffffff;padding:14px;"><p style="margin:0;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(cuerpoMail)}</p></section>`;
+  // Si viene reporteHtml desde la vista previa, se envía el mismo documento formal; queda listo para reutilizarlo como fuente de PDF/adjunto en una segunda etapa.
+  return `<!doctype html><html><body style="margin:0;background:#f6f8f3;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:820px;margin:0 auto;padding:24px;">${introduccion}${reporte}${consultaHtml}</div></body></html>`;
 }
 
 export async function POST(request: Request) {
