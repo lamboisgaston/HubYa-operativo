@@ -18,8 +18,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
     const hub = await updateHubOperativo(slug, body.hubOperativo);
     return hub ? NextResponse.json(hub) : NextResponse.json({ error: "Hub no encontrado" }, { status: 404 });
   }
-  if (body?.moduloOperativo || body?.parametrosOperativos) {
-    const hub = await updateHubParametrosOperativos(slug, { moduloOperativo: body.moduloOperativo, parametrosOperativos: body.parametrosOperativos });
+  if (body?.moduloOperativo || body?.parametrosOperativos || body?.nivelEstabilidad !== undefined) {
+    const hub = await updateHubParametrosOperativos(slug, { moduloOperativo: body.moduloOperativo, parametrosOperativos: body.parametrosOperativos, nivelEstabilidad: body.nivelEstabilidad });
     return hub ? NextResponse.json(hub) : NextResponse.json({ error: "Hub no encontrado" }, { status: 404 });
   }
   return NextResponse.json({ error: "No hay cambios válidos para guardar." }, { status: 400 });

@@ -1,4 +1,4 @@
-const REMITENTE_HUBYA = "HubYa <noreply@hubya.tech>";
+const REMITENTE_HUBYA = "HUBYA <noreply@hubya.tech>";
 const REPLY_TO_HUBYA = "lamboisgaston@gmail.com";
 const DOMINIO_RESEND_HUBYA = "hubya.tech";
 const ERROR_DOMINIO_RESEND_HUBYA = "El dominio hubya.tech todavía no está verificado en Resend.";

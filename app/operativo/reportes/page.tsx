@@ -11,7 +11,7 @@ export default async function ReportesGeneralesPage() {
           <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7a8a6d]">Reportes generales</p>
           <h1 className="mt-2 text-3xl font-black sm:text-4xl">Reportes por Hub</h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold text-[#5f6f55]">Acceso rápido a borradores, reportes guardados y generación de reportes sin salir de la red operativa.</p>
-          <Link href="/operativo" className="mt-5 inline-flex rounded-2xl border border-[#cfd8c6] px-4 py-3 text-sm font-black">Volver a HubYa Operativo</Link>
+          <Link href="/operativo" className="mt-5 inline-flex rounded-2xl border border-[#cfd8c6] px-4 py-3 text-sm font-black">Volver a HUBYA Operativo</Link>
         </header>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

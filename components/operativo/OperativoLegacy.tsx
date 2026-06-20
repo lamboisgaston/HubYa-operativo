@@ -197,11 +197,11 @@ const trabajoRealizadoInicial = "Mantenimiento integral de espacios verdes, cort
 const trabajoPendienteInicial = "Validación final con cada cliente y próximos repasos programados.";
 const observacionGeneralInicial = "Resumen cargado manualmente. Sin cálculos automáticos obligatorios.";
 const sobreHubYaLineas = [
-  "HubYa es una tecnología cooperativista de inteligencia salteña.",
+  "HUBYA es una tecnología cooperativista de inteligencia salteña.",
   "Agrupa demanda para coordinar mejor la oferta disponible y ejecutar procesos específicos según cada rama de servicio.",
   "La lógica es simple: una demanda agrupada permite organizar mejor horarios, tareas, personal, traslados y recursos. Por eso un Hub es más eficiente que clientes aislados y dispersos.",
-  "En JardinerosYa hablamos de usuarios del sistema. En HubYa hablamos de clientes, porque el Hub se construye desde la demanda.",
-  "Filosofía HubYa: el agrupamiento de la demanda mejora el agrupamiento de la oferta, y el agrupamiento de la oferta mejora la capacidad de abastecer la demanda.",
+  "En JardinerosYa hablamos de usuarios del sistema. En HUBYA hablamos de clientes, porque el Hub se construye desde la demanda.",
+  "Filosofía HUBYA: el agrupamiento de la demanda mejora el agrupamiento de la oferta, y el agrupamiento de la oferta mejora la capacidad de abastecer la demanda.",
 ];
 const clientesBasePorHub: Record<HubDisponible, string[]> = {
   "Hub Tipal": [],
@@ -293,7 +293,7 @@ function clientePublicoAIngreso(cliente: Cliente, index = 0): FilaClienteIngreso
   return {
     id: idNumericoEstable(cliente.id || `${cliente.nombre}-${index}`),
     contactoId: cliente.id,
-    origen: "HubYa",
+    origen: "HUBYA",
     nombre: cliente.nombre || `Cliente ${index + 1}`,
     referencia: cliente.referencia || "Cliente real del Hub",
     email: cliente.email || "",
@@ -806,7 +806,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const [estadoNuevoHub, setEstadoNuevoHub] = useState("Elegí demanda u oferta para crear un Hub desde el panel interno.");
   const [hubVinculos, setHubVinculos] = useState<HubVinculo[]>([]);
   const [nuevoVinculoForm, setNuevoVinculoForm] = useState(NUEVO_VINCULO_FORM_INICIAL);
-  const [estadoVinculos, setEstadoVinculos] = useState("HubYa agrupa demanda; la oferta se vincula para resolverla.");
+  const [estadoVinculos, setEstadoVinculos] = useState("HUBYA agrupa demanda; la oferta se vincula para resolverla.");
   const [asuntoFichaHub, setAsuntoFichaHub] = useState("Actualización de la ficha del Hub");
   const [mensajeFichaHub, setMensajeFichaHub] = useState("Hola, compartimos una actualización de la ficha operativa del Hub.");
   const [incluirPostulantesFicha, setIncluirPostulantesFicha] = useState(true);
@@ -1112,7 +1112,21 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     actualizarDatosHub({ actores: datosHub.actores.map((actor) => actor.id === id ? { ...actor, ...cambios } : actor) });
   }
 
-  const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : `Cliente ${index + 1}`, [clienteActivo?.id]);
+  function aliasVecino(index: number) {
+    let numero = index;
+    let alias = "";
+    do {
+      alias = String.fromCharCode(65 + (numero % 26)) + alias;
+      numero = Math.floor(numero / 26) - 1;
+    } while (numero >= 0);
+    return `Vecino ${alias}`;
+  }
+
+  const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : aliasVecino(index), [clienteActivo?.id]);
+  const moduloOperativoReporte = hubActual?.moduloOperativo === "jardinerosya" ? "JardinerosYa" : (hubActual?.rama || hubActual?.moduloOperativo || "Sin módulo operativo");
+  const integrantesHubReporte = hubActual?.clientesActivos || datosHub.clientesIngresos.length || datosHub.clientesIngresos.filter((cliente) => cliente.nombre.trim()).length;
+  const nivelEstabilidadReporte = Math.min(10, Math.max(1, Math.round(Number(hubActual?.nivelEstabilidad || 8))));
+  const textoFuenteJardinerosYa = "Este reporte fue generado a partir del sistema operativo JardinerosYa, utilizado por el Hub para organizar el mantenimiento de espacios verdes.";
   const destinatariosSeleccionados = destinatariosInformacion.filter((destinatario) => destinatario.incluido);
   const destinatariosConEmailInformacion = destinatariosInformacion.filter((destinatario) => emailValido(destinatario.email || ""));
 
@@ -1123,7 +1137,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function seleccionarHubInformacion(hub: HubDisponible) {
     setHubInformacion(hub);
-    setAsuntoInformacion((actual) => actual || `Email HubYa — ${hub}`);
+    setAsuntoInformacion((actual) => actual || `Email HUBYA — ${hub}`);
     setMensajeInformacion((actual) => actual || `Hola, te compartimos información correspondiente al ${hub}.`);
     setDestinatariosInformacion(normalizarDatosHub(jornada.datosPorHub[hub], hub).clientesIngresos.map((cliente) => ({ id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email, incluido: emailValido(cliente.email) })));
     setEstadoInformacion("idle");
@@ -1196,16 +1210,19 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
 
   const reporteTexto = useMemo(() => [
-    `HubYa — ${tituloReporteHub}`,
-    `Sistema: ${hubActual?.rama || "HubYa"}`,
-    `Módulo operativo: ${hubActual?.moduloOperativo || "otro"}`,
+    `HUBYA — ${tituloReporteHub}`,
+    `Sistema: ${hubActual?.rama || "HUBYA"}`,
     `Hub: ${jornada.hub}`,
-    `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
     `Fecha: ${fechaFormateada}`,
+    `Módulo operativo: ${moduloOperativoReporte}`,
+    `Integrantes del Hub: ${integrantesHubReporte}`,
+    `Nivel de estabilidad: ${nivelEstabilidadReporte}/10`,
+    ...(hubActual?.moduloOperativo === "jardinerosya" ? [textoFuenteJardinerosYa] : []),
+    `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
     `Cliente seleccionado: ${clienteActivo?.nombre || "Sin cliente seleccionado"}`,
     "",
     "CLIENTES / INGRESOS",
-    ...datosHub.clientesIngresos.map((cliente, index) => `${nombrePrivado(cliente, index) || "Sin cliente"} · ${estadoVisitaCliente(cliente)} · ${conceptoTarifaCliente(cliente)} · Importe: ${formatoPlano(cliente.importe) || formatoMoneda(0)}`),
+    ...datosHub.clientesIngresos.map((cliente, index) => `${nombrePrivado(cliente, index) || "Sin cliente"} · ${estadoVisitaCliente(cliente)} · ${conceptoTarifaCliente(cliente)} · Importe: ${formatoPlano(cliente.importe) || formatoMoneda(0)} · Dato operativo: ${moduloOperativoReporte}`),
     `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
     "",
     "GASTOS",
@@ -1224,23 +1241,27 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
     "CIERRE DEL REPORTE",
     "Gracias por formar parte de una gestión organizada del espacio verde.",
-    "HubYa · Coordinación humana sobre procesos recurrentes",
+    "HUBYA · Coordinación humana sobre procesos recurrentes",
     "",
     "SOBRE HUBYA",
     ...sobreHubYaLineas,
-  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, gastosRealesDelDia, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, hubActual?.rama, informacionReporte, tituloReporteHub]);
+  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, gastosRealesDelDia, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, hubActual?.rama, hubActual?.moduloOperativo, hubActual?.nivelEstabilidad, informacionReporte, integrantesHubReporte, moduloOperativoReporte, nivelEstabilidadReporte, textoFuenteJardinerosYa, tituloReporteHub]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return [
-      `HubYa — ${tituloReporteHub}`,
-      `Sistema: ${hubActual?.rama || "HubYa"}`,
+      `HUBYA — ${tituloReporteHub}`,
+      `Sistema: ${hubActual?.rama || "HUBYA"}`,
       `Hub: ${jornada.hub}`,
-      `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
       `Fecha: ${fechaFormateada}`,
+      `Módulo operativo: ${moduloOperativoReporte}`,
+      `Integrantes del Hub: ${integrantesHubReporte}`,
+      `Nivel de estabilidad: ${nivelEstabilidadReporte}/10`,
+      ...(hubActual?.moduloOperativo === "jardinerosya" ? [textoFuenteJardinerosYa] : []),
+      `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
       `Cliente seleccionado: ${clienteObjetivo.nombre || "Sin cliente seleccionado"}`,
       "",
       "CLIENTES / INGRESOS",
-      ...datosHub.clientesIngresos.map((cliente, index) => `${cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : `Cliente ${index + 1}`} · ${estadoVisitaCliente(cliente)} · ${conceptoTarifaCliente(cliente)} · Importe: ${formatoPlano(cliente.importe) || formatoMoneda(0)}`),
+      ...datosHub.clientesIngresos.map((cliente, index) => `${cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : aliasVecino(index)} · ${estadoVisitaCliente(cliente)} · ${conceptoTarifaCliente(cliente)} · Importe: ${formatoPlano(cliente.importe) || formatoMoneda(0)} · Dato operativo: ${moduloOperativoReporte}`),
       `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
       "",
       "GASTOS",
@@ -1259,21 +1280,21 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
       "CIERRE DEL REPORTE",
       "Gracias por formar parte de una gestión organizada del espacio verde.",
-      "HubYa · Coordinación humana sobre procesos recurrentes",
+      "HUBYA · Coordinación humana sobre procesos recurrentes",
       "",
       "SOBRE HUBYA",
       ...sobreHubYaLineas,
     ].join("\n");
   }
 
-  const asuntoReporte = `Reporte diario HubYa — ${jornada.hub} — ${fechaFormateada}`;
+  const asuntoReporte = `Reporte diario HUBYA — ${jornada.hub} — ${fechaFormateada}`;
   const firmaDatosHub = JSON.stringify(datosHub);
 
   const emailPrivado = useMemo(() => [
     `Hola ${clienteActivo?.nombre || "cliente"}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}. Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.`,
     "",
     "Saludos,",
-    "HubYa",
+    "HUBYA",
   ].join("\n"), [clienteActivo?.nombre, fechaFormateada, jornada.hub]);
 
   useEffect(() => {
@@ -1287,7 +1308,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function filasClientesHtmlPara(clienteObjetivo: FilaClienteIngreso | undefined) {
     return clientesDelHub.map((cliente, index) => {
-      const nombreVisible = clienteObjetivo && cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : nombrePrivado(cliente, index) || "Sin cliente";
+      const nombreVisible = clienteObjetivo && cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : aliasVecino(index);
       const estadoVisita = estadoVisitaCliente(cliente);
       const importe = formatoPlano(cliente.importe) || formatoMoneda(0);
       return `
@@ -1299,6 +1320,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                       <td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</td>
                       <td style="border:1px solid #d8dfd1;padding:8px;text-align:right;font-weight:900;">${escaparHtml(importe)}</td>
                     </tr>
+                    <tr><td colspan="6" style="border:1px solid #d8dfd1;border-top:0;background:#f6f8f3;padding:8px;color:#4f5f47;font-weight:800;">Dato operativo: ${escaparHtml(moduloOperativoReporte)}</td></tr>
                     <tr><td colspan="6" style="border:1px solid #d8dfd1;border-top:0;background:#fbfcf9;padding:8px;color:#4f5f47;"><strong>Observación:</strong> ${escaparHtml(observacionCliente(cliente))}</td></tr>`;
     }).join("");
   }
@@ -1319,15 +1341,17 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     return `
     <article style="width:100%;max-width:760px;border:1px solid #6f7968;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;">
       <header style="border-bottom:2px solid #1f2a1d;padding:18px;background:#f8faf5;">
-        <p style="margin:0;color:#66745c;font-size:11px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;">HUNYA</p>
+        <p style="margin:0;color:#66745c;font-size:11px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;">HUBYA</p>
         <h1 style="margin:4px 0 0;font-size:22px;line-height:1.2;font-weight:900;text-transform:uppercase;">Reporte del Hub</h1>
         <p style="margin:8px 0 0;color:#4f5f47;font-size:13px;font-weight:700;">Detalle del trabajo coordinado dentro del Hub.</p>
       </header>
       <section style="padding:16px;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>
           <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Hub</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(jornada.hub)}</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Fecha</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(fechaFormateada)}</td></tr>
-          <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Zona</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(hubActual?.zona || jornada.hub)}</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Servicio</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(hubActual?.rama || "JardinerosYa")}</td></tr>
+          <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Módulo operativo</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(moduloOperativoReporte)}</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Integrantes del Hub</td><td style="border:1px solid #d8dfd1;padding:7px;">${integrantesHubReporte}</td></tr>
+          <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Nivel de estabilidad</td><td style="border:1px solid #d8dfd1;padding:7px;">${nivelEstabilidadReporte}/10</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Zona</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(hubActual?.zona || jornada.hub)}</td></tr>
         </tbody></table>
+        ${hubActual?.moduloOperativo === "jardinerosya" ? `<p style="margin:10px 0 0;border:1px solid #d8dfd1;background:#fbfcf9;padding:10px;font-size:12px;font-weight:700;color:#4f5f47;">${escaparHtml(textoFuenteJardinerosYa)}</p>` : ""}
         <section style="margin-top:14px;border:1px solid #1f2a1d;background:#fbfcf9;padding:14px;">
           <h2 style="margin:0 0 10px;font-size:15px;">Resumen del cliente</h2>
           <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>
@@ -1335,6 +1359,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Estado de visita</td><td style="border:1px solid #d8dfd1;padding:8px;font-weight:900;">${escaparHtml(estadoVisita)}</td></tr>
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Tarifa</td><td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(tarifa)}</td></tr>
             <tr><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:9px;font-weight:900;">Importe</td><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:9px;font-size:18px;font-weight:900;">${escaparHtml(importe)}</td></tr>
+            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Dato operativo</td><td style="border:1px solid #d8dfd1;padding:8px;font-weight:800;">${escaparHtml(moduloOperativoReporte)}</td></tr>
             <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Observación</td><td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(observacionCliente(clienteReporte))}</td></tr>
           </tbody></table>
         </section>
@@ -1357,13 +1382,13 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         </tbody></table>
         <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:12px;font-size:12px;line-height:1.5;"><strong>Detalle del trabajo:</strong><br>${escaparHtml(datosHub.resumen.observacionGeneral || "Sin cargar")}</section>
         ${informacionReporte ? `<section style="margin-top:14px;border:1px solid #c7d8bf;background:#eef7ea;padding:12px;font-size:12px;line-height:1.5;"><strong>${escaparHtml(informacionReporte.titulo || "Información importante del Hub")}</strong><br>${escaparHtml(informacionReporte.texto)}</section>` : ""}
-        <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Sobre HubYa</h2>${sobreHubYaHtml}</section>
+        <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Sobre HUBYA</h2>${sobreHubYaHtml}</section>
         <footer style="margin-top:14px;background:#1f2a1d;color:#fff;padding:14px;text-align:center;font-size:12px;line-height:1.5;font-weight:700;">Gracias por formar parte de una gestión organizada del Hub. Este reporte busca ordenar la información, mejorar la continuidad del servicio y mantener claridad entre todos los integrantes.</footer>
       </section>
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasGastosHtml, hubActual?.rama, hubActual?.zona, informacionReporte, jornada.hub, sobreHubYaHtml, totalDistribuido, totalFacturadoHub, totalGastos]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasGastosHtml, hubActual?.rama, hubActual?.zona, hubActual?.moduloOperativo, hubActual?.nivelEstabilidad, informacionReporte, integrantesHubReporte, jornada.hub, moduloOperativoReporte, nivelEstabilidadReporte, sobreHubYaHtml, textoFuenteJardinerosYa, totalDistribuido, totalFacturadoHub, totalGastos]);
 
 
 
@@ -1388,7 +1413,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         tipo === "prueba" ? `Hola, este es un envío de prueba del reporte de ${jornada.hub} del día ${fechaFormateada}.` : `Hola ${cliente.nombre || "cliente"}, te compartimos el reporte correspondiente a la jornada del ${jornada.hub} del día ${fechaFormateada}. Lo principal está resumido al inicio del comprobante. El detalle queda disponible como respaldo de transparencia operativa.`,
         "",
         "Saludos,",
-        "HubYa",
+        "HUBYA",
       ].join("\n");
       try {
         const respuesta = await fetch("/api/enviar-reporte", {
@@ -1788,11 +1813,11 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   function mailConsultaTexto(cliente: ClienteConsultaHub, consulta = consultaActiva) {
     const links = linksPorOpcionConsulta(cliente, consulta);
     return [
-      `Asunto: Consulta HubYa — ${consulta?.hub || hubConsulta}`,
+      `Asunto: Consulta HUBYA — ${consulta?.hub || hubConsulta}`,
       "",
       `Hola ${cliente.nombre || "cliente"},`,
       "",
-      `Desde HubYa queremos confirmar la planificación del ${consulta?.hub || hubConsulta}.`,
+      `Desde HUBYA queremos confirmar la planificación del ${consulta?.hub || hubConsulta}.`,
       "",
       consulta?.pregunta || preguntaConsulta,
       "",
@@ -1801,7 +1826,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       "Tu respuesta nos ayuda a organizar mejor la demanda, el personal, los horarios y la frecuencia del Hub.",
       "",
       "Saludos,",
-      "HubYa",
+      "HUBYA",
     ].join("\n");
   }
 
@@ -1883,7 +1908,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   function enviarMensajeEquipo() {
     if (!equipoActivo || !mensajeEquipo.mensaje.trim()) return setMensajeGuardado("Escribí un mensaje para el equipo activo.");
     if (integrantesDestinoMensaje.length === 0) return setMensajeGuardado("Seleccioná al menos un integrante para enviar el mensaje.");
-    const mensaje: MensajeEquipoActivo = { id: `mensaje-equipo-${Date.now()}`, asunto: mensajeEquipo.asunto || `Mensaje HubYa — ${equipoActivo.nombre}`, mensaje: mensajeEquipo.mensaje, fecha: new Date().toISOString(), destinatarios: integrantesDestinoMensaje.map((integrante) => integrante.id), canal: "whatsapp preparado" };
+    const mensaje: MensajeEquipoActivo = { id: `mensaje-equipo-${Date.now()}`, asunto: mensajeEquipo.asunto || `Mensaje HUBYA — ${equipoActivo.nombre}`, mensaje: mensajeEquipo.mensaje, fecha: new Date().toISOString(), destinatarios: integrantesDestinoMensaje.map((integrante) => integrante.id), canal: "whatsapp preparado" };
     actualizarEquipoActivo(equipoActivo.id, { mensajesEnviados: [mensaje, ...equipoActivo.mensajesEnviados] });
     setMensajeGuardado(`Mensaje preparado individualmente para ${integrantesDestinoMensaje.length} integrantes de ${equipoActivo.nombre}.`);
   }
@@ -1990,7 +2015,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     return (
       <main className="min-h-screen bg-[#eef2e8] px-4 py-8 text-[#182018]">
         <section className="mx-auto max-w-5xl rounded-2xl border border-[#cfd8c6] bg-white p-5 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HubYa Operativo</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HUBYA Operativo</p>
           <h1 className="mt-2 text-2xl font-black">¿Con qué Hub vas a trabajar hoy?</h1>
           <p className="mt-2 text-sm font-semibold text-[#66745c]">Elegí el Hub antes de cargar la jornada. Los clientes y los resúmenes guardados se muestran separados por Hub.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -2010,7 +2035,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       <section className="mx-auto max-w-[1600px] px-3 py-3 sm:px-4">
         {!simpleMode && <header className="sticky top-0 z-20 mb-3 rounded-xl border border-[#cfd8c6] bg-white/95 p-3 shadow-sm backdrop-blur">
           <div className="grid gap-2 xl:grid-cols-[1fr_220px_180px_220px_auto] xl:items-end">
-            <div><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HubYa Operativo · carga manual + reporte vivo</p><h1 className="text-xl font-black leading-tight">Reporte del Hub — {jornada.hub} — {fechaFormateada}</h1></div>
+            <div><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HUBYA Operativo · carga manual + reporte vivo</p><h1 className="text-xl font-black leading-tight">Reporte del Hub — {jornada.hub} — {fechaFormateada}</h1></div>
             <div className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]"><span>Hub seleccionado</span><div className="flex h-8 items-center rounded-lg border border-[#cfd8c6] bg-[#f8faf5] px-2 text-sm font-black normal-case text-[#1f2a1d]">{jornada.hub} · {datosHub.clientesIngresos.length} clientes</div></div>
             <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Fecha<input type="date" value={jornada.fecha} onChange={(e) => actualizarJornada({ fecha: e.target.value })} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nombre del resumen<input value={jornada.nombreResumen} onChange={(e) => actualizarJornada({ nombreResumen: e.target.value })} placeholder={nombreResumenActual()} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label>
             <div className="flex flex-wrap gap-1.5 xl:justify-end"><button onClick={cambiarHub} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cambiar Hub</button><button onClick={guardarJornada} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar</button><button onClick={cargarJornada} className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 text-xs font-black">Cargar</button><button onClick={limpiarJornada} className="h-8 rounded-lg border border-[#d6b7b7] bg-[#fff7f7] px-3 text-xs font-black text-[#743c3c]">Limpiar</button></div>
@@ -2096,7 +2121,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             </div>
             <div className="space-y-3">
               <div className="overflow-x-auto rounded-lg border border-[#d8dfd1]"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Incluido</th><th className="border p-1">Nombre</th><th className="border p-1">Email</th></tr></thead><tbody>{destinatariosInformacion.length === 0 ? <tr><td colSpan={3} className="border p-3 text-center font-bold text-[#66745c]">Seleccioná un Hub para ver sus clientes.</td></tr> : destinatariosInformacion.map((destinatario, index) => <tr key={`destinatario-${destinatario.id}-${index}`} className={destinatario.incluido ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1 text-center"><input type="checkbox" checked={destinatario.incluido} disabled={!emailValido(destinatario.email || "")} onChange={(e) => actualizarDestinatarioInformacion(destinatario.id, e.target.checked)} /></td><td className="border border-[#e1e6dc] p-1 font-semibold">{destinatario.nombre || "Sin nombre"}</td><td className={`border border-[#e1e6dc] p-1 ${emailValido(destinatario.email || "") ? "" : "font-black text-[#743c3c]"}`}>{emailValido(destinatario.email || "") ? destinatario.email : "Sin email cargado"}</td></tr>)}</tbody></table></div>
-              <div className="grid gap-2"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Referencia interna<input value={asuntoInformacion} onChange={(e) => setAsuntoInformacion(e.target.value)} placeholder={hubInformacion ? `Email HubYa — ${hubInformacion}` : "Email HubYa — [Hub seleccionado]"} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Mensaje principal<textarea value={mensajeInformacion} onChange={(e) => setMensajeInformacion(e.target.value)} placeholder={hubInformacion ? `Hola, te compartimos información correspondiente al ${hubInformacion}.` : "Hola, te compartimos información correspondiente al [Hub seleccionado]."} className="min-h-24 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nota opcional<textarea value={notaInformacion} onChange={(e) => setNotaInformacion(e.target.value)} className="min-h-16 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label></div>
+              <div className="grid gap-2"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Referencia interna<input value={asuntoInformacion} onChange={(e) => setAsuntoInformacion(e.target.value)} placeholder={hubInformacion ? `Email HUBYA — ${hubInformacion}` : "Email HUBYA — [Hub seleccionado]"} className="h-8 rounded-lg border border-[#cfd8c6] px-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Mensaje principal<textarea value={mensajeInformacion} onChange={(e) => setMensajeInformacion(e.target.value)} placeholder={hubInformacion ? `Hola, te compartimos información correspondiente al ${hubInformacion}.` : "Hola, te compartimos información correspondiente al [Hub seleccionado]."} className="min-h-24 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Nota opcional<textarea value={notaInformacion} onChange={(e) => setNotaInformacion(e.target.value)} className="min-h-16 rounded-lg border border-[#cfd8c6] p-2 text-sm normal-case outline-none" /></label></div>
               <button onClick={enviarInformacion} disabled={estadoInformacion === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60">Enviar a seleccionados</button>
             </div>
           </div>

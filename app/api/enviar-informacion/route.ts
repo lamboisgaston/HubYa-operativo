@@ -32,7 +32,7 @@ function armarHtml(nombre: string, hub: string, mensaje: string, nota: string) {
   const saludo = nombre ? `Hola ${escaparHtml(nombre)},` : "Hola,";
   const notaHtml = nota ? `<div style="margin-top:18px;border-top:1px solid #d8dfd1;padding-top:12px;"><strong>Nota:</strong><p style="margin:6px 0 0;white-space:pre-line;">${escaparHtml(nota)}</p></div>` : "";
 
-  return `<!doctype html><html><body style="margin:0;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:680px;margin:0 auto;padding:24px;"><p style="margin:0 0 14px;font-size:14px;line-height:1.5;">${saludo}</p><p style="margin:0 0 18px;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(mensaje)}</p>${notaHtml}<p style="margin:22px 0 0;color:#66745c;font-size:12px;font-weight:700;">HubYa · ${escaparHtml(hub)}</p></div></body></html>`;
+  return `<!doctype html><html><body style="margin:0;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:680px;margin:0 auto;padding:24px;"><p style="margin:0 0 14px;font-size:14px;line-height:1.5;">${saludo}</p><p style="margin:0 0 18px;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(mensaje)}</p>${notaHtml}<p style="margin:22px 0 0;color:#66745c;font-size:12px;font-weight:700;">HUBYA · ${escaparHtml(hub)}</p></div></body></html>`;
 }
 
 function emailValido(email: string) {
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
         to: [email],
         subject: asunto,
         html: armarHtml(nombre, hub, mensaje, nota),
-        text: `${nombre ? `Hola ${nombre},\n\n` : "Hola,\n\n"}${mensaje}${nota ? `\n\nNota: ${nota}` : ""}\n\nHubYa · ${hub}`,
+        text: `${nombre ? `Hola ${nombre},\n\n` : "Hola,\n\n"}${mensaje}${nota ? `\n\nNota: ${nota}` : ""}\n\nHUBYA · ${hub}`,
       }),
     });
 

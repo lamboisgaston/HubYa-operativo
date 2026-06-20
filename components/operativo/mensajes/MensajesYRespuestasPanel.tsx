@@ -34,7 +34,7 @@ export function MensajesYRespuestasPanel({ hubs, contactos, mensajes, respuestas
   const [hubIds, setHubIds] = useState<string[]>(hubActual ? [hubActual.id] : []);
   const [clienteIds, setClienteIds] = useState<string[]>([]);
   const [asunto, setAsunto] = useState("Información importante del Hub");
-  const [titulo, setTitulo] = useState("Acerca de HubYa");
+  const [titulo, setTitulo] = useState("Acerca de HUBYA");
   const [mensaje, setMensaje] = useState("Hola {nombre}, te compartimos información importante sobre {hub}.");
   const [incluyeEncuesta, setIncluyeEncuesta] = useState(false);
   const [preguntaEncuesta, setPreguntaEncuesta] = useState("¿Cómo querés avanzar?");
@@ -87,7 +87,7 @@ export function MensajesYRespuestasPanel({ hubs, contactos, mensajes, respuestas
   return <section className="grid gap-5">
     <header className="rounded-[2rem] border border-[#d8dfd1] bg-white p-6 shadow-sm">
       <p className="text-xs font-black uppercase tracking-[0.2em] text-[#7a8a6d]">Operativo</p><h1 className="mt-1 text-3xl font-black">Mensajes y encuestas</h1>
-      <p className="mt-2 max-w-3xl text-sm font-semibold text-[#66745c]">Enviar un mensaje en HubYa es elegir Hub, elegir personas, escribir y enviar. Si hace falta encuesta, se agrega; si no, queda como mensaje simple.</p>
+      <p className="mt-2 max-w-3xl text-sm font-semibold text-[#66745c]">Enviar un mensaje en HUBYA es elegir Hub, elegir personas, escribir y enviar. Si hace falta encuesta, se agrega; si no, queda como mensaje simple.</p>
       {estadoUi && <p className="mt-4 rounded-2xl border border-[#cfd8c6] bg-[#fffdf2] p-3 text-sm font-black">{estadoUi}</p>}
     </header>
 
