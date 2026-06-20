@@ -205,7 +205,7 @@ const sobreHubYaLineas = [
   "Esa fuerza no nace solo de estar juntos, sino de organizar mejor lo que cada persona puede aportar.",
   "HUBYA busca transformar lo individual en cooperación, lo aislado en comunidad operativa y el mérito del trabajo bien hecho en estabilidad para todos los integrantes del Hub.",
   "“El todo es más que la suma de sus partes.”",
-  "Aristóteles",
+  "Principio aristotélico",
   "www.hubya.tech",
 ];
 const clientesBasePorHub: Record<HubDisponible, string[]> = {
