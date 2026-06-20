@@ -34,11 +34,11 @@ function emailValido(email: string) {
 function armarHtml(nombre: string, hub: string, pregunta: string, links: Record<string, string>) {
   const botones = Object.entries(links).map(([opcion, url]) => `<a href="${escaparHtml(url)}" style="display:inline-block;margin:0 8px 8px 0;border-radius:12px;background:#1f2a1d;color:#ffffff;padding:12px 18px;text-decoration:none;font-weight:800;">${escaparHtml(opcion)}</a>`).join("");
 
-  return `<!doctype html><html><body style="margin:0;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:680px;margin:0 auto;padding:24px;"><p style="margin:0 0 14px;font-size:14px;line-height:1.5;">Hola ${escaparHtml(nombre || "cliente")},</p><p style="margin:0 0 18px;font-size:14px;line-height:1.5;">Desde HubYa queremos confirmar la planificación del ${escaparHtml(hub)}.</p><p style="margin:0 0 18px;font-size:18px;line-height:1.45;font-weight:800;">${escaparHtml(pregunta)}</p><div style="margin:0 0 18px;">${botones}</div><p style="margin:0 0 18px;font-size:14px;line-height:1.5;">Tu respuesta nos ayuda a organizar mejor la demanda, el personal, los horarios y la frecuencia del Hub.</p><p style="margin:0;font-size:14px;line-height:1.5;">Saludos,<br/>HubYa</p></div></body></html>`;
+  return `<!doctype html><html><body style="margin:0;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:680px;margin:0 auto;padding:24px;"><p style="margin:0 0 14px;font-size:14px;line-height:1.5;">Hola ${escaparHtml(nombre || "cliente")},</p><p style="margin:0 0 18px;font-size:14px;line-height:1.5;">Desde HUBYA queremos confirmar la planificación del ${escaparHtml(hub)}.</p><p style="margin:0 0 18px;font-size:18px;line-height:1.45;font-weight:800;">${escaparHtml(pregunta)}</p><div style="margin:0 0 18px;">${botones}</div><p style="margin:0 0 18px;font-size:14px;line-height:1.5;">Tu respuesta nos ayuda a organizar mejor la demanda, el personal, los horarios y la frecuencia del Hub.</p><p style="margin:0;font-size:14px;line-height:1.5;">Saludos,<br/>HUBYA</p></div></body></html>`;
 }
 
 function armarTexto(nombre: string, hub: string, pregunta: string, links: Record<string, string>) {
-  return [`Hola ${nombre || "cliente"},`, "", `Desde HubYa queremos confirmar la planificación del ${hub}.`, "", pregunta, "", ...Object.entries(links).map(([opcion, url]) => `${opcion}: ${url}`), "", "Tu respuesta nos ayuda a organizar mejor la demanda, el personal, los horarios y la frecuencia del Hub.", "", "Saludos,", "HubYa"].join("\n");
+  return [`Hola ${nombre || "cliente"},`, "", `Desde HUBYA queremos confirmar la planificación del ${hub}.`, "", pregunta, "", ...Object.entries(links).map(([opcion, url]) => `${opcion}: ${url}`), "", "Tu respuesta nos ayuda a organizar mejor la demanda, el personal, los horarios y la frecuencia del Hub.", "", "Saludos,", "HUBYA"].join("\n");
 }
 
 export async function POST(request: Request) {
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const respuesta = await fetch(RESEND_API_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: mailFrom, reply_to: replyTo, to: [email], subject: `Consulta HubYa — ${hub}`, html: armarHtml(nombre, hub, pregunta, links), text: armarTexto(nombre, hub, pregunta, links) }),
+      body: JSON.stringify({ from: mailFrom, reply_to: replyTo, to: [email], subject: `Consulta HUBYA — ${hub}`, html: armarHtml(nombre, hub, pregunta, links), text: armarTexto(nombre, hub, pregunta, links) }),
     });
     const data = await respuesta.json().catch(() => null);
     resultados.push({ email, ok: respuesta.ok, id: data?.id ?? null, error: respuesta.ok ? null : mensajeErrorResend(data) });

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   if (!hub) return Response.json({ error: "Debe indicar hub." }, { status: 400 });
   if (!mensaje) return Response.json({ error: "Debe indicar mensaje." }, { status: 400 });
 
-  const texto = `Hola ${nombreCliente}.\n\n${mensaje}\n\nHubYa · ${hub}`;
+  const texto = `Hola ${nombreCliente}.\n\n${mensaje}\n\nHUBYA · ${hub}`;
   const respuesta = await fetch(`https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {

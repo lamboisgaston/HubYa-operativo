@@ -114,7 +114,7 @@ export async function POST(request: Request) {
   const nombreCliente = campoTexto(payload.nombreCliente);
   const hub = campoTexto(payload.hub);
   const fecha = campoTexto(payload.fecha);
-  const asunto = campoTexto(payload.asunto) || `Reporte diario HubYa — ${hub} — ${fecha}`;
+  const asunto = campoTexto(payload.asunto) || `Reporte diario HUBYA — ${hub} — ${fecha}`;
   const cuerpoMail = campoTexto(payload.cuerpoMail);
   const reporteHtml = campoTexto(payload.reporteHtml);
   const reporteTexto = campoTexto(payload.reporteTexto);

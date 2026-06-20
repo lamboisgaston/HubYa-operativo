@@ -71,7 +71,7 @@ export default async function WebPublicaPage() {
             Las necesidades aisladas tienen poca fuerza. Las necesidades organizadas pueden construir estabilidad.
           </p>
           <h1 className="mt-5 text-4xl font-black tracking-tight md:text-7xl">
-            HubYa: necesidades individuales en{" "}
+            HUBYA: necesidades individuales en{" "}
             <span className="bg-gradient-to-r from-[#4f46e5] to-[#06b6d4] bg-clip-text text-transparent">
               fuerza colectiva
             </span>
@@ -81,7 +81,7 @@ export default async function WebPublicaPage() {
             estabilidad operativa.
           </p>
           <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-[#9ca3af]">
-            HubYa transforma demandas dispersas en Hubs organizados. Cuando varias personas necesitan lo mismo, pueden
+            HUBYA transforma demandas dispersas en Hubs organizados. Cuando varias personas necesitan lo mismo, pueden
             coordinarse mejor, contratar con más fuerza y sostener servicios más estables.
           </p>
           <p className="mx-auto mt-6 inline-flex rounded-full border border-[#06b6d4]/30 bg-[#06b6d4]/10 px-5 py-3 text-sm font-black text-[#a5f3fc]">
@@ -106,7 +106,7 @@ export default async function WebPublicaPage() {
         <div className="mt-5 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
           <div>
             <h2 className="text-3xl font-black text-white md:text-5xl">
-              HubYa convierte necesidades individuales en fuerza colectiva.
+              HUBYA convierte necesidades individuales en fuerza colectiva.
             </h2>
             <div className="mt-6 space-y-4 text-base leading-7 text-[#9ca3af]">
               <p>
@@ -117,12 +117,12 @@ export default async function WebPublicaPage() {
                 Cuando cada persona intenta resolver sola, todo queda disperso. Pero cuando esas necesidades se agrupan,
                 aparece una nueva capacidad: coordinar, contratar mejor, sostener equipos y construir continuidad.
               </p>
-              <p>HubYa nace desde esa idea: convertir necesidades individuales en fuerza colectiva.</p>
+              <p>HUBYA nace desde esa idea: convertir necesidades individuales en fuerza colectiva.</p>
             </div>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-[#4f46e5]/10">
             <p className="text-lg font-black text-white">
-              HubYa permite agrupar personas que necesitan servicios similares, ordenar esa demanda y coordinar quién la
+              HUBYA permite agrupar personas que necesitan servicios similares, ordenar esa demanda y coordinar quién la
               resuelve.
             </p>
             <ul className="mt-5 grid gap-3 text-sm text-[#cbd5e1]">
@@ -141,7 +141,7 @@ export default async function WebPublicaPage() {
         <p className="text-xs font-black uppercase tracking-[0.25em] text-[#06b6d4]">¿Cómo funciona?</p>
         <h2 className="mt-3 text-3xl font-black text-white">De necesidad compartida a operación coordinada.</h2>
         <p className="mt-4 max-w-3xl text-sm leading-6 text-[#9ca3af]">
-          HubYa agrupa demanda, organiza oferta y genera estabilidad operativa. La tecnología ayuda a detectar necesidades
+          HUBYA agrupa demanda, organiza oferta y genera estabilidad operativa. La tecnología ayuda a detectar necesidades
           similares, ordenar la información del Hub y coordinar equipos o prestadores capaces de resolverlas con continuidad.
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -167,11 +167,11 @@ export default async function WebPublicaPage() {
             </h2>
             <div className="mt-6 space-y-4 text-base leading-7 text-[#9ca3af]">
               <p>
-                HubYa organiza la demanda a través de Hubs, pero cada tipo de necesidad requiere herramientas
+                HUBYA organiza la demanda a través de Hubs, pero cada tipo de necesidad requiere herramientas
                 específicas. Por eso desarrollamos módulos operativos adaptados a distintos procesos.
               </p>
               <p>
-                <strong className="text-white">HubYa es la tecnología madre.</strong> Los módulos son herramientas
+                <strong className="text-white">HUBYA es la tecnología madre.</strong> Los módulos son herramientas
                 especializadas para resolver procesos concretos: registrar información, coordinar responsables, generar
                 reportes y mejorar la continuidad operativa.
               </p>
@@ -181,7 +181,7 @@ export default async function WebPublicaPage() {
               </p>
             </div>
             <p className="mt-6 rounded-2xl border border-[#06b6d4]/30 bg-[#06b6d4]/10 p-5 text-lg font-black text-[#a5f3fc]">
-              HubYa agrupa la demanda. Sus módulos ordenan el proceso.
+              HUBYA agrupa la demanda. Sus módulos ordenan el proceso.
             </p>
           </div>
 
@@ -216,7 +216,7 @@ export default async function WebPublicaPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.25em] text-[#06b6d4]">Ejemplos de módulos</p>
-            <h2 className="mt-3 text-3xl font-black text-white">Ramas funcionales de HubYa</h2>
+            <h2 className="mt-3 text-3xl font-black text-white">Ramas funcionales de HUBYA</h2>
           </div>
           <p className="max-w-2xl text-sm leading-6 text-[#9ca3af]">
             Cada módulo está diseñado para ordenar un tipo específico de proceso. No son proyectos separados: funcionan
@@ -229,7 +229,7 @@ export default async function WebPublicaPage() {
               key={modulo.nombre}
               className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.025] p-6 shadow-xl shadow-black/20"
             >
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#06b6d4]">Módulo HubYa</p>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#06b6d4]">Módulo HUBYA</p>
               <h3 className="mt-3 text-2xl font-black text-white">{modulo.nombre}</h3>
               <p className="mt-3 text-base font-black text-[#e5e7eb]">{modulo.proceso}</p>
               <p className="mt-4 text-sm leading-6 text-[#9ca3af]">{modulo.descripcion}</p>

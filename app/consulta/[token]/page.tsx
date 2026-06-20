@@ -80,11 +80,11 @@ export default function ConsultaPublicaPage({ params }: ConsultaPublicaPageProps
   }, [contexto, opcionSeleccionada, respuestaEnviada, respuestaExistente]);
 
   if (!contexto) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#eef2e8] p-4 text-[#182018]"><section className="max-w-lg rounded-2xl border border-[#cfd8c6] bg-white p-6 text-center shadow-sm"><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HubYa</p><h1 className="mt-2 text-2xl font-black">Consulta no encontrada</h1><p className="mt-2 text-sm font-semibold text-[#66745c]">El link no existe en este navegador o todavía no fue generado.</p></section></main>;
+    return <main className="flex min-h-screen items-center justify-center bg-[#eef2e8] p-4 text-[#182018]"><section className="max-w-lg rounded-2xl border border-[#cfd8c6] bg-white p-6 text-center shadow-sm"><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">HUBYA</p><h1 className="mt-2 text-2xl font-black">Consulta no encontrada</h1><p className="mt-2 text-sm font-semibold text-[#66745c]">El link no existe en este navegador o todavía no fue generado.</p></section></main>;
   }
 
   if (respuestaEnviada || respuestaExistente) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#eef2e8] p-4 text-[#182018]"><section className="max-w-lg rounded-2xl border border-[#b7d6ba] bg-white p-6 text-center shadow-sm"><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">{contexto.consulta.hub}</p><h1 className="mt-2 text-2xl font-black">Gracias. Tu respuesta fue registrada.</h1><p className="mt-2 text-sm font-semibold text-[#66745c]">HubYa ya recibió tu respuesta para esta consulta.</p></section></main>;
+    return <main className="flex min-h-screen items-center justify-center bg-[#eef2e8] p-4 text-[#182018]"><section className="max-w-lg rounded-2xl border border-[#b7d6ba] bg-white p-6 text-center shadow-sm"><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#66745c]">{contexto.consulta.hub}</p><h1 className="mt-2 text-2xl font-black">Gracias. Tu respuesta fue registrada.</h1><p className="mt-2 text-sm font-semibold text-[#66745c]">HUBYA ya recibió tu respuesta para esta consulta.</p></section></main>;
   }
 
   return (

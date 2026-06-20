@@ -28,7 +28,7 @@ export default async function FichaHubPage({ params }: { params: Promise<{ hubId
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Ciudad / zona</dt><dd className="mt-1 font-black">{hub.zona}</dd></div>
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Vecinos</dt><dd className="mt-1 font-black">{hub.clientesActivos}</dd></div>
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Capacidad operativa referencial</dt><dd className="mt-1 font-black">{Math.max(1, Math.ceil(hub.clientesActivos / 12))} persona estable</dd></div>
-            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Estabilidad operativa</dt><dd className="mt-1 font-black">{hub.clientesActivos ? "Operativa" : "Sin datos reales"}</dd></div>
+            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Nivel de estabilidad</dt><dd className="mt-1 font-black">{hub.nivelEstabilidad || 8}/10</dd></div>
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Servicios activos</dt><dd className="mt-1 font-black">{hub.servicios.filter((servicio) => servicio.activo).length}</dd></div>
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Abastecimiento de demanda</dt><dd className="mt-1 font-black">{activos.length} activos</dd></div>
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Paisajistas</dt><dd className="mt-1 font-black">{paisajistas.length}</dd></div>

@@ -73,7 +73,7 @@ function contenidoMail(solicitud: SolicitudHub, decision: DecisionSolicitudHub, 
         "",
         `Te informamos que tu solicitud para sumarte a ${hub} fue aprobada.`,
         "",
-        "Desde HubYa vamos a tener en cuenta tus datos para la organización operativa del Hub correspondiente.",
+        "Desde HUBYA vamos a tener en cuenta tus datos para la organización operativa del Hub correspondiente.",
         "",
         "Próximamente podremos comunicarnos con vos para coordinar detalles del servicio, frecuencia y próximas acciones.",
       ]
@@ -88,10 +88,10 @@ function contenidoMail(solicitud: SolicitudHub, decision: DecisionSolicitudHub, 
       ];
 
   if (mensajeOpcional) lineas.push("", "Mensaje administrativo:", mensajeOpcional);
-  lineas.push("", "Saludos,", "Equipo HubYa");
+  lineas.push("", "Saludos,", "Equipo HUBYA");
   const text = lineas.join("\n");
   const html = `<!doctype html><html><body style="margin:0;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;"><div style="max-width:680px;margin:0 auto;padding:24px;white-space:pre-line;font-size:14px;line-height:1.5;">${escaparHtml(text)}</div></body></html>`;
-  return { subject: decision === "aprobada" ? "Solicitud aprobada — HubYa" : "Respuesta a tu solicitud — HubYa", text, html };
+  return { subject: decision === "aprobada" ? "Solicitud aprobada — HUBYA" : "Respuesta a tu solicitud — HUBYA", text, html };
 }
 
 async function enviarMailSolicitud(solicitud: SolicitudHub, decision: DecisionSolicitudHub, mensajeOpcional: string) {

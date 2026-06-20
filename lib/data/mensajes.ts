@@ -24,7 +24,7 @@ type ActualizarRespuestaInput = { respuestaId: string; estado: EstadoRespuestaOp
 const RESEND_API_URL = "https://api.resend.com/emails";
 const estadosRespuesta = new Set<EstadoRespuestaOperativa>(["nueva", "leída", "respondida", "pendiente", "archivada"]);
 const canales = new Set<CanalMensajeOperativo>(["email", "whatsapp", "manual", "sistema"]);
-const acercaDefault = "HubYa agrupa demanda por Hub, coordina información operativa y escucha respuestas para organizar próximos pasos.";
+const acercaDefault = "HUBYA agrupa demanda por Hub, coordina información operativa y escucha respuestas para organizar próximos pasos.";
 
 function texto(valor: unknown) { return typeof valor === "string" ? valor.trim() : ""; }
 function uid(prefijo: string) { return `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`; }
