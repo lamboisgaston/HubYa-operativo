@@ -11,14 +11,18 @@ export default async function OperativoPage() {
       <section className="mx-auto flex max-w-6xl flex-col gap-6">
         <header className="rounded-[2rem] border border-[#d8dfd1] bg-white p-6 shadow-sm">
           <h1 className="text-3xl font-black sm:text-4xl">HUBYA Operativo</h1>
-          <p className="mt-2 max-w-2xl text-sm font-semibold text-[#5f6f55]">Elegí un Hub o administrá la red operativa.</p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link href="/operativo/mensajes" className="rounded-2xl bg-[#1f2a1d] px-4 py-3 text-center text-sm font-black text-white">Enviar mensaje</Link>
-            <Link href="/operativo/mensajes#respuestas" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Respuestas recibidas</Link>
+          <p className="mt-2 max-w-2xl text-sm font-semibold text-[#5f6f55]">Elegí un Hub, elegí personas, enviá una comunicación y mirá qué respondió cada una.</p>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+            <Link href="/operativo" className="rounded-2xl bg-[#1f2a1d] px-4 py-3 text-center text-sm font-black text-white">Hubs</Link>
+            <Link href="/operativo/usuarios" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Usuarios</Link>
+            <Link href="#base-general" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Agregar usuario</Link>
+            <Link href="#crear-hub" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Crear Hub</Link>
+            <Link href="/operativo/comunicaciones" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Comunicaciones</Link>
+            <Link href="/operativo/centro-respuestas" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Centro de respuestas</Link>
           </div>
         </header>
 
-        <CrearHubForm />
+        <div id="crear-hub"><CrearHubForm /></div>
 
         <section className="grid gap-4">
           <div>
@@ -31,7 +35,7 @@ export default async function OperativoPage() {
               <h3 className="text-2xl font-black uppercase leading-tight">{hub.nombre}</h3>
               <p className="mt-1 text-sm font-bold text-[#66745c]">{hub.zona}</p>
               <dl className="mt-5 grid gap-3 rounded-2xl bg-[#f8faf5] p-4 text-sm">
-                <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Vecinos reales</dt><dd className="font-black">{hub.cantidadClientes}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Usuarios del Hub</dt><dd className="font-black">{hub.cantidadClientes}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Borradores</dt><dd className="font-black">{hub.cantidadReportesBorrador}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Reportes guardados</dt><dd className="font-black">{hub.cantidadReportesGuardados}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="font-black text-[#66745c]">Servicios activos</dt><dd className="font-black">{hub.serviciosActivos.length}</dd></div>

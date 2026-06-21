@@ -16,7 +16,7 @@ export default async function HubEntradaPage({ params }: { params: Promise<{ hub
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="text-3xl font-black">¿Qué querés hacer?</h1>
-              <p className="mt-1 text-sm font-bold text-[#66745c]">Entrá solo a la herramienta que necesitás usar ahora.</p>
+              <p className="mt-1 text-sm font-bold text-[#66745c]">Todo lo del Hub en una sola estructura: ficha, usuarios, reportes, comunicaciones, respuestas, parámetros e historial.</p>
             </div>
             <Link href="/operativo" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black">Volver a mis Hubs</Link>
           </div>
@@ -24,12 +24,13 @@ export default async function HubEntradaPage({ params }: { params: Promise<{ hub
 
         <div className="grid gap-4 sm:grid-cols-2">
           {[
-            ["Ficha del Hub", "ficha"],
+            ["Ficha", "ficha"],
+            ["Usuarios", "usuarios"],
+            ["Hub Operativo", "ficha#hub-operativo"],
             ["Reportes", "reportes"],
-            ["Contactos", "contactos"],
-            ["Vínculos", "vinculos"],
-            ["Mensajes y respuestas", "mensajes"],
-            ["Parámetros operativos", "parametros"],
+            ["Comunicaciones", "comunicaciones"],
+            ["Respuestas", "respuestas"],
+            ["Parámetros", "parametros"],
           ].map(([label, path]) => (
             <Link key={path} href={`/operativo/hubs/${hub.slug}/${path}`} className="rounded-[2rem] border border-[#d8dfd1] bg-white p-8 text-center text-2xl font-black shadow-sm transition hover:border-[#1f2a1d] hover:bg-[#eef2e8]">
               {label}
@@ -40,7 +41,7 @@ export default async function HubEntradaPage({ params }: { params: Promise<{ hub
         <section className="rounded-[2rem] border border-[#d8dfd1] bg-white p-6 shadow-sm">
           <h2 className="text-xl font-black">Resumen simple</h2>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Vecinos</dt><dd className="text-2xl font-black">{hub.clientesActivos}</dd></div>
+            <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Usuarios</dt><dd className="text-2xl font-black">{hub.clientesActivos}</dd></div>
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Borradores</dt><dd className="text-2xl font-black">{detalle?.reportesBorrador.length ?? 0}</dd></div>
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Reportes guardados</dt><dd className="text-2xl font-black">{(detalle?.reportesGuardados.length ?? 0) + (detalle?.reportesEnviados.length ?? 0)}</dd></div>
             <div className="rounded-2xl bg-[#f8faf5] p-4"><dt className="font-black text-[#66745c]">Servicios activos</dt><dd className="text-2xl font-black">{serviciosActivos}</dd></div>
