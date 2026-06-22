@@ -32,7 +32,7 @@ const TARIFAS_CLIENTE: Array<{ value: TarifaCliente; label: string }> = [
 
 type FilaGasto = { id: number; concepto: string; importe: CampoNumerico };
 type FilaActor = { id: number; nombre: string; activo: boolean; participacion: CampoNumerico; ajusteManual: CampoNumerico; email?: string; whatsapp?: string; rol?: string; recibeReportes?: boolean; participaDistribucion?: boolean; observacion?: string };
-type VentaAsociadaVertical = "HueverosYa" | "VerdulerosYa" | "Otro servicio";
+type VentaAsociadaVertical = "HueverosYa" | "VerdulerosYa" | "Otro";
 type VentaAsociada = { activa: boolean; vertical: VentaAsociadaVertical; producto: string; precio: CampoNumerico; linkPago: string; entrega: string };
 
 type ResumenHubManual = {
@@ -194,8 +194,8 @@ const ENVIOS_REPORTES_STORAGE_KEY = "hubya-envios-reportes";
 const NUEVO_HUB_FORM_INICIAL = { tipoHub: "demanda", nombre: "", zona: "", rama: "", equipoOperativo: "", descripcion: "", responsable: "" };
 const NUEVO_VINCULO_FORM_INICIAL = { hub_id: "Hub Tipal" as HubDisponible, oferta_id: "", estado: "POSTULANTE" as EstadoHubVinculo, rol: "Resolutor", fecha_inicio: "", fecha_fin: "", capacidad: "", observaciones: "" };
 const PRODUCTOS_HUEVEROS_YA = ["1/2 caja de huevos grandes", "1 caja de huevos grandes", "2 cajas de huevos grandes"];
-const OPCIONES_ENTREGA_VENTA = ["Mañana lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Entregar junto con la jardinería"];
-const VENTA_ASOCIADA_INICIAL: VentaAsociada = { activa: false, vertical: "HueverosYa", producto: PRODUCTOS_HUEVEROS_YA[0], precio: 0, linkPago: "", entrega: OPCIONES_ENTREGA_VENTA[0] };
+const ENTREGA_VENTA_ASOCIADA = "Se entrega junto con la próxima visita de jardinería.";
+const VENTA_ASOCIADA_INICIAL: VentaAsociada = { activa: false, vertical: "HueverosYa", producto: PRODUCTOS_HUEVEROS_YA[0], precio: 0, linkPago: "", entrega: ENTREGA_VENTA_ASOCIADA };
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -439,7 +439,7 @@ function conceptoTarifaCliente(cliente: Pick<FilaClienteIngreso, "importe" | "ta
 }
 
 function normalizarVentaAsociada(venta: Partial<VentaAsociada> | undefined): VentaAsociada {
-  const vertical = ["HueverosYa", "VerdulerosYa", "Otro servicio"].includes(String(venta?.vertical)) ? venta?.vertical as VentaAsociadaVertical : "HueverosYa";
+  const vertical = venta?.vertical === "HueverosYa" || venta?.vertical === "VerdulerosYa" ? venta.vertical : venta?.vertical === "Otro" || venta?.vertical === "Otro servicio" ? "Otro" : "HueverosYa";
   const productoPorDefecto = vertical === "HueverosYa" ? PRODUCTOS_HUEVEROS_YA[0] : "";
   return {
     activa: Boolean(venta?.activa),
@@ -447,7 +447,7 @@ function normalizarVentaAsociada(venta: Partial<VentaAsociada> | undefined): Ven
     producto: String(venta?.producto || productoPorDefecto),
     precio: venta?.precio ?? 0,
     linkPago: String(venta?.linkPago || ""),
-    entrega: String(venta?.entrega || OPCIONES_ENTREGA_VENTA[0]),
+    entrega: ENTREGA_VENTA_ASOCIADA,
   };
 }
 
@@ -1066,12 +1066,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const bloqueVentaTexto = useMemo(() => ventaAsociada.activa ? [
     "",
     "VENTA ASOCIADA",
-    `Vertical: ${ventaAsociada.vertical}`,
-    `Producto: ${ventaAsociada.producto || "Sin producto seleccionado"}`,
+    ventaAsociada.vertical,
+    `Producto: ${ventaAsociada.vertical === "HueverosYa" ? ventaAsociada.producto || "Sin producto seleccionado" : "Sin producto seleccionado"}`,
     `Precio: ${formatoPlano(ventaAsociada.precio) || formatoMoneda(0)}`,
-    `Entrega: ${ventaAsociada.entrega || "Sin entrega seleccionada"}`,
+    "Entrega junto con la próxima visita de jardinería",
     `Link de pago: ${ventaAsociada.linkPago || "Sin link de pago cargado"}`,
-  ] : [], [ventaAsociada.activa, ventaAsociada.entrega, ventaAsociada.linkPago, ventaAsociada.precio, ventaAsociada.producto, ventaAsociada.vertical]);
+  ] : [], [ventaAsociada.activa, ventaAsociada.linkPago, ventaAsociada.precio, ventaAsociada.producto, ventaAsociada.vertical]);
   const resumenesDelHub = historialResumenes[jornada.hub] || [];
   const borradoresDelHub = borradoresReportes[jornada.hub] || [];
   const clientesSinEmailReporte = datosHub.clientesIngresos.filter((cliente) => !cliente.email.trim());
@@ -1378,7 +1378,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                     <tr><td colspan="3" style="border:1px solid #d8dfd1;padding:8px;color:#66745c;font-weight:700;">${escaparHtml(MENSAJE_SIN_GASTOS_REALES)}</td></tr>`;
   const filasActoresHtml = distribucionCalculada.map((actor) => `
                     <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(actor.nombre || "Sin actor")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:center;">${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoMoneda(actor.importeFinal))}</td></tr>`).join("");
-  const ventaAsociadaHtml = ventaAsociada.activa ? `<section style="margin-top:14px;border:1px solid #9aa78f;background:#fbfcf9;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Venta asociada</h2><p style="margin:0;"><strong>Vertical:</strong> ${escaparHtml(ventaAsociada.vertical)}</p><p style="margin:6px 0 0;"><strong>Producto:</strong> ${escaparHtml(ventaAsociada.producto || "Sin producto seleccionado")}</p><p style="margin:6px 0 0;"><strong>Precio:</strong> ${escaparHtml(formatoPlano(ventaAsociada.precio) || formatoMoneda(0))}</p><p style="margin:6px 0 0;"><strong>Entrega:</strong> ${escaparHtml(ventaAsociada.entrega || "Sin entrega seleccionada")}</p><p style="margin:6px 0 0;"><strong>Link de pago:</strong> ${ventaAsociada.linkPago ? `<a href="${escaparHtml(ventaAsociada.linkPago)}" style="color:#1f2a1d;font-weight:900;">${escaparHtml(ventaAsociada.linkPago)}</a>` : "Sin link de pago cargado"}</p></section>` : "";
+  const ventaAsociadaHtml = ventaAsociada.activa ? `<section style="margin-top:18px;border:1px solid #9aa78f;background:#fbfcf9;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Venta asociada</h2><p style="margin:0;font-size:14px;font-weight:900;">${escaparHtml(ventaAsociada.vertical)}</p><p style="margin:6px 0 0;"><strong>Producto:</strong> ${escaparHtml(ventaAsociada.vertical === "HueverosYa" ? ventaAsociada.producto || "Sin producto seleccionado" : "Sin producto seleccionado")}</p><p style="margin:6px 0 0;"><strong>Precio:</strong> ${escaparHtml(formatoPlano(ventaAsociada.precio) || formatoMoneda(0))}</p><p style="margin:6px 0 0;"><strong>Entrega:</strong> Entrega junto con la próxima visita de jardinería</p><p style="margin:6px 0 0;"><strong>Link de pago:</strong> ${ventaAsociada.linkPago ? `<a href="${escaparHtml(ventaAsociada.linkPago)}" style="color:#1f2a1d;font-weight:900;">${escaparHtml(ventaAsociada.linkPago)}</a>` : "Sin link de pago cargado"}</p></section>` : "";
 
   function armarReporteHtmlParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
@@ -2269,31 +2269,29 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
               <h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Venta asociada</h3>
-              <p className="mb-2 text-xs font-bold text-[#66745c]">¿Este reporte lleva una venta asociada?</p>
+              <p className="mb-2 text-xs font-bold text-[#66745c]">¿Este reporte lleva venta asociada?</p>
               <div className="mb-3 flex flex-wrap gap-2 text-xs">
-                <button type="button" onClick={() => actualizarVentaAsociada({ activa: false })} className={`h-8 rounded-md px-3 font-black ${!ventaAsociada.activa ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>No lleva venta</button>
-                <button type="button" onClick={() => actualizarVentaAsociada({ activa: true })} className={`h-8 rounded-md px-3 font-black ${ventaAsociada.activa ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>Sí, agregar venta</button>
+                <button type="button" onClick={() => actualizarVentaAsociada({ activa: false })} className={`h-8 rounded-md px-3 font-black ${!ventaAsociada.activa ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>No</button>
+                <button type="button" onClick={() => actualizarVentaAsociada({ activa: true })} className={`h-8 rounded-md px-3 font-black ${ventaAsociada.activa ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>Sí</button>
               </div>
               {ventaAsociada.activa && <div className="grid gap-3 lg:grid-cols-3">
                 <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Vertical
                   <select value={ventaAsociada.vertical} onChange={(e) => actualizarVentaAsociada({ vertical: e.target.value as VentaAsociadaVertical, producto: e.target.value === "HueverosYa" ? PRODUCTOS_HUEVEROS_YA[0] : "" })} className="h-8 rounded-lg border px-2 text-sm normal-case">
-                    <option>HueverosYa</option><option>VerdulerosYa</option><option>Otro servicio</option>
+                    <option>HueverosYa</option><option>VerdulerosYa</option><option>Otro</option>
                   </select>
                 </label>
-                {ventaAsociada.vertical === "HueverosYa" ? <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Producto
-                  <select value={ventaAsociada.producto} onChange={(e) => actualizarVentaAsociada({ producto: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case">{PRODUCTOS_HUEVEROS_YA.map((producto) => <option key={producto}>{producto}</option>)}</select>
-                </label> : <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Producto / servicio
-                  <input value={ventaAsociada.producto} onChange={(e) => actualizarVentaAsociada({ producto: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                </label>}
-                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio
-                  <input type="number" step="1" min="0" value={ventaAsociada.precio} onChange={(e) => actualizarVentaAsociada({ precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                </label>
-                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] lg:col-span-2">Link de pago Mercado Pago
-                  <input value={ventaAsociada.linkPago} onChange={(e) => actualizarVentaAsociada({ linkPago: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                </label>
-                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Entrega
-                  <select value={ventaAsociada.entrega} onChange={(e) => actualizarVentaAsociada({ entrega: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case">{OPCIONES_ENTREGA_VENTA.map((opcion) => <option key={opcion}>{opcion}</option>)}</select>
-                </label>
+                {ventaAsociada.vertical === "HueverosYa" && <>
+                  <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Producto
+                    <select value={ventaAsociada.producto} onChange={(e) => actualizarVentaAsociada({ producto: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case">{PRODUCTOS_HUEVEROS_YA.map((producto) => <option key={producto}>{producto}</option>)}</select>
+                  </label>
+                  <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio manual
+                    <input type="number" step="1" min="0" value={ventaAsociada.precio} onChange={(e) => actualizarVentaAsociada({ precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                  </label>
+                  <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] lg:col-span-2">Link de pago Mercado Pago
+                    <input value={ventaAsociada.linkPago} onChange={(e) => actualizarVentaAsociada({ linkPago: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                  </label>
+                  <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#4f5f47] lg:col-span-3">{ENTREGA_VENTA_ASOCIADA} El pago funciona como pedido pagado / confirmado para entregar; no marca la entrega como realizada.</p>
+                </>}
               </div>}
             </section>
 
