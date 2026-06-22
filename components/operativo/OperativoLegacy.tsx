@@ -33,7 +33,7 @@ const TARIFAS_CLIENTE: Array<{ value: TarifaCliente; label: string }> = [
 type FilaGasto = { id: number; concepto: string; importe: CampoNumerico };
 type FilaActor = { id: number; nombre: string; activo: boolean; participacion: CampoNumerico; ajusteManual: CampoNumerico; email?: string; whatsapp?: string; rol?: string; recibeReportes?: boolean; participaDistribucion?: boolean; observacion?: string };
 type VentaAsociadaVertical = "HueverosYa" | "VerdulerosYa" | "Otro";
-type VentaAsociada = { activa: boolean; vertical: VentaAsociadaVertical; producto: string; precio: CampoNumerico; linkPago: string; entrega: string };
+type VentaAsociada = { activa: boolean; vertical: VentaAsociadaVertical; producto: string; precio: CampoNumerico; foto: string; linkPago: string; entrega: string };
 
 type ResumenHubManual = {
   tiempoEfectivo: string;
@@ -194,8 +194,8 @@ const ENVIOS_REPORTES_STORAGE_KEY = "hubya-envios-reportes";
 const NUEVO_HUB_FORM_INICIAL = { tipoHub: "demanda", nombre: "", zona: "", rama: "", equipoOperativo: "", descripcion: "", responsable: "" };
 const NUEVO_VINCULO_FORM_INICIAL = { hub_id: "Hub Tipal" as HubDisponible, oferta_id: "", estado: "POSTULANTE" as EstadoHubVinculo, rol: "Resolutor", fecha_inicio: "", fecha_fin: "", capacidad: "", observaciones: "" };
 const PRODUCTOS_HUEVEROS_YA = ["1/2 caja de huevos grandes", "1 caja de huevos grandes", "2 cajas de huevos grandes"];
-const ENTREGA_VENTA_ASOCIADA = "Se entrega junto con la próxima visita de jardinería.";
-const VENTA_ASOCIADA_INICIAL: VentaAsociada = { activa: false, vertical: "HueverosYa", producto: PRODUCTOS_HUEVEROS_YA[0], precio: 0, linkPago: "", entrega: ENTREGA_VENTA_ASOCIADA };
+const ENTREGA_VENTA_ASOCIADA = "Entregado en tu domicilio junto con el servicio de jardinería.";
+const VENTA_ASOCIADA_INICIAL: VentaAsociada = { activa: false, vertical: "HueverosYa", producto: PRODUCTOS_HUEVEROS_YA[0], precio: 0, foto: "", linkPago: "", entrega: ENTREGA_VENTA_ASOCIADA };
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -446,6 +446,7 @@ function normalizarVentaAsociada(venta: Partial<VentaAsociada> | undefined): Ven
     vertical,
     producto: String(venta?.producto || productoPorDefecto),
     precio: venta?.precio ?? 0,
+    foto: String(venta?.foto || ""),
     linkPago: String(venta?.linkPago || ""),
     entrega: ENTREGA_VENTA_ASOCIADA,
   };
@@ -1069,7 +1070,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     ventaAsociada.vertical,
     `Producto: ${ventaAsociada.vertical === "HueverosYa" ? ventaAsociada.producto || "Sin producto seleccionado" : "Sin producto seleccionado"}`,
     `Precio: ${formatoPlano(ventaAsociada.precio) || formatoMoneda(0)}`,
-    "Entrega junto con la próxima visita de jardinería",
+    ENTREGA_VENTA_ASOCIADA,
     `Link de pago: ${ventaAsociada.linkPago || "Sin link de pago cargado"}`,
   ] : [], [ventaAsociada.activa, ventaAsociada.linkPago, ventaAsociada.precio, ventaAsociada.producto, ventaAsociada.vertical]);
   const resumenesDelHub = historialResumenes[jornada.hub] || [];
@@ -1261,76 +1262,42 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   }
 
 
-  const reporteTexto = useMemo(() => [
-    `HUBYA — ${tituloReporteHub}`,
-    `Sistema: ${hubActual?.rama || "HUBYA"}`,
-    `Hub: ${jornada.hub}`,
-    `Fecha: ${fechaFormateada}`,
-    `Módulo operativo: ${moduloOperativoReporte}`,
-    `Integrantes del Hub: ${integrantesHubReporte}`,
-    `Nivel de estabilidad: ${nivelEstabilidadReporte}/10`,
-    `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
-    `Cliente seleccionado: ${clienteActivo?.nombre || "Sin cliente seleccionado"}`,
-    "",
-    "CLIENTES / INGRESOS",
-    ...datosHub.clientesIngresos.map((cliente, index) => `${nombrePrivado(cliente, index) || "Sin cliente"} · ${estadoVisitaCliente(cliente)} · ${conceptoTarifaCliente(cliente)} · Importe: ${formatoPlano(cliente.importe) || formatoMoneda(0)} · Dato operativo: ${moduloOperativoReporte}`),
-    `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
-    "",
-    "GASTOS",
-    ...(gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto) => `${gasto.concepto || "Sin concepto"}: ${formatoPlano(gasto.importe) || formatoMoneda(0)}`) : [MENSAJE_SIN_GASTOS_REALES]),
-    `Total gastos: ${formatoMoneda(totalGastos)}`,
-    `Total a distribuir: ${formatoMoneda(totalADistribuir)}`,
-    "",
-    "DISTRIBUCIÓN OPERATIVA",
-    ...distribucionCalculada.map((actor) => `${actor.nombre || "Sin actor"}: ${formatoMoneda(actor.importeFinal)} (${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"})`),
-    `Total distribuido: ${formatoMoneda(totalDistribuido)}`,
-    "",
-    `Tiempo efectivo: ${datosHub.resumen.tiempoEfectivo || "Sin cargar"}`,
-    `Estado operativo: ${datosHub.resumen.estadoOperativo || "Sin cargar"}`,
-    `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
-    "",
-    ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
-    ...bloqueVentaTexto,
-    "",
-    "CONTACTO POR DUDAS",
-    contactoDudasReporte,
-  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, gastosRealesDelDia, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, hubActual?.rama, hubActual?.moduloOperativo, hubActual?.nivelEstabilidad, informacionReporte, integrantesHubReporte, moduloOperativoReporte, nivelEstabilidadReporte, tituloReporteHub, bloqueVentaTexto]);
+  const clientesDelHub = datosHub.clientesIngresos;
+  const clienteActivoReporte = clientesDelHub.find((cliente) => cliente.id === datosHub.clienteActivoId) || clientesDelHub[0] || clienteActivo;
+
+  function textoReportePrevioParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
+    const clienteReporte = clienteObjetivo || clienteActivoReporte;
+    const importesNormales = clientesDelHub.filter((cliente) => cliente.id !== clienteReporte?.id && importeCliente(cliente) > 0).map((cliente) => importeCliente(cliente));
+    const importeNormal = importesNormales.length > 0 ? importesNormales.reduce((total, valor) => total + valor, 0) / importesNormales.length : importeCliente(clienteReporte);
+    const desvioNormal = importeNormal > 0 ? Math.round(((importeCliente(clienteReporte) - importeNormal) / importeNormal) * 100) : 0;
+    return [
+      "TU ÚLTIMA VISITA",
+      `Importe última visita: ${formatoPlano(clienteReporte?.importe) || formatoMoneda(0)}`,
+      `Desvío respecto a la normal: ${desvioNormal}%`,
+      "",
+      "Para ver detalles del reporte de jardinería:",
+      "www.jardinerosya.online",
+      ...bloqueVentaTexto.length ? ["", "OPORTUNIDADES PARA ESTA VISITA", "Productos disponibles para entregar en tu domicilio junto con el servicio de jardinería.", ...bloqueVentaTexto.filter(Boolean)] : [],
+      "",
+      "RESUMEN ANTERIOR DEL HUB",
+      `Hub: ${jornada.hub}`,
+      `Fecha anterior: ${fechaFormateada}`,
+      `Integrantes activos: ${integrantesHubReporte}`,
+      `Servicio realizado: ${moduloOperativoReporte}`,
+      `Estado general del Hub 1 a 10: ${nivelEstabilidadReporte}/10`,
+      `Horas trabajadas: ${datosHub.resumen.tiempoEfectivo || "Sin cargar"}`,
+      `Gastos del día: ${formatoPlano(totalGastos) || formatoMoneda(0)}`,
+      `Servicios de maquinaria y transporte: ${gastosRealesDelDia.filter((gasto) => /maquin|transp|nafta|aceite|tanza/i.test(gasto.concepto)).map((gasto) => `${gasto.concepto}: ${formatoPlano(gasto.importe)}`).join(" · ") || "Sin cargar"}`,
+      `Servicios de administración del Hub: ${distribucionCalculada.filter((actor) => /admin|responsable|capataz/i.test(`${actor.nombre} ${actor.rol || ""}`)).map((actor) => actor.nombre || actor.rol || "Administración").join(" · ") || "Sin cargar"}`,
+      `Otros insumos: ${gastosRealesDelDia.filter((gasto) => !/maquin|transp|nafta|aceite|tanza/i.test(gasto.concepto)).map((gasto) => `${gasto.concepto}: ${formatoPlano(gasto.importe)}`).join(" · ") || "Sin cargar"}`,
+      `Observaciones rápidas: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
+    ].join("\n");
+  }
+
+  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, bloqueVentaTexto, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, gastosRealesDelDia, integrantesHubReporte, jornada.hub, moduloOperativoReporte, nivelEstabilidadReporte, totalGastos]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
-    return [
-      `HUBYA — ${tituloReporteHub}`,
-      `Sistema: ${hubActual?.rama || "HUBYA"}`,
-      `Hub: ${jornada.hub}`,
-      `Fecha: ${fechaFormateada}`,
-      `Módulo operativo: ${moduloOperativoReporte}`,
-      `Integrantes del Hub: ${integrantesHubReporte}`,
-      `Nivel de estabilidad: ${nivelEstabilidadReporte}/10`,
-        `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
-      `Cliente seleccionado: ${clienteObjetivo.nombre || "Sin cliente seleccionado"}`,
-      "",
-      "CLIENTES / INGRESOS",
-      ...datosHub.clientesIngresos.map((cliente, index) => `${cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : aliasVecino(index)} · ${estadoVisitaCliente(cliente)} · ${conceptoTarifaCliente(cliente)} · Importe: ${formatoPlano(cliente.importe) || formatoMoneda(0)} · Dato operativo: ${moduloOperativoReporte}`),
-      `Total facturado al Hub: ${formatoMoneda(totalFacturadoHub)}`,
-      "",
-      "GASTOS",
-      ...(gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto) => `${gasto.concepto || "Sin concepto"}: ${formatoPlano(gasto.importe) || formatoMoneda(0)}`) : [MENSAJE_SIN_GASTOS_REALES]),
-      `Total gastos: ${formatoMoneda(totalGastos)}`,
-      `Total a distribuir: ${formatoMoneda(totalADistribuir)}`,
-      "",
-      "DISTRIBUCIÓN OPERATIVA",
-      ...distribucionCalculada.map((actor) => `${actor.nombre || "Sin actor"}: ${formatoMoneda(actor.importeFinal)} (${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"})`),
-      `Total distribuido: ${formatoMoneda(totalDistribuido)}`,
-      "",
-      `Tiempo efectivo: ${datosHub.resumen.tiempoEfectivo || "Sin cargar"}`,
-      `Estado operativo: ${datosHub.resumen.estadoOperativo || "Sin cargar"}`,
-      `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
-      "",
-      ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
-      ...bloqueVentaTexto,
-      "",
-      "CONTACTO POR DUDAS",
-      contactoDudasReporte,
-    ].join("\n");
+    return textoReportePrevioParaCliente(clienteObjetivo);
   }
 
   const asuntoReporte = `Reporte diario HUBYA — ${jornada.hub} — ${fechaFormateada}`;
@@ -1351,92 +1318,31 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     setBorradoresReportes((actual) => ({ ...actual, [jornada.hub]: [borrador, ...(actual[jornada.hub] || []).filter((item) => item.id !== borrador.id)] }));
   }, [firmaDatosHub, isMounted, hubSeleccionado, jornada.fecha, jornada.hub, jornada.nombreResumen, reporteTexto, seccionActiva]);
 
-  const clientesDelHub = datosHub.clientesIngresos;
-  const clienteActivoReporte = clientesDelHub.find((cliente) => cliente.id === datosHub.clienteActivoId) || clientesDelHub[0] || clienteActivo;
-
-  function filasClientesHtmlPara(clienteObjetivo: FilaClienteIngreso | undefined) {
-    return clientesDelHub.map((cliente, index) => {
-      const nombreVisible = !clienteObjetivo ? (cliente.nombre || "Sin cliente") : cliente.id === clienteObjetivo.id ? (cliente.nombre || "Sin cliente") : aliasVecino(index);
-      const estadoVisita = estadoVisitaCliente(cliente);
-      const importe = formatoPlano(cliente.importe) || formatoMoneda(0);
-      return `
-                    <tr>
-                      <td style="border:1px solid #d8dfd1;padding:8px;font-weight:700;">${escaparHtml(nombreVisible)}</td>
-                      <td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(jornada.hub)}</td>
-                      <td style="border:1px solid #d8dfd1;padding:8px;font-weight:800;color:${estadoVisita === "Saltea visita" ? "#8a6a16" : "#2f6d32"};">${escaparHtml(estadoVisita)}</td>
-                      <td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(conceptoTarifaCliente(cliente))}</td>
-                      <td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</td>
-                      <td style="border:1px solid #d8dfd1;padding:8px;text-align:right;font-weight:900;">${escaparHtml(importe)}</td>
-                    </tr>
-                    <tr><td colspan="6" style="border:1px solid #d8dfd1;border-top:0;background:#f6f8f3;padding:8px;color:#4f5f47;font-weight:800;">Dato operativo: ${escaparHtml(moduloOperativoReporte)}</td></tr>
-                    <tr><td colspan="6" style="border:1px solid #d8dfd1;border-top:0;background:#fbfcf9;padding:8px;color:#4f5f47;"><strong>Observación:</strong> ${escaparHtml(observacionCliente(cliente))}</td></tr>`;
-    }).join("");
-  }
-  const filasClientesHtml = filasClientesHtmlPara(clienteActivoReporte);
-  const filasGastosHtml = gastosRealesDelDia.length > 0 ? gastosRealesDelDia.map((gasto) => `
-                    <tr><td colspan="2" style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(gasto.concepto || "Sin concepto")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoPlano(gasto.importe))}</td></tr>`).join("") : `
-                    <tr><td colspan="3" style="border:1px solid #d8dfd1;padding:8px;color:#66745c;font-weight:700;">${escaparHtml(MENSAJE_SIN_GASTOS_REALES)}</td></tr>`;
-  const filasActoresHtml = distribucionCalculada.map((actor) => `
-                    <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(actor.nombre || "Sin actor")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:center;">${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoMoneda(actor.importeFinal))}</td></tr>`).join("");
-  const ventaAsociadaHtml = ventaAsociada.activa ? `<section style="margin-top:18px;border:1px solid #9aa78f;background:#fbfcf9;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Venta asociada</h2><p style="margin:0;font-size:14px;font-weight:900;">${escaparHtml(ventaAsociada.vertical)}</p><p style="margin:6px 0 0;"><strong>Producto:</strong> ${escaparHtml(ventaAsociada.vertical === "HueverosYa" ? ventaAsociada.producto || "Sin producto seleccionado" : "Sin producto seleccionado")}</p><p style="margin:6px 0 0;"><strong>Precio:</strong> ${escaparHtml(formatoPlano(ventaAsociada.precio) || formatoMoneda(0))}</p><p style="margin:6px 0 0;"><strong>Entrega:</strong> Entrega junto con la próxima visita de jardinería</p><p style="margin:6px 0 0;"><strong>Link de pago:</strong> ${ventaAsociada.linkPago ? `<a href="${escaparHtml(ventaAsociada.linkPago)}" style="color:#1f2a1d;font-weight:900;">${escaparHtml(ventaAsociada.linkPago)}</a>` : "Sin link de pago cargado"}</p></section>` : "";
+  const ventaAsociadaHtml = ventaAsociada.activa ? `<section style="margin-top:18px;border:1px solid #d8dfd1;background:#fbfcf9;padding:14px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 4px;color:#1f2a1d;font-size:16px;font-weight:900;">Oportunidades para esta visita</h2><p style="margin:0 0 12px;color:#4f5f47;font-weight:700;">Productos disponibles para entregar en tu domicilio junto con el servicio de jardinería.</p><article style="border:1px solid #cfd8c6;background:#ffffff;border-radius:18px;padding:12px;overflow:hidden;"><p style="margin:0 0 8px;color:#66745c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">${escaparHtml(ventaAsociada.vertical)}</p>${ventaAsociada.foto ? `<img src="${escaparHtml(ventaAsociada.foto)}" alt="${escaparHtml(ventaAsociada.producto || ventaAsociada.vertical)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid #eef1e9;margin-bottom:10px;" />` : `<div style="height:120px;border-radius:14px;border:1px dashed #cfd8c6;background:#f8faf5;margin-bottom:10px;display:flex;align-items:center;justify-content:center;color:#66745c;font-weight:900;">Foto del producto</div>`}<h3 style="margin:0;font-size:17px;font-weight:900;">${escaparHtml(ventaAsociada.producto || "Producto sin nombre")}</h3><p style="margin:8px 0 0;font-size:18px;font-weight:900;color:#1f2a1d;">${escaparHtml(formatoPlano(ventaAsociada.precio) || formatoMoneda(0))}</p><p style="margin:8px 0 0;color:#4f5f47;font-weight:800;">${escaparHtml(ENTREGA_VENTA_ASOCIADA)}</p>${ventaAsociada.linkPago ? `<a href="${escaparHtml(ventaAsociada.linkPago)}" style="display:inline-block;margin-top:10px;background:#1f2a1d;color:#fff;padding:10px 12px;border-radius:12px;text-decoration:none;font-weight:900;">Pagar y confirmar pedido</a>` : `<p style="margin:10px 0 0;color:#743c3c;font-weight:900;">Sin link de pago Mercado Pago cargado.</p>`}</article></section>` : "";
 
   function armarReporteHtmlParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
     const importe = formatoPlano(clienteReporte?.importe) || formatoMoneda(0);
-    const estadoVisita = estadoVisitaCliente(clienteReporte);
-    const tarifa = conceptoTarifaCliente(clienteReporte);
+    const importesNormales = clientesDelHub.filter((cliente) => cliente.id !== clienteReporte?.id && importeCliente(cliente) > 0).map((cliente) => importeCliente(cliente));
+    const importeNormal = importesNormales.length > 0 ? importesNormales.reduce((total, valor) => total + valor, 0) / importesNormales.length : importeCliente(clienteReporte);
+    const desvioNormal = importeNormal > 0 ? Math.round(((importeCliente(clienteReporte) - importeNormal) / importeNormal) * 100) : 0;
     // Preparado para segunda etapa: este HTML formal puede reutilizarse como fuente de PDF/imagen adjunta sin cambiar el envío actual.
     return `
     <article style="width:100%;max-width:760px;border:1px solid #6f7968;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;">
-      <header style="border-bottom:2px solid #1f2a1d;padding:18px;background:#f8faf5;">
-        <p style="margin:0;color:#66745c;font-size:11px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;">HUBYA</p>
-        <h1 style="margin:4px 0 0;font-size:22px;line-height:1.2;font-weight:900;text-transform:uppercase;">Reporte del Hub</h1>
-        <p style="margin:8px 0 0;color:#4f5f47;font-size:13px;font-weight:700;">Detalle del trabajo coordinado dentro del Hub.</p>
-      </header>
       <section style="padding:16px;">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>
-          <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Hub</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(jornada.hub)}</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Fecha</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(fechaFormateada)}</td></tr>
-          <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Módulo operativo</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(moduloOperativoReporte)}</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Integrantes del Hub</td><td style="border:1px solid #d8dfd1;padding:7px;">${integrantesHubReporte}</td></tr>
-          <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Nivel de estabilidad</td><td style="border:1px solid #d8dfd1;padding:7px;">${nivelEstabilidadReporte}/10</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Zona</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(hubActual?.zona || jornada.hub)}</td></tr>
-        </tbody></table>
-        <section style="margin-top:14px;border:1px solid #1f2a1d;background:#fbfcf9;padding:14px;">
-          <h2 style="margin:0 0 10px;font-size:15px;">Resumen del cliente</h2>
-          <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Cliente</td><td style="border:1px solid #d8dfd1;padding:8px;font-weight:800;">${escaparHtml(clienteReporte?.nombre || "Sin cliente seleccionado")}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Estado de visita</td><td style="border:1px solid #d8dfd1;padding:8px;font-weight:900;">${escaparHtml(estadoVisita)}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Tarifa</td><td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(tarifa)}</td></tr>
-            <tr><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:9px;font-weight:900;">Importe</td><td style="border:1px solid #1f2a1d;background:#eef2e8;padding:9px;font-size:18px;font-weight:900;">${escaparHtml(importe)}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Dato operativo</td><td style="border:1px solid #d8dfd1;padding:8px;font-weight:800;">${escaparHtml(moduloOperativoReporte)}</td></tr>
-            <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:8px;font-weight:900;">Observación</td><td style="border:1px solid #d8dfd1;padding:8px;">${escaparHtml(observacionCliente(clienteReporte))}</td></tr>
-          </tbody></table>
+        <section style="border:1px solid #1f2a1d;background:#fbfcf9;padding:14px;border-radius:18px;">
+          <h2 style="margin:0 0 10px;font-size:18px;font-weight:900;text-transform:uppercase;">Tu última visita</h2>
+          <p style="margin:0 0 8px;font-size:15px;font-weight:900;">Importe última visita: ${escaparHtml(importe)}</p>
+          <p style="margin:0 0 12px;font-size:15px;font-weight:900;">Desvío respecto a la normal: ${desvioNormal}%</p>
+          <p style="margin:0;color:#4f5f47;font-weight:800;">Para ver detalles del reporte de jardinería:<br><a href="https://www.jardinerosya.online" style="color:#1f2a1d;font-weight:900;">www.jardinerosya.online</a></p>
         </section>
-        <table style="margin-top:14px;width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;">
-          <tbody>
-            <tr style="background:#eef2e8;"><th colspan="6" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Detalle por cliente</th></tr>
-            <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Cliente</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Hub</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Estado de visita</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Tarifa</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Horas / frecuencia</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasClientesHtmlPara(clienteObjetivo ? clienteReporte : undefined)}
-            <tr style="background:#fbfcf9;font-weight:900;"><td colspan="5" style="border:1px solid #9aa78f;padding:6px;">Total facturado al Hub</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</td></tr>
-          </tbody>
-        </table>
-        <table style="margin-top:14px;width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;"><tbody>
-          <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Gastos reales del día</th></tr>
-          <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th colspan="2" style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Concepto</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasGastosHtml}
-          <tr style="font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total gastos</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</td></tr>
-        </tbody></table>
-        <table style="margin-top:14px;width:100%;border-collapse:collapse;background:#ffffff;font-size:12px;"><tbody>
-          <tr style="background:#eef2e8;"><th colspan="3" style="border:1px solid #9aa78f;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Distribución operativa</th></tr>
-          <tr style="background:#f8faf5;color:#66745c;font-size:10px;text-transform:uppercase;"><th style="border:1px solid #d8dfd1;padding:6px;text-align:left;">Actor</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:center;">Participación / activo</th><th style="border:1px solid #d8dfd1;padding:6px;text-align:right;">Importe</th></tr>${filasActoresHtml}
-          <tr style="background:#fbfcf9;font-weight:900;"><td colspan="2" style="border:1px solid #9aa78f;padding:6px;">Total distribuido</td><td style="border:1px solid #9aa78f;padding:6px;text-align:right;">${escaparHtml(formatoPlano(totalDistribuido) || formatoMoneda(0))}</td></tr>
-        </tbody></table>
-        <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:12px;font-size:12px;line-height:1.5;"><strong>Detalle del trabajo:</strong><br>${escaparHtml(datosHub.resumen.observacionGeneral || "Sin cargar")}</section>
-        ${informacionReporte ? `<section style="margin-top:14px;border:1px solid #c7d8bf;background:#eef7ea;padding:12px;font-size:12px;line-height:1.5;"><strong>${escaparHtml(informacionReporte.titulo || "Información importante del Hub")}</strong><br>${escaparHtml(informacionReporte.texto)}</section>` : ""}
         ${ventaAsociadaHtml}
-        <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Contacto por dudas</h2><p style="margin:0;font-weight:900;">${escaparHtml(contactoDudasReporte)}</p></section>
-        <footer style="margin-top:14px;background:#1f2a1d;color:#fff;padding:14px;text-align:center;font-size:12px;line-height:1.5;font-weight:700;">HUBYA TECH · www.hubya.tech</footer>
+        <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:12px;border-radius:16px;font-size:12px;line-height:1.45;"><h2 style="margin:0 0 10px;font-size:16px;font-weight:900;">Resumen anterior del Hub</h2><table style="width:100%;border-collapse:collapse;"><tbody><tr><td style="padding:5px;font-weight:900;">Hub</td><td style="padding:5px;">${escaparHtml(jornada.hub)}</td></tr><tr><td style="padding:5px;font-weight:900;">Fecha anterior</td><td style="padding:5px;">${escaparHtml(fechaFormateada)}</td></tr><tr><td style="padding:5px;font-weight:900;">Integrantes activos</td><td style="padding:5px;">${integrantesHubReporte}</td></tr><tr><td style="padding:5px;font-weight:900;">Servicio realizado</td><td style="padding:5px;">${escaparHtml(moduloOperativoReporte)}</td></tr><tr><td style="padding:5px;font-weight:900;">Estado general del Hub 1 a 10</td><td style="padding:5px;">${nivelEstabilidadReporte}/10</td></tr><tr><td style="padding:5px;font-weight:900;">Horas trabajadas</td><td style="padding:5px;">${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</td></tr><tr><td style="padding:5px;font-weight:900;">Gastos del día</td><td style="padding:5px;">${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</td></tr><tr><td style="padding:5px;font-weight:900;">Servicios de maquinaria y transporte</td><td style="padding:5px;">${escaparHtml(gastosRealesDelDia.filter((gasto) => /maquin|transp|nafta|aceite|tanza/i.test(gasto.concepto)).map((gasto) => `${gasto.concepto}: ${formatoPlano(gasto.importe)}`).join(" · ") || "Sin cargar")}</td></tr><tr><td style="padding:5px;font-weight:900;">Servicios de administración del Hub</td><td style="padding:5px;">${escaparHtml(distribucionCalculada.filter((actor) => /admin|responsable|capataz/i.test(`${actor.nombre} ${actor.rol || ""}`)).map((actor) => actor.nombre || actor.rol || "Administración").join(" · ") || "Sin cargar")}</td></tr><tr><td style="padding:5px;font-weight:900;">Otros insumos</td><td style="padding:5px;">${escaparHtml(gastosRealesDelDia.filter((gasto) => !/maquin|transp|nafta|aceite|tanza/i.test(gasto.concepto)).map((gasto) => `${gasto.concepto}: ${formatoPlano(gasto.importe)}`).join(" · ") || "Sin cargar")}</td></tr><tr><td style="padding:5px;font-weight:900;">Observaciones rápidas</td><td style="padding:5px;">${escaparHtml(datosHub.resumen.observacionGeneral || "Sin cargar")}</td></tr></tbody></table></section>
       </section>
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasGastosHtml, hubActual?.rama, hubActual?.zona, hubActual?.moduloOperativo, hubActual?.nivelEstabilidad, informacionReporte, integrantesHubReporte, jornada.hub, moduloOperativoReporte, nivelEstabilidadReporte, ventaAsociadaHtml, totalDistribuido, totalFacturadoHub, totalGastos]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, gastosRealesDelDia, integrantesHubReporte, jornada.hub, moduloOperativoReporte, nivelEstabilidadReporte, ventaAsociadaHtml, totalGastos, distribucionCalculada]);
 
 
 
@@ -2286,6 +2192,9 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                   </label>
                   <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio manual
                     <input type="number" step="1" min="0" value={ventaAsociada.precio} onChange={(e) => actualizarVentaAsociada({ precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                  </label>
+                  <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] lg:col-span-2">Foto del producto
+                    <input value={ventaAsociada.foto} onChange={(e) => actualizarVentaAsociada({ foto: e.target.value })} placeholder="https://.../foto.jpg" className="h-8 rounded-lg border px-2 text-sm normal-case" />
                   </label>
                   <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] lg:col-span-2">Link de pago Mercado Pago
                     <input value={ventaAsociada.linkPago} onChange={(e) => actualizarVentaAsociada({ linkPago: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
