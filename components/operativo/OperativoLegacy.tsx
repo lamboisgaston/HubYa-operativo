@@ -32,6 +32,8 @@ const TARIFAS_CLIENTE: Array<{ value: TarifaCliente; label: string }> = [
 
 type FilaGasto = { id: number; concepto: string; importe: CampoNumerico };
 type FilaActor = { id: number; nombre: string; activo: boolean; participacion: CampoNumerico; ajusteManual: CampoNumerico; email?: string; whatsapp?: string; rol?: string; recibeReportes?: boolean; participaDistribucion?: boolean; observacion?: string };
+type VentaAsociadaVertical = "HueverosYa" | "VerdulerosYa" | "Otro servicio";
+type VentaAsociada = { activa: boolean; vertical: VentaAsociadaVertical; producto: string; precio: CampoNumerico; linkPago: string; entrega: string };
 
 type ResumenHubManual = {
   tiempoEfectivo: string;
@@ -46,6 +48,7 @@ type DatosHub = {
   actores: FilaActor[];
   resumen: ResumenHubManual;
   clienteActivoId: number;
+  ventaAsociada: VentaAsociada;
 };
 type DatosPorHub = Record<HubDisponible, DatosHub>;
 
@@ -76,6 +79,7 @@ type ResumenGuardadoHub = {
   observacion: string;
   notaInstitucional: string[];
   reporteTexto: string;
+  ventaAsociada: VentaAsociada;
 };
 
 type HistorialResumenesPorHub = Record<HubDisponible, ResumenGuardadoHub[]>;
@@ -189,6 +193,9 @@ const CONSULTAS_HUB_STORAGE_KEY = "hubya-consultas-hub";
 const ENVIOS_REPORTES_STORAGE_KEY = "hubya-envios-reportes";
 const NUEVO_HUB_FORM_INICIAL = { tipoHub: "demanda", nombre: "", zona: "", rama: "", equipoOperativo: "", descripcion: "", responsable: "" };
 const NUEVO_VINCULO_FORM_INICIAL = { hub_id: "Hub Tipal" as HubDisponible, oferta_id: "", estado: "POSTULANTE" as EstadoHubVinculo, rol: "Resolutor", fecha_inicio: "", fecha_fin: "", capacidad: "", observaciones: "" };
+const PRODUCTOS_HUEVEROS_YA = ["1/2 caja de huevos grandes", "1 caja de huevos grandes", "2 cajas de huevos grandes"];
+const OPCIONES_ENTREGA_VENTA = ["Mañana lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Entregar junto con la jardinería"];
+const VENTA_ASOCIADA_INICIAL: VentaAsociada = { activa: false, vertical: "HueverosYa", producto: PRODUCTOS_HUEVEROS_YA[0], precio: 0, linkPago: "", entrega: OPCIONES_ENTREGA_VENTA[0] };
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -339,6 +346,7 @@ function datosHubInicial(hub: HubDisponible): DatosHub {
     actores: ["Hernán Llanes", "Armando Castillo", "Mauricio Vallejos"].map((nombre, index) => ({ id: hubIndex * 100000 + index, nombre, activo: true, participacion: 1, ajusteManual: 0 })),
     resumen: resumenInicial(),
     clienteActivoId: clientesIngresos[0]?.id || 0,
+    ventaAsociada: { ...VENTA_ASOCIADA_INICIAL },
   };
 }
 
@@ -430,6 +438,19 @@ function conceptoTarifaCliente(cliente: Pick<FilaClienteIngreso, "importe" | "ta
   return importeCliente(cliente) > 0 ? `Tarifa aplicada: ${etiqueta}` : `Tarifa de referencia: ${etiqueta}`;
 }
 
+function normalizarVentaAsociada(venta: Partial<VentaAsociada> | undefined): VentaAsociada {
+  const vertical = ["HueverosYa", "VerdulerosYa", "Otro servicio"].includes(String(venta?.vertical)) ? venta?.vertical as VentaAsociadaVertical : "HueverosYa";
+  const productoPorDefecto = vertical === "HueverosYa" ? PRODUCTOS_HUEVEROS_YA[0] : "";
+  return {
+    activa: Boolean(venta?.activa),
+    vertical,
+    producto: String(venta?.producto || productoPorDefecto),
+    precio: venta?.precio ?? 0,
+    linkPago: String(venta?.linkPago || ""),
+    entrega: String(venta?.entrega || OPCIONES_ENTREGA_VENTA[0]),
+  };
+}
+
 function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partial<FilaActor> & { actor?: string; importe?: CampoNumerico })[] }) | undefined, hub: HubDisponible): DatosHub {
   const base = datosHubInicial(hub);
   const clientesFuente = Array.isArray(datos?.clientesIngresos) ? datos.clientesIngresos : base.clientesIngresos;
@@ -442,6 +463,7 @@ function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partia
     actores: actoresFuente.map(normalizarActor),
     resumen: { ...resumenInicial(), ...datos?.resumen },
     clienteActivoId: clientesIngresos.some((cliente) => cliente.id === datos?.clienteActivoId) ? Number(datos?.clienteActivoId) : clientesIngresos[0]?.id || 0,
+    ventaAsociada: normalizarVentaAsociada(datos?.ventaAsociada),
   };
 }
 
@@ -475,6 +497,7 @@ function normalizarResumenGuardado(resumen: Partial<ResumenGuardadoHub>, hub: Hu
     observacion: resumen.observacion || datos.resumen.observacionGeneral || "",
     notaInstitucional: resumen.notaInstitucional || sobreHubYaLineas,
     reporteTexto: resumen.reporteTexto || "",
+    ventaAsociada: normalizarVentaAsociada(resumen.ventaAsociada || datos.ventaAsociada),
   };
 }
 
@@ -1039,6 +1062,16 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     return { ...actor, importeDistribuido, importeFinal };
   });
   const totalDistribuido = distribucionCalculada.reduce((total, actor) => total + actor.importeFinal, 0);
+  const ventaAsociada = normalizarVentaAsociada(datosHub.ventaAsociada);
+  const bloqueVentaTexto = useMemo(() => ventaAsociada.activa ? [
+    "",
+    "VENTA ASOCIADA",
+    `Vertical: ${ventaAsociada.vertical}`,
+    `Producto: ${ventaAsociada.producto || "Sin producto seleccionado"}`,
+    `Precio: ${formatoPlano(ventaAsociada.precio) || formatoMoneda(0)}`,
+    `Entrega: ${ventaAsociada.entrega || "Sin entrega seleccionada"}`,
+    `Link de pago: ${ventaAsociada.linkPago || "Sin link de pago cargado"}`,
+  ] : [], [ventaAsociada.activa, ventaAsociada.entrega, ventaAsociada.linkPago, ventaAsociada.precio, ventaAsociada.producto, ventaAsociada.vertical]);
   const resumenesDelHub = historialResumenes[jornada.hub] || [];
   const borradoresDelHub = borradoresReportes[jornada.hub] || [];
   const clientesSinEmailReporte = datosHub.clientesIngresos.filter((cliente) => !cliente.email.trim());
@@ -1052,6 +1085,11 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function actualizarDatosHub(cambios: Partial<DatosHub>) {
     setJornada((actual) => ({ ...actual, datosPorHub: { ...actual.datosPorHub, [actual.hub]: { ...normalizarDatosHub(actual.datosPorHub[actual.hub], actual.hub), ...cambios } } }));
+  }
+
+  function actualizarVentaAsociada(cambios: Partial<VentaAsociada>) {
+    const ventaActual = normalizarVentaAsociada(datosHub.ventaAsociada);
+    actualizarDatosHub({ ventaAsociada: normalizarVentaAsociada({ ...ventaActual, ...cambios }) });
   }
 
   function seleccionarHubTrabajo(hub: HubDisponible) {
@@ -1141,7 +1179,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const moduloOperativoReporte = hubActual?.moduloOperativo === "jardinerosya" ? "JardinerosYa" : (hubActual?.rama || hubActual?.moduloOperativo || "Sin módulo operativo");
   const integrantesHubReporte = hubActual?.clientesActivos || datosHub.clientesIngresos.length || datosHub.clientesIngresos.filter((cliente) => cliente.nombre.trim()).length;
   const nivelEstabilidadReporte = Math.min(10, Math.max(1, Math.round(Number(hubActual?.nivelEstabilidad || 8))));
-  const textoFuenteJardinerosYa = "Este reporte fue generado a partir del sistema operativo JardinerosYa, utilizado por el Hub para organizar el mantenimiento de espacios verdes.";
   const destinatariosSeleccionados = destinatariosInformacion.filter((destinatario) => destinatario.incluido);
   const destinatariosConEmailInformacion = destinatariosInformacion.filter((destinatario) => emailValido(destinatario.email || ""));
 
@@ -1232,7 +1269,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     `Módulo operativo: ${moduloOperativoReporte}`,
     `Integrantes del Hub: ${integrantesHubReporte}`,
     `Nivel de estabilidad: ${nivelEstabilidadReporte}/10`,
-    ...(hubActual?.moduloOperativo === "jardinerosya" ? [textoFuenteJardinerosYa] : []),
     `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
     `Cliente seleccionado: ${clienteActivo?.nombre || "Sin cliente seleccionado"}`,
     "",
@@ -1254,12 +1290,11 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
     "",
     ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
+    ...bloqueVentaTexto,
+    "",
     "CONTACTO POR DUDAS",
     contactoDudasReporte,
-    "",
-    "SOBRE HUBYA",
-    ...sobreHubYaLineas,
-  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, gastosRealesDelDia, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, hubActual?.rama, hubActual?.moduloOperativo, hubActual?.nivelEstabilidad, informacionReporte, integrantesHubReporte, moduloOperativoReporte, nivelEstabilidadReporte, textoFuenteJardinerosYa, tituloReporteHub]);
+  ].join("\n"), [clienteActivo?.nombre, datosHub.clientesIngresos, gastosRealesDelDia, datosHub.resumen.estadoOperativo, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, distribucionCalculada, fechaFormateada, jornada.hub, nombrePrivado, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, equipoVinculadoAlHub?.nombre, hubActual?.rama, hubActual?.moduloOperativo, hubActual?.nivelEstabilidad, informacionReporte, integrantesHubReporte, moduloOperativoReporte, nivelEstabilidadReporte, tituloReporteHub, bloqueVentaTexto]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return [
@@ -1270,8 +1305,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       `Módulo operativo: ${moduloOperativoReporte}`,
       `Integrantes del Hub: ${integrantesHubReporte}`,
       `Nivel de estabilidad: ${nivelEstabilidadReporte}/10`,
-      ...(hubActual?.moduloOperativo === "jardinerosya" ? [textoFuenteJardinerosYa] : []),
-      `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
+        `Equipo activo vinculado: ${equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}`,
       `Cliente seleccionado: ${clienteObjetivo.nombre || "Sin cliente seleccionado"}`,
       "",
       "CLIENTES / INGRESOS",
@@ -1292,11 +1326,10 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       `Observación: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
       "",
       ...(informacionReporte ? ["INFORMACIÓN IMPORTANTE", `${informacionReporte.titulo ? `${informacionReporte.titulo}: ` : ""}${informacionReporte.texto}`, ""] : []),
+      ...bloqueVentaTexto,
+      "",
       "CONTACTO POR DUDAS",
       contactoDudasReporte,
-      "",
-      "SOBRE HUBYA",
-      ...sobreHubYaLineas,
     ].join("\n");
   }
 
@@ -1345,7 +1378,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                     <tr><td colspan="3" style="border:1px solid #d8dfd1;padding:8px;color:#66745c;font-weight:700;">${escaparHtml(MENSAJE_SIN_GASTOS_REALES)}</td></tr>`;
   const filasActoresHtml = distribucionCalculada.map((actor) => `
                     <tr><td style="border:1px solid #d8dfd1;padding:6px;">${escaparHtml(actor.nombre || "Sin actor")}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:center;">${numero(actor.participacion)} / ${actor.activo ? "activo" : "inactivo"}</td><td style="border:1px solid #d8dfd1;padding:6px;text-align:right;">${escaparHtml(formatoMoneda(actor.importeFinal))}</td></tr>`).join("");
-  const sobreHubYaHtml = sobreHubYaLineas.map((linea) => `<p style="margin:8px 0 0;">${escaparHtml(linea)}</p>`).join("");
+  const ventaAsociadaHtml = ventaAsociada.activa ? `<section style="margin-top:14px;border:1px solid #9aa78f;background:#fbfcf9;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Venta asociada</h2><p style="margin:0;"><strong>Vertical:</strong> ${escaparHtml(ventaAsociada.vertical)}</p><p style="margin:6px 0 0;"><strong>Producto:</strong> ${escaparHtml(ventaAsociada.producto || "Sin producto seleccionado")}</p><p style="margin:6px 0 0;"><strong>Precio:</strong> ${escaparHtml(formatoPlano(ventaAsociada.precio) || formatoMoneda(0))}</p><p style="margin:6px 0 0;"><strong>Entrega:</strong> ${escaparHtml(ventaAsociada.entrega || "Sin entrega seleccionada")}</p><p style="margin:6px 0 0;"><strong>Link de pago:</strong> ${ventaAsociada.linkPago ? `<a href="${escaparHtml(ventaAsociada.linkPago)}" style="color:#1f2a1d;font-weight:900;">${escaparHtml(ventaAsociada.linkPago)}</a>` : "Sin link de pago cargado"}</p></section>` : "";
 
   function armarReporteHtmlParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
@@ -1366,7 +1399,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Módulo operativo</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(moduloOperativoReporte)}</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Integrantes del Hub</td><td style="border:1px solid #d8dfd1;padding:7px;">${integrantesHubReporte}</td></tr>
           <tr><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Nivel de estabilidad</td><td style="border:1px solid #d8dfd1;padding:7px;">${nivelEstabilidadReporte}/10</td><td style="border:1px solid #d8dfd1;background:#f6f8f3;padding:7px;font-weight:900;">Zona</td><td style="border:1px solid #d8dfd1;padding:7px;">${escaparHtml(hubActual?.zona || jornada.hub)}</td></tr>
         </tbody></table>
-        ${hubActual?.moduloOperativo === "jardinerosya" ? `<p style="margin:10px 0 0;border:1px solid #d8dfd1;background:#fbfcf9;padding:10px;font-size:12px;font-weight:700;color:#4f5f47;">${escaparHtml(textoFuenteJardinerosYa)}</p>` : ""}
         <section style="margin-top:14px;border:1px solid #1f2a1d;background:#fbfcf9;padding:14px;">
           <h2 style="margin:0 0 10px;font-size:15px;">Resumen del cliente</h2>
           <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>
@@ -1397,14 +1429,14 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         </tbody></table>
         <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:12px;font-size:12px;line-height:1.5;"><strong>Detalle del trabajo:</strong><br>${escaparHtml(datosHub.resumen.observacionGeneral || "Sin cargar")}</section>
         ${informacionReporte ? `<section style="margin-top:14px;border:1px solid #c7d8bf;background:#eef7ea;padding:12px;font-size:12px;line-height:1.5;"><strong>${escaparHtml(informacionReporte.titulo || "Información importante del Hub")}</strong><br>${escaparHtml(informacionReporte.texto)}</section>` : ""}
+        ${ventaAsociadaHtml}
         <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Contacto por dudas</h2><p style="margin:0;font-weight:900;">${escaparHtml(contactoDudasReporte)}</p></section>
-        <section style="margin-top:12px;border:1px solid #9aa78f;padding:12px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 8px;color:#1f2a1d;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;">Sobre HUBYA</h2>${sobreHubYaHtml}</section>
         <footer style="margin-top:14px;background:#1f2a1d;color:#fff;padding:14px;text-align:center;font-size:12px;line-height:1.5;font-weight:700;">HUBYA TECH · www.hubya.tech</footer>
       </section>
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasGastosHtml, hubActual?.rama, hubActual?.zona, hubActual?.moduloOperativo, hubActual?.nivelEstabilidad, informacionReporte, integrantesHubReporte, jornada.hub, moduloOperativoReporte, nivelEstabilidadReporte, sobreHubYaHtml, textoFuenteJardinerosYa, totalDistribuido, totalFacturadoHub, totalGastos]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, filasActoresHtml, filasGastosHtml, hubActual?.rama, hubActual?.zona, hubActual?.moduloOperativo, hubActual?.nivelEstabilidad, informacionReporte, integrantesHubReporte, jornada.hub, moduloOperativoReporte, nivelEstabilidadReporte, ventaAsociadaHtml, totalDistribuido, totalFacturadoHub, totalGastos]);
 
 
 
@@ -1619,6 +1651,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       observacion: datosHub.resumen.observacionGeneral,
       notaInstitucional: sobreHubYaLineas,
       reporteTexto,
+      ventaAsociada,
     };
   }
 
@@ -2233,6 +2266,36 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             </section>
 
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Datos operativos</h3><div className="grid gap-2 lg:grid-cols-3"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Tiempo efectivo por operario<input value={datosHub.resumen.tiempoEfectivo} onChange={(e) => actualizarResumen({ tiempoEfectivo: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Estado operativo<input value={datosHub.resumen.estadoOperativo} onChange={(e) => actualizarResumen({ estadoOperativo: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Observación general<input value={datosHub.resumen.observacionGeneral} onChange={(e) => actualizarResumen({ observacionGeneral: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label></div></section>
+
+            <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+              <h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Venta asociada</h3>
+              <p className="mb-2 text-xs font-bold text-[#66745c]">¿Este reporte lleva una venta asociada?</p>
+              <div className="mb-3 flex flex-wrap gap-2 text-xs">
+                <button type="button" onClick={() => actualizarVentaAsociada({ activa: false })} className={`h-8 rounded-md px-3 font-black ${!ventaAsociada.activa ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>No lleva venta</button>
+                <button type="button" onClick={() => actualizarVentaAsociada({ activa: true })} className={`h-8 rounded-md px-3 font-black ${ventaAsociada.activa ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>Sí, agregar venta</button>
+              </div>
+              {ventaAsociada.activa && <div className="grid gap-3 lg:grid-cols-3">
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Vertical
+                  <select value={ventaAsociada.vertical} onChange={(e) => actualizarVentaAsociada({ vertical: e.target.value as VentaAsociadaVertical, producto: e.target.value === "HueverosYa" ? PRODUCTOS_HUEVEROS_YA[0] : "" })} className="h-8 rounded-lg border px-2 text-sm normal-case">
+                    <option>HueverosYa</option><option>VerdulerosYa</option><option>Otro servicio</option>
+                  </select>
+                </label>
+                {ventaAsociada.vertical === "HueverosYa" ? <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Producto
+                  <select value={ventaAsociada.producto} onChange={(e) => actualizarVentaAsociada({ producto: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case">{PRODUCTOS_HUEVEROS_YA.map((producto) => <option key={producto}>{producto}</option>)}</select>
+                </label> : <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Producto / servicio
+                  <input value={ventaAsociada.producto} onChange={(e) => actualizarVentaAsociada({ producto: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                </label>}
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio
+                  <input type="number" step="1" min="0" value={ventaAsociada.precio} onChange={(e) => actualizarVentaAsociada({ precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                </label>
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] lg:col-span-2">Link de pago Mercado Pago
+                  <input value={ventaAsociada.linkPago} onChange={(e) => actualizarVentaAsociada({ linkPago: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                </label>
+                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Entrega
+                  <select value={ventaAsociada.entrega} onChange={(e) => actualizarVentaAsociada({ entrega: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case">{OPCIONES_ENTREGA_VENTA.map((opcion) => <option key={opcion}>{opcion}</option>)}</select>
+                </label>
+              </div>}
+            </section>
 
             {parametrosJardinerosYaReporte && <section className="rounded-xl border border-[#bfd3b8] bg-[#fbfdf8] p-3 shadow-sm">
               <h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Paso 5 — Parámetros de referencia del Hub</h3>
