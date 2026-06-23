@@ -33,7 +33,7 @@ const TARIFAS_CLIENTE: Array<{ value: TarifaCliente; label: string }> = [
 type FilaGasto = { id: number; concepto: string; importe: CampoNumerico };
 type FilaActor = { id: number; nombre: string; activo: boolean; participacion: CampoNumerico; ajusteManual: CampoNumerico; email?: string; whatsapp?: string; rol?: string; recibeReportes?: boolean; participaDistribucion?: boolean; observacion?: string };
 type VentaAsociadaVertical = "HueverosYa" | "VerdulerosYa" | "Otro";
-type VentaAsociada = { activa: boolean; vertical: VentaAsociadaVertical; producto: string; precio: CampoNumerico; foto: string; linkPago: string; entrega: string };
+type VentaAsociada = { activa: boolean; vertical: VentaAsociadaVertical; producto: string; precio: CampoNumerico; foto: string; linkPago: string; precioMediaCaja?: CampoNumerico; linkPagoMediaCaja?: string; precioCaja?: CampoNumerico; linkPagoCaja?: string; entrega: string };
 
 type ResumenHubManual = {
   tiempoEfectivo: string;
@@ -196,7 +196,9 @@ const NUEVO_VINCULO_FORM_INICIAL = { hub_id: "Hub Tipal" as HubDisponible, ofert
 const PRODUCTOS_HUEVEROS_YA = ["1/2 caja de huevos grandes", "1 caja de huevos grandes"];
 const TEXTO_ENTREGA_VENTA_ASOCIADA = "Si pagás se entrega en tu domicilio mañana.";
 const ENTREGA_VENTA_ASOCIADA = "El pago confirma el pedido. La entrega se realiza junto con la visita de jardinería.";
-const VENTA_ASOCIADA_INICIAL: VentaAsociada = { activa: false, vertical: "HueverosYa", producto: PRODUCTOS_HUEVEROS_YA[0], precio: 0, foto: "", linkPago: "", entrega: ENTREGA_VENTA_ASOCIADA };
+const FOTO_MEDIA_CAJA_HUEVOS = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 420'%3E%3Crect width='640' height='420' fill='%23fbf3df'/%3E%3Crect x='84' y='138' width='472' height='196' rx='36' fill='%23caa66a'/%3E%3Crect x='120' y='176' width='400' height='118' rx='26' fill='%23e4c98e'/%3E%3Cg fill='%23fff9e9' stroke='%23d7c19c' stroke-width='4'%3E%3Cellipse cx='185' cy='235' rx='36' ry='46'/%3E%3Cellipse cx='253' cy='235' rx='36' ry='46'/%3E%3Cellipse cx='321' cy='235' rx='36' ry='46'/%3E%3Cellipse cx='389' cy='235' rx='36' ry='46'/%3E%3Cellipse cx='457' cy='235' rx='36' ry='46'/%3E%3C/g%3E%3Ctext x='320' y='82' text-anchor='middle' font-family='Arial' font-size='34' font-weight='800' fill='%231f2a1d'%3E1/2 caja de huevos grandes%3C/text%3E%3C/svg%3E";
+const FOTO_CAJA_HUEVOS = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 420'%3E%3Crect width='640' height='420' fill='%23f6efe0'/%3E%3Crect x='66' y='118' width='508' height='222' rx='38' fill='%23b98f54'/%3E%3Crect x='106' y='154' width='428' height='150' rx='28' fill='%23dfbe7f'/%3E%3Cg fill='%23fff9e9' stroke='%23d7c19c' stroke-width='4'%3E%3Cellipse cx='168' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='229' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='290' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='351' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='412' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='473' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='168' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='229' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='290' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='351' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='412' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='473' cy='270' rx='30' ry='39'/%3E%3C/g%3E%3Ctext x='320' y='82' text-anchor='middle' font-family='Arial' font-size='36' font-weight='800' fill='%231f2a1d'%3E1 caja de huevos grandes%3C/text%3E%3C/svg%3E";
+const VENTA_ASOCIADA_INICIAL: VentaAsociada = { activa: false, vertical: "HueverosYa", producto: PRODUCTOS_HUEVEROS_YA[0], precio: 0, foto: "", linkPago: "", precioMediaCaja: 0, linkPagoMediaCaja: "", precioCaja: 0, linkPagoCaja: "", entrega: ENTREGA_VENTA_ASOCIADA };
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -449,6 +451,10 @@ function normalizarVentaAsociada(venta: Partial<VentaAsociada> | undefined): Ven
     precio: venta?.precio ?? 0,
     foto: String(venta?.foto || ""),
     linkPago: String(venta?.linkPago || ""),
+    precioMediaCaja: venta?.precioMediaCaja ?? (venta?.producto === PRODUCTOS_HUEVEROS_YA[0] ? venta?.precio : 0) ?? 0,
+    linkPagoMediaCaja: String(venta?.linkPagoMediaCaja || (venta?.producto === PRODUCTOS_HUEVEROS_YA[0] ? venta?.linkPago || "" : "")),
+    precioCaja: venta?.precioCaja ?? (venta?.producto === PRODUCTOS_HUEVEROS_YA[1] ? venta?.precio : 0) ?? 0,
+    linkPagoCaja: String(venta?.linkPagoCaja || (venta?.producto === PRODUCTOS_HUEVEROS_YA[1] ? venta?.linkPago || "" : "")),
     entrega: ENTREGA_VENTA_ASOCIADA,
   };
 }
@@ -1065,15 +1071,29 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   });
   const totalDistribuido = distribucionCalculada.reduce((total, actor) => total + actor.importeFinal, 0);
   const ventaAsociada = normalizarVentaAsociada(datosHub.ventaAsociada);
-  const bloqueVentaTexto = useMemo(() => ventaAsociada.activa ? [
-    "",
-    "VENTA ASOCIADA",
-    ventaAsociada.vertical,
-    `Producto: ${ventaAsociada.vertical === "HueverosYa" ? ventaAsociada.producto || "Sin producto seleccionado" : "Sin producto seleccionado"}`,
-    `Precio: ${formatoPlano(ventaAsociada.precio) || formatoMoneda(0)}`,
-    `Link de pago Mercado Pago: ${ventaAsociada.linkPago || "Sin link de pago cargado"}`,
-    ENTREGA_VENTA_ASOCIADA,
-  ] : [], [ventaAsociada.activa, ventaAsociada.linkPago, ventaAsociada.precio, ventaAsociada.producto, ventaAsociada.vertical]);
+  const bloqueVentaTexto = useMemo(() => {
+    if (!ventaAsociada.activa) return [];
+    if (ventaAsociada.vertical === "HueverosYa") return [
+      "",
+      "OPORTUNIDADES PARA ESTA VISITA",
+      TEXTO_ENTREGA_VENTA_ASOCIADA,
+      "HueverosYa",
+      `${PRODUCTOS_HUEVEROS_YA[0]}: ${formatoPlano(ventaAsociada.precioMediaCaja) || formatoMoneda(0)}`,
+      `Link Mercado Pago media caja: ${ventaAsociada.linkPagoMediaCaja || "Sin link de pago cargado"}`,
+      `${PRODUCTOS_HUEVEROS_YA[1]}: ${formatoPlano(ventaAsociada.precioCaja) || formatoMoneda(0)}`,
+      `Link Mercado Pago 1 caja: ${ventaAsociada.linkPagoCaja || "Sin link de pago cargado"}`,
+    ];
+    return [
+      "",
+      "OPORTUNIDADES PARA ESTA VISITA",
+      TEXTO_ENTREGA_VENTA_ASOCIADA,
+      ventaAsociada.vertical,
+      `Producto: ${ventaAsociada.producto || "Sin producto seleccionado"}`,
+      `Precio: ${formatoPlano(ventaAsociada.precio) || formatoMoneda(0)}`,
+      `Link de pago Mercado Pago: ${ventaAsociada.linkPago || "Sin link de pago cargado"}`,
+      ENTREGA_VENTA_ASOCIADA,
+    ];
+  }, [ventaAsociada.activa, ventaAsociada.linkPago, ventaAsociada.linkPagoCaja, ventaAsociada.linkPagoMediaCaja, ventaAsociada.precio, ventaAsociada.precioCaja, ventaAsociada.precioMediaCaja, ventaAsociada.producto, ventaAsociada.vertical]);
   const resumenesDelHub = historialResumenes[jornada.hub] || [];
   const borradoresDelHub = borradoresReportes[jornada.hub] || [];
   const clientesSinEmailReporte = datosHub.clientesIngresos.filter((cliente) => !cliente.email.trim());
@@ -1287,6 +1307,15 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     return gastosPorCategoria(categoria).reduce((total, gasto) => total + numero(gasto.importe), 0);
   }
 
+
+  function totalDistribucionPorRol(patron: RegExp) {
+    return distribucionCalculada.filter((actor) => patron.test(`${actor.nombre} ${actor.rol || ""}`)).reduce((total, actor) => total + actor.importeFinal, 0);
+  }
+
+  const totalJardinerosEquipoOperativo = totalDistribucionPorRol(/jardiner|operativ|cuadrilla|mano|responsable/i);
+  const totalHubOfertaAdministracion = totalDistribucionPorRol(/hub|admin|oferta|coordin/i);
+  const totalOtrosParticipantes = Math.max(0, totalDistribuido - totalJardinerosEquipoOperativo - totalHubOfertaAdministracion);
+
   function nombreVecinoParaReporte(cliente: FilaClienteIngreso, destinatario: FilaClienteIngreso | undefined, index: number) {
     return cliente.id === destinatario?.id ? cliente.nombre : aliasVecino(index);
   }
@@ -1313,26 +1342,34 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       "[ ] Regular",
       "[ ] Buena",
       "[ ] Muy buena",
-      ...bloqueVentaTexto.length ? ["", "OPORTUNIDADES PARA ESTA VISITA", TEXTO_ENTREGA_VENTA_ASOCIADA, ...bloqueVentaTexto.filter(Boolean)] : [],
+      ...bloqueVentaTexto.filter(Boolean),
       "",
       "RESUMEN ANTERIOR DEL HUB",
       `Hub: ${jornada.hub}`,
       `Fecha anterior: ${fechaFormateada}`,
       `Estado general del Hub: ${nivelEstabilidadReporte}/10`,
       `Horas trabajadas: ${datosHub.resumen.tiempoEfectivo || "Sin cargar"}`,
+      "Facturación del Hub:",
+      ...lineasDistribucionVecinos(clienteReporte),
       `Total del Hub: ${formatoPlano(totalFacturadoHub) || formatoMoneda(0)}`,
-      `Gastos del día: ${formatoPlano(totalGastos) || formatoMoneda(0)}`,
+      "",
+      "Gastos del día:",
       `Servicios de maquinaria y transporte: ${formatoMoneda(totalGastosCategoria("maquinaria"))}`,
       `Servicios de administración del Hub: ${formatoMoneda(totalGastosCategoria("administracion"))}`,
       `Otros insumos: ${formatoMoneda(totalGastosCategoria("otros"))}`,
-      "Distribución del Hub:",
-      ...lineasDistribucionVecinos(clienteReporte),
-      `Total distribuido: ${formatoPlano(totalFacturadoHub) || formatoMoneda(0)}`,
+      `Total de gastos: ${formatoPlano(totalGastos) || formatoMoneda(0)}`,
+      "",
+      "Distribución operativa:",
+      `Saldo a distribuir: ${formatoPlano(totalADistribuir) || formatoMoneda(0)}`,
+      `Jardinero / equipo operativo: ${formatoMoneda(totalJardinerosEquipoOperativo)}`,
+      `Hub de oferta / administración: ${formatoMoneda(totalHubOfertaAdministracion)}`,
+      `Otros participantes, si corresponde: ${formatoMoneda(totalOtrosParticipantes)}`,
+      `Total distribuido: ${formatoPlano(totalDistribuido) || formatoMoneda(0)}`,
       `Observaciones rápidas: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
     ].join("\n");
   }
 
-  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, bloqueVentaTexto, clientesDelHub, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, gastosRealesDelDia, jornada.hub, nivelEstabilidadReporte, totalFacturadoHub, totalGastos]);
+  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, bloqueVentaTexto, clientesDelHub, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, gastosRealesDelDia, jornada.hub, nivelEstabilidadReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalHubOfertaAdministracion, totalJardinerosEquipoOperativo, totalOtrosParticipantes]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return textoReportePrevioParaCliente(clienteObjetivo);
@@ -1356,7 +1393,10 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     setBorradoresReportes((actual) => ({ ...actual, [jornada.hub]: [borrador, ...(actual[jornada.hub] || []).filter((item) => item.id !== borrador.id)] }));
   }, [firmaDatosHub, isMounted, hubSeleccionado, jornada.fecha, jornada.hub, jornada.nombreResumen, reporteTexto, seccionActiva]);
 
-  const ventaAsociadaHtml = ventaAsociada.activa ? `<section style="margin-top:18px;border:1px solid #d8dfd1;background:#fbfcf9;padding:14px;font-size:12px;line-height:1.5;"><h2 style="margin:0 0 4px;color:#1f2a1d;font-size:16px;font-weight:900;">Oportunidades para esta visita</h2><p style="margin:0 0 12px;color:#4f5f47;font-weight:700;">${escaparHtml(TEXTO_ENTREGA_VENTA_ASOCIADA)}</p><article style="border:1px solid #cfd8c6;background:#ffffff;border-radius:18px;padding:12px;overflow:hidden;"><p style="margin:0 0 8px;color:#66745c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">${escaparHtml(ventaAsociada.vertical)}</p>${ventaAsociada.foto ? `<img src="${escaparHtml(ventaAsociada.foto)}" alt="${escaparHtml(ventaAsociada.producto || ventaAsociada.vertical)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid #eef1e9;margin-bottom:10px;" />` : `<div style="height:120px;border-radius:14px;border:1px dashed #cfd8c6;background:#f8faf5;margin-bottom:10px;display:flex;align-items:center;justify-content:center;color:#66745c;font-weight:900;">Foto del producto</div>`}<h3 style="margin:0;font-size:17px;font-weight:900;">${escaparHtml(ventaAsociada.producto || "Producto sin nombre")}</h3><p style="margin:8px 0 0;font-size:18px;font-weight:900;color:#1f2a1d;">${escaparHtml(formatoPlano(ventaAsociada.precio) || formatoMoneda(0))}</p><p style="margin:8px 0 0;color:#4f5f47;font-weight:800;">${escaparHtml(ENTREGA_VENTA_ASOCIADA)}</p>${ventaAsociada.linkPago ? `<a href="${escaparHtml(ventaAsociada.linkPago)}" style="display:inline-block;margin-top:10px;background:#1f2a1d;color:#fff;padding:10px 12px;border-radius:12px;text-decoration:none;font-weight:900;">Concretar venta</a>` : `<p style="margin:10px 0 0;color:#743c3c;font-weight:900;">Sin link de pago Mercado Pago cargado.</p>`}</article></section>` : "";
+  const ventaAsociadaHtml = ventaAsociada.activa ? `<section style="margin-top:18px;border:1px solid #d8dfd1;background:#fbfcf9;padding:14px;font-size:12px;line-height:1.5;border-radius:18px;"><h2 style="margin:0 0 4px;color:#1f2a1d;font-size:16px;font-weight:900;">Oportunidades para esta visita</h2><p style="margin:0 0 12px;color:#4f5f47;font-weight:700;">${escaparHtml(TEXTO_ENTREGA_VENTA_ASOCIADA)}</p>${ventaAsociada.vertical === "HueverosYa" ? `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">${[
+    { producto: PRODUCTOS_HUEVEROS_YA[0], foto: FOTO_MEDIA_CAJA_HUEVOS, precio: ventaAsociada.precioMediaCaja, link: ventaAsociada.linkPagoMediaCaja, campo: "Link Mercado Pago media caja" },
+    { producto: PRODUCTOS_HUEVEROS_YA[1], foto: FOTO_CAJA_HUEVOS, precio: ventaAsociada.precioCaja, link: ventaAsociada.linkPagoCaja, campo: "Link Mercado Pago 1 caja" },
+  ].map((opcion) => `<article style="border:1px solid #cfd8c6;background:#ffffff;border-radius:18px;padding:12px;overflow:hidden;"><p style="margin:0 0 8px;color:#66745c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">HueverosYa</p><img src="${opcion.foto}" alt="${escaparHtml(opcion.producto)}" style="width:100%;max-height:150px;object-fit:cover;border-radius:14px;border:1px solid #eef1e9;margin-bottom:10px;" /><h3 style="margin:0;font-size:17px;font-weight:900;">${escaparHtml(opcion.producto)}</h3><p style="margin:8px 0 0;font-size:18px;font-weight:900;color:#1f2a1d;">${escaparHtml(formatoPlano(opcion.precio) || formatoMoneda(0))}</p><p style="margin:8px 0 0;color:#66745c;font-size:11px;font-weight:900;">${escaparHtml(opcion.campo)}</p>${opcion.link ? `<a href="${escaparHtml(opcion.link)}" style="display:inline-block;margin-top:10px;background:#1f2a1d;color:#fff;padding:10px 12px;border-radius:12px;text-decoration:none;font-weight:900;">Concretar venta</a>` : `<p style="margin:10px 0 0;color:#743c3c;font-weight:900;">Sin link de pago Mercado Pago cargado.</p>`}</article>`).join("")}</div>` : `<article style="border:1px solid #cfd8c6;background:#ffffff;border-radius:18px;padding:12px;overflow:hidden;"><p style="margin:0 0 8px;color:#66745c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">${escaparHtml(ventaAsociada.vertical)}</p>${ventaAsociada.foto ? `<img src="${escaparHtml(ventaAsociada.foto)}" alt="${escaparHtml(ventaAsociada.producto || ventaAsociada.vertical)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid #eef1e9;margin-bottom:10px;" />` : `<div style="height:120px;border-radius:14px;border:1px dashed #cfd8c6;background:#f8faf5;margin-bottom:10px;display:flex;align-items:center;justify-content:center;color:#66745c;font-weight:900;">Foto del producto</div>`}<h3 style="margin:0;font-size:17px;font-weight:900;">${escaparHtml(ventaAsociada.producto || "Producto sin nombre")}</h3><p style="margin:8px 0 0;font-size:18px;font-weight:900;color:#1f2a1d;">${escaparHtml(formatoPlano(ventaAsociada.precio) || formatoMoneda(0))}</p>${ventaAsociada.linkPago ? `<a href="${escaparHtml(ventaAsociada.linkPago)}" style="display:inline-block;margin-top:10px;background:#1f2a1d;color:#fff;padding:10px 12px;border-radius:12px;text-decoration:none;font-weight:900;">Concretar venta</a>` : `<p style="margin:10px 0 0;color:#743c3c;font-weight:900;">Sin link de pago Mercado Pago cargado.</p>`}</article>`}</section>` : "";
 
   function armarReporteHtmlParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
@@ -1381,12 +1421,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           </div>
         </section>
         ${ventaAsociadaHtml}
-        <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:18px;font-size:12px;line-height:1.45;"><h2 style="margin:0 0 12px;font-size:17px;font-weight:900;">Resumen anterior del Hub</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;"><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Hub</strong><br>${escaparHtml(jornada.hub)}</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Fecha anterior</strong><br>${escaparHtml(fechaFormateada)}</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Estado general del Hub</strong><br>${nivelEstabilidadReporte}/10</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Horas trabajadas</strong><br>${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</div></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><p style="margin:0;color:#66745c;font-weight:900;">Total del Hub</p><p style="margin:4px 0 0;font-size:20px;font-weight:900;color:#1f2a1d;">${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</p></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Gastos del día</h3><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de maquinaria y transporte</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("maquinaria")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de administración del Hub</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("administracion")))}</strong></p><p style="margin:0;display:flex;justify-content:space-between;gap:12px;"><span>Otros insumos</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("otros")))}</strong></p></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Distribución del Hub</h3>${clientesDelHub.map((cliente, index) => `<p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(nombreVecinoParaReporte(cliente, clienteReporte, index))}</span><strong>${escaparHtml(formatoPlano(cliente.importe) || formatoMoneda(0))}</strong></p>`).join("")}<p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total distribuido</span><strong>${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</strong></p></div>${datosHub.resumen.observacionGeneral ? `<div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h3 style="margin:0 0 6px;font-size:14px;font-weight:900;">Observaciones rápidas</h3><p style="margin:0;color:#4f5f47;font-weight:700;">${escaparHtml(datosHub.resumen.observacionGeneral)}</p></div>` : ""}</section>
+        <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:18px;font-size:12px;line-height:1.45;"><h2 style="margin:0 0 12px;font-size:17px;font-weight:900;">Resumen anterior del Hub</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;"><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Hub</strong><br>${escaparHtml(jornada.hub)}</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Fecha anterior</strong><br>${escaparHtml(fechaFormateada)}</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Estado general del Hub</strong><br>${nivelEstabilidadReporte}/10</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Horas trabajadas</strong><br>${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</div></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Facturación del Hub</h3>${clientesDelHub.map((cliente, index) => `<p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(nombreVecinoParaReporte(cliente, clienteReporte, index))}</span><strong>${escaparHtml(formatoPlano(cliente.importe) || formatoMoneda(0))}</strong></p>`).join("")}<p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total del Hub</span><strong>${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</strong></p></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Gastos</h3><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de maquinaria y transporte</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("maquinaria")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de administración del Hub</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("administracion")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros insumos</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("otros")))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total de gastos</span><strong>${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</strong></p></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Distribución</h3><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Saldo a distribuir</span><strong>${escaparHtml(formatoPlano(totalADistribuir) || formatoMoneda(0))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Jardinero / equipo operativo</span><strong>${escaparHtml(formatoMoneda(totalJardinerosEquipoOperativo))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Hub de oferta / administración</span><strong>${escaparHtml(formatoMoneda(totalHubOfertaAdministracion))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros participantes, si corresponde</span><strong>${escaparHtml(formatoMoneda(totalOtrosParticipantes))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total distribuido</span><strong>${escaparHtml(formatoPlano(totalDistribuido) || formatoMoneda(0))}</strong></p></div>${datosHub.resumen.observacionGeneral ? `<div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h3 style="margin:0 0 6px;font-size:14px;font-weight:900;">Observaciones rápidas</h3><p style="margin:0;color:#4f5f47;font-weight:700;">${escaparHtml(datosHub.resumen.observacionGeneral)}</p></div>` : ""}</section>
       </section>
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, gastosRealesDelDia, jornada.hub, nivelEstabilidadReporte, totalFacturadoHub, ventaAsociadaHtml]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, gastosRealesDelDia, jornada.hub, nivelEstabilidadReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalHubOfertaAdministracion, totalJardinerosEquipoOperativo, totalOtrosParticipantes, ventaAsociadaHtml]);
 
 
 
@@ -2231,19 +2271,31 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
                   </select>
                 </label>
                 {ventaAsociada.vertical === "HueverosYa" && <>
-                  <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Producto
-                    <select value={ventaAsociada.producto} onChange={(e) => actualizarVentaAsociada({ producto: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case">{PRODUCTOS_HUEVEROS_YA.map((producto) => <option key={producto}>{producto}</option>)}</select>
-                  </label>
-                  <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio manual
-                    <input type="number" step="1" min="0" value={ventaAsociada.precio} onChange={(e) => actualizarVentaAsociada({ precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                  </label>
-                  <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] lg:col-span-2">Foto del producto
-                    <input value={ventaAsociada.foto} onChange={(e) => actualizarVentaAsociada({ foto: e.target.value })} placeholder="https://.../foto.jpg" className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                  </label>
-                  <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c] lg:col-span-2">Link de pago Mercado Pago
-                    <input value={ventaAsociada.linkPago} onChange={(e) => actualizarVentaAsociada({ linkPago: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                  </label>
-                  <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#4f5f47] lg:col-span-3">{TEXTO_ENTREGA_VENTA_ASOCIADA} {ENTREGA_VENTA_ASOCIADA}</p>
+                  <div className="rounded-xl border border-[#cfd8c6] bg-[#fbfcf9] p-3 lg:col-span-3">
+                    <p className="mb-2 text-xs font-black text-[#1f2a1d]">Opción izquierda — {PRODUCTOS_HUEVEROS_YA[0]}</p>
+                    <img src={FOTO_MEDIA_CAJA_HUEVOS} alt="Media caja de huevos grandes" className="mb-2 h-24 w-full rounded-lg border object-cover" />
+                    <div className="grid gap-2 lg:grid-cols-2">
+                      <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio editable
+                        <input type="number" step="1" min="0" value={ventaAsociada.precioMediaCaja} onChange={(e) => actualizarVentaAsociada({ precioMediaCaja: normalizarNumero(e.target.value), producto: PRODUCTOS_HUEVEROS_YA[0], precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                      </label>
+                      <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Link Mercado Pago media caja
+                        <input value={ventaAsociada.linkPagoMediaCaja || ""} onChange={(e) => actualizarVentaAsociada({ linkPagoMediaCaja: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-[#cfd8c6] bg-[#fbfcf9] p-3 lg:col-span-3">
+                    <p className="mb-2 text-xs font-black text-[#1f2a1d]">Opción derecha — {PRODUCTOS_HUEVEROS_YA[1]}</p>
+                    <img src={FOTO_CAJA_HUEVOS} alt="Caja completa de huevos grandes" className="mb-2 h-24 w-full rounded-lg border object-cover" />
+                    <div className="grid gap-2 lg:grid-cols-2">
+                      <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio editable
+                        <input type="number" step="1" min="0" value={ventaAsociada.precioCaja} onChange={(e) => actualizarVentaAsociada({ precioCaja: normalizarNumero(e.target.value), producto: PRODUCTOS_HUEVEROS_YA[1], precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                      </label>
+                      <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Link Mercado Pago 1 caja
+                        <input value={ventaAsociada.linkPagoCaja || ""} onChange={(e) => actualizarVentaAsociada({ linkPagoCaja: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
+                      </label>
+                    </div>
+                  </div>
+                  <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#4f5f47] lg:col-span-3">{TEXTO_ENTREGA_VENTA_ASOCIADA}</p>
                 </>}
               </div>}
             </section>
