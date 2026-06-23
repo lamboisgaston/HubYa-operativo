@@ -1307,6 +1307,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       "",
       "Para ver detalles del reporte de jardinería:",
       "www.jardinerosya.online",
+      "",
+      "Calificá la visita anterior del jardinero:",
+      "[ ] Mala",
+      "[ ] Regular",
+      "[ ] Buena",
+      "[ ] Muy buena",
       ...bloqueVentaTexto.length ? ["", "OPORTUNIDADES PARA ESTA VISITA", TEXTO_ENTREGA_VENTA_ASOCIADA, ...bloqueVentaTexto.filter(Boolean)] : [],
       "",
       "RESUMEN ANTERIOR DEL HUB",
@@ -1366,7 +1372,13 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           <h2 style="margin:0 0 10px;font-size:18px;font-weight:900;text-transform:uppercase;">Tu última visita</h2>
           <p style="margin:0 0 8px;font-size:15px;font-weight:900;">Importe última visita: ${escaparHtml(importe)}</p>
           <p style="margin:0 0 12px;font-size:15px;font-weight:900;">Desvío respecto a la normal: ${desvioNormal}%</p>
-          <p style="margin:0;color:#4f5f47;font-weight:800;">Para ver detalles del reporte de jardinería:<br><a href="https://www.jardinerosya.online" style="color:#1f2a1d;font-weight:900;">www.jardinerosya.online</a></p>
+          <p style="margin:0 0 14px;color:#4f5f47;font-weight:800;">Para ver detalles del reporte de jardinería:<br><a href="https://www.jardinerosya.online" style="color:#1f2a1d;font-weight:900;">www.jardinerosya.online</a></p>
+          <div style="margin-top:12px;border-top:1px solid #d8dfd1;padding-top:12px;">
+            <p style="margin:0 0 8px;color:#1f2a1d;font-size:14px;font-weight:900;">Calificá la visita anterior del jardinero:</p>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              ${["Mala", "Regular", "Buena", "Muy buena"].map((opcion) => `<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid #cfd8c6;background:#ffffff;border-radius:999px;padding:7px 10px;color:#1f2a1d;font-size:13px;font-weight:800;"><span style="display:inline-block;width:12px;height:12px;border:1.5px solid #6f7968;border-radius:3px;background:#fff;"></span>${opcion}</span>`).join("")}
+            </div>
+          </div>
         </section>
         ${ventaAsociadaHtml}
         <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:18px;font-size:12px;line-height:1.45;"><h2 style="margin:0 0 12px;font-size:17px;font-weight:900;">Resumen anterior del Hub</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;"><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Hub</strong><br>${escaparHtml(jornada.hub)}</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Fecha anterior</strong><br>${escaparHtml(fechaFormateada)}</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Estado general del Hub</strong><br>${nivelEstabilidadReporte}/10</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Horas trabajadas</strong><br>${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</div></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><p style="margin:0;color:#66745c;font-weight:900;">Total del Hub</p><p style="margin:4px 0 0;font-size:20px;font-weight:900;color:#1f2a1d;">${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</p></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Gastos del día</h3><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de maquinaria y transporte</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("maquinaria")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de administración del Hub</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("administracion")))}</strong></p><p style="margin:0;display:flex;justify-content:space-between;gap:12px;"><span>Otros insumos</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("otros")))}</strong></p></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Distribución del Hub</h3>${clientesDelHub.map((cliente, index) => `<p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(nombreVecinoParaReporte(cliente, clienteReporte, index))}</span><strong>${escaparHtml(formatoPlano(cliente.importe) || formatoMoneda(0))}</strong></p>`).join("")}<p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total distribuido</span><strong>${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</strong></p></div>${datosHub.resumen.observacionGeneral ? `<div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h3 style="margin:0 0 6px;font-size:14px;font-weight:900;">Observaciones rápidas</h3><p style="margin:0;color:#4f5f47;font-weight:700;">${escaparHtml(datosHub.resumen.observacionGeneral)}</p></div>` : ""}</section>
