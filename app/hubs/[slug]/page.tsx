@@ -1,3 +1,3 @@
 export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation"; import { PublicHeader } from "@/components/public/PublicHeader"; import { PublicFooter } from "@/components/public/PublicFooter"; import { HubPublicPage } from "@/components/public/HubPublicPage"; import { getHubBySlug } from "@/lib/data/hubs";
-export default async function Page({ params }: { params: Promise<{ slug: string }> }) { const { slug } = await params; const hub = await getHubBySlug(slug); if (!hub) notFound(); return <main className="min-h-screen bg-[#0a0a0f] text-[#f5f5f0]"><PublicHeader/><HubPublicPage hub={hub}/><PublicFooter/></main>; }
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) { const { slug } = await params; const hub = await getHubBySlug(slug); if (!hub) notFound(); return <main className="min-h-screen bg-[#F8FAF7] text-[#0B1726]"><PublicHeader/><HubPublicPage hub={hub}/><PublicFooter/></main>; }
