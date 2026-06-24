@@ -41,15 +41,15 @@ export function RequestHubForm() {
     setEstado(`Solicitud recibida como Hub de ${solicitud.tipoHub === "demanda" ? "demanda" : "oferta / equipo activo"}.`);
   }
 
-  return <form action={submit} className="grid gap-3 rounded-2xl border border-[#4f46e5]/25 bg-[#4f46e5]/10 p-5 text-left">
-    <h2 className="text-2xl font-black text-white">Solicitar creación de un nuevo Hub</h2>
-    <p className="text-sm font-semibold text-[#9ca3af]">Elegí si querés agrupar clientes de una zona/proceso o armar un equipo activo para ejecutar una oferta operativa.</p>
-    <label className="grid gap-1 text-xs font-bold uppercase tracking-wide text-[#9ca3af]">Tipo de Hub<select name="tipoHub" className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm normal-case text-white outline-none focus:border-[#06b6d4]"><option value="demanda">Hub de demanda · clientes</option><option value="oferta">Hub de oferta / Equipo activo</option></select></label>
+  return <form action={submit} className="grid gap-3 rounded-2xl border border-[#DDE7E2] bg-[#FFF4CC] p-5 text-left">
+    <h2 className="text-2xl font-black text-[#0B1726]">Solicitar creación de un nuevo Hub</h2>
+    <p className="text-sm font-semibold text-[#53685C]">Elegí si querés agrupar clientes de una zona/proceso o armar un equipo activo para ejecutar una oferta operativa.</p>
+    <label className="grid gap-1 text-xs font-bold uppercase tracking-wide text-[#53685C]">Tipo de Hub<select name="tipoHub" className="rounded-xl border border-[#DDE7E2] bg-[#F8FAF7] px-3 py-2 text-sm normal-case text-[#0B1726] outline-none focus:border-[#1E8F4D]"><option value="demanda">Hub de demanda · clientes</option><option value="oferta">Hub de oferta / Equipo activo</option></select></label>
     <div className="grid gap-3 md:grid-cols-2">
-      {[ ["nombreHub", "Nombre del Hub *"], ["zona", "Zona / alcance *"], ["rubro", "Rubro o proceso *"], ["responsable", "Responsable *"], ["whatsapp", "WhatsApp *"], ["email", "Email"] ].map(([name, label]) => <label key={name} className="grid gap-1 text-xs font-bold uppercase tracking-wide text-[#9ca3af]">{label}<input required={name !== "email"} name={name} type={name === "email" ? "email" : "text"} className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm normal-case text-white outline-none focus:border-[#06b6d4]" /></label>)}
+      {[ ["nombreHub", "Nombre del Hub *"], ["zona", "Zona / alcance *"], ["rubro", "Rubro o proceso *"], ["responsable", "Responsable *"], ["whatsapp", "WhatsApp *"], ["email", "Email"] ].map(([name, label]) => <label key={name} className="grid gap-1 text-xs font-bold uppercase tracking-wide text-[#53685C]">{label}<input required={name !== "email"} name={name} type={name === "email" ? "email" : "text"} className="rounded-xl border border-[#DDE7E2] bg-[#F8FAF7] px-3 py-2 text-sm normal-case text-[#0B1726] outline-none focus:border-[#1E8F4D]" /></label>)}
     </div>
-    <label className="grid gap-1 text-xs font-bold uppercase tracking-wide text-[#9ca3af]">Descripción<textarea required name="descripcion" className="min-h-24 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm normal-case text-white outline-none focus:border-[#06b6d4]" /></label>
-    <button className="rounded-xl bg-gradient-to-r from-[#4f46e5] to-[#06b6d4] px-5 py-3 text-sm font-black text-white">Enviar solicitud de nuevo Hub</button>
-    {estado && <p className="text-sm font-bold text-[#06b6d4]">{estado}</p>}
+    <label className="grid gap-1 text-xs font-bold uppercase tracking-wide text-[#53685C]">Descripción<textarea required name="descripcion" className="min-h-24 rounded-xl border border-[#DDE7E2] bg-[#F8FAF7] px-3 py-2 text-sm normal-case text-[#0B1726] outline-none focus:border-[#1E8F4D]" /></label>
+    <button className="rounded-xl bg-gradient-to-r from-[#1E8F4D] to-[#22C7E8] px-5 py-3 text-sm font-black text-white">Enviar solicitud de nuevo Hub</button>
+    {estado && <p className="text-sm font-bold text-[#1E8F4D]">{estado}</p>}
   </form>;
 }

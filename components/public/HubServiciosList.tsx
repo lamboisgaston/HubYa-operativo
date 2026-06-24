@@ -6,28 +6,28 @@ function nombresPostulantes(servicio: HubServicioPublico) {
 
 export function HubServiciosList({ servicios, compacto = false }: { servicios: HubServicioPublico[]; compacto?: boolean }) {
   if (servicios.length === 0) {
-    return <p className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3 text-sm font-semibold text-[#9ca3af]">Este Hub todavía no tiene demandas/servicios cargados.</p>;
+    return <p className="mt-4 rounded-xl border border-[#DDE7E2] bg-[#F8FAF7] p-3 text-sm font-semibold text-[#53685C]">Este Hub todavía no tiene demandas/servicios cargados.</p>;
   }
 
   return (
     <div className={compacto ? "mt-5 grid gap-3" : "mt-8 grid gap-4"}>
-      <p className="text-xs font-black uppercase tracking-[0.22em] text-[#06b6d4]">Demandas / Servicios del Hub</p>
+      <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1E8F4D]">Demandas / Servicios del Hub</p>
       {servicios.map((servicio, index) => (
-        <article key={servicio.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <article key={servicio.id} className="rounded-2xl border border-[#DDE7E2] bg-[#F8FAF7] p-4">
           <div className="flex gap-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4f46e5]/20 text-xs font-black text-[#c7d2fe]">{index + 1}</span>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#EAF7EF] text-xs font-black text-[#1E8F4D]">{index + 1}</span>
             <div className="min-w-0 flex-1">
-              <h4 className={compacto ? "font-black text-white" : "text-lg font-black text-white"}>{servicio.nombre_servicio}</h4>
-              {!compacto && <p className="mt-1 text-sm text-[#9ca3af]">{servicio.descripcion}</p>}
+              <h4 className={compacto ? "font-black text-[#0B1726]" : "text-lg font-black text-[#0B1726]"}>{servicio.nombre_servicio}</h4>
+              {!compacto && <p className="mt-1 text-sm text-[#53685C]">{servicio.descripcion}</p>}
               <dl className="mt-3 grid gap-2 text-sm">
-                <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3">
-                  <dt className="text-[10px] font-black uppercase tracking-wide text-emerald-200">Vínculo activo</dt>
-                  <dd className="mt-1 font-black text-white">{servicio.vinculoActivo?.oferta_nombre || "Sin vínculo activo"}</dd>
-                  {!compacto && servicio.vinculoActivo?.responsable && <p className="mt-1 text-xs font-semibold text-emerald-100/80">Responsable: {servicio.vinculoActivo.responsable}</p>}
+                <div className="rounded-xl border border-[#BFE8CF] bg-[#EAF7EF] p-3">
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-[#1E8F4D]">Vínculo activo</dt>
+                  <dd className="mt-1 font-black text-[#0B1726]">{servicio.vinculoActivo?.oferta_nombre || "Sin vínculo activo"}</dd>
+                  {!compacto && servicio.vinculoActivo?.responsable && <p className="mt-1 text-xs font-semibold text-[#375243]">Responsable: {servicio.vinculoActivo.responsable}</p>}
                 </div>
-                <div className="rounded-xl border border-[#06b6d4]/20 bg-[#06b6d4]/10 p-3">
-                  <dt className="text-[10px] font-black uppercase tracking-wide text-[#a5f3fc]">Postulantes</dt>
-                  <dd className="mt-1 font-semibold text-white">{nombresPostulantes(servicio)}</dd>
+                <div className="rounded-xl border border-[#BFE8CF] bg-[#E8F6FF] p-3">
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-[#1E8F4D]">Postulantes</dt>
+                  <dd className="mt-1 font-semibold text-[#0B1726]">{nombresPostulantes(servicio)}</dd>
                 </div>
               </dl>
             </div>
