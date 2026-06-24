@@ -1040,7 +1040,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     const importeFinal = importeDistribuido + numero(actor.ajusteManual);
     return { ...actor, importeDistribuido, importeFinal };
   });
-  const totalDistribuido = distribucionCalculada.reduce((total, actor) => total + actor.importeFinal, 0);
+  const totalDistribuido = distribucionCalculada.reduce((total, actor) => total + actor.importeDistribuido, 0);
   const resumenesDelHub = historialResumenes[jornada.hub] || [];
   const borradoresDelHub = borradoresReportes[jornada.hub] || [];
   const clientesSinEmailReporte = datosHub.clientesIngresos.filter((cliente) => !cliente.email.trim());
@@ -1273,8 +1273,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       "Tu importe:",
       formatoPlano(clienteReporte?.importe) || formatoMoneda(0),
       "",
-      "Total del Hub:",
-      formatoPlano(totalFacturadoHub) || formatoMoneda(0),
+      "Resumen del Hub:",
+      `Total del Hub: ${formatoPlano(totalFacturadoHub) || formatoMoneda(0)}`,
       "",
       `Integrantes participantes: ${integrantesParticipantesReporte}`,
       `Integrantes que saltean visita: ${integrantesSalteanVisitaReporte}`,
@@ -1364,7 +1364,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;">
             <h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Estimado de distribución</h2>
             <p style="margin:0 0 8px;color:#66745c;font-weight:700;">Esta sección es un estimado interno de cómo se puede distribuir el saldo entre los jardineros/equipo. No es una liquidación definitiva.</p>
-            <p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Total a pagar / saldo distribuible</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(totalPagarEquipoOperativo))}</strong></p>
+            <p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Saldo distribuible</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(totalPagarEquipoOperativo))}</strong></p>
             <p style="margin:0 0 8px;display:flex;justify-content:space-between;gap:12px;"><span>Total de puntos</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(totalParticipacion.toLocaleString("es-AR", { maximumFractionDigits: 2 }))}</strong></p>
             ${distribucionCalculada.filter((actor) => actor.activo && actor.participaDistribucion !== false).map((actor) => `<p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(actor.rol || "Integrante")}${actor.nombre ? ` · ${escaparHtml(actor.nombre)}` : ""}: participación ${escaparHtml(numero(actor.participacion).toLocaleString("es-AR", { maximumFractionDigits: 2 }))}</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(actor.importeDistribuido))}</strong></p>`).join("")}
             <p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;"><span>Total estimado distribuido</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(totalDistribuido))}</strong></p>
