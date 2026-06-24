@@ -32,8 +32,6 @@ const TARIFAS_CLIENTE: Array<{ value: TarifaCliente; label: string }> = [
 
 type FilaGasto = { id: number; concepto: string; importe: CampoNumerico };
 type FilaActor = { id: number; nombre: string; activo: boolean; participacion: CampoNumerico; ajusteManual: CampoNumerico; email?: string; whatsapp?: string; rol?: string; recibeReportes?: boolean; participaDistribucion?: boolean; observacion?: string };
-type VentaAsociadaVertical = "HueverosYa" | "VerdulerosYa" | "Otro";
-type VentaAsociada = { activa: boolean; vertical: VentaAsociadaVertical; producto: string; precio: CampoNumerico; foto: string; linkPago: string; precioMediaCaja?: CampoNumerico; linkPagoMediaCaja?: string; precioCaja?: CampoNumerico; linkPagoCaja?: string; entrega: string };
 
 type ResumenHubManual = {
   tiempoEfectivo: string;
@@ -48,7 +46,6 @@ type DatosHub = {
   actores: FilaActor[];
   resumen: ResumenHubManual;
   clienteActivoId: number;
-  ventaAsociada: VentaAsociada;
 };
 type DatosPorHub = Record<HubDisponible, DatosHub>;
 
@@ -79,7 +76,6 @@ type ResumenGuardadoHub = {
   observacion: string;
   notaInstitucional: string[];
   reporteTexto: string;
-  ventaAsociada: VentaAsociada;
 };
 
 type HistorialResumenesPorHub = Record<HubDisponible, ResumenGuardadoHub[]>;
@@ -193,12 +189,6 @@ const CONSULTAS_HUB_STORAGE_KEY = "hubya-consultas-hub";
 const ENVIOS_REPORTES_STORAGE_KEY = "hubya-envios-reportes";
 const NUEVO_HUB_FORM_INICIAL = { tipoHub: "demanda", nombre: "", zona: "", rama: "", equipoOperativo: "", descripcion: "", responsable: "" };
 const NUEVO_VINCULO_FORM_INICIAL = { hub_id: "Hub Tipal" as HubDisponible, oferta_id: "", estado: "POSTULANTE" as EstadoHubVinculo, rol: "Resolutor", fecha_inicio: "", fecha_fin: "", capacidad: "", observaciones: "" };
-const PRODUCTOS_HUEVEROS_YA = ["1/2 caja de huevos grandes", "1 caja de huevos grandes"];
-const TEXTO_ENTREGA_VENTA_ASOCIADA = "Si pagás se entrega en tu domicilio mañana.";
-const ENTREGA_VENTA_ASOCIADA = "El pago confirma el pedido. La entrega se realiza junto con la visita de jardinería.";
-const FOTO_MEDIA_CAJA_HUEVOS = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 420'%3E%3Crect width='640' height='420' fill='%23fbf3df'/%3E%3Crect x='84' y='138' width='472' height='196' rx='36' fill='%23caa66a'/%3E%3Crect x='120' y='176' width='400' height='118' rx='26' fill='%23e4c98e'/%3E%3Cg fill='%23fff9e9' stroke='%23d7c19c' stroke-width='4'%3E%3Cellipse cx='185' cy='235' rx='36' ry='46'/%3E%3Cellipse cx='253' cy='235' rx='36' ry='46'/%3E%3Cellipse cx='321' cy='235' rx='36' ry='46'/%3E%3Cellipse cx='389' cy='235' rx='36' ry='46'/%3E%3Cellipse cx='457' cy='235' rx='36' ry='46'/%3E%3C/g%3E%3Ctext x='320' y='82' text-anchor='middle' font-family='Arial' font-size='34' font-weight='800' fill='%231f2a1d'%3E1/2 caja de huevos grandes%3C/text%3E%3C/svg%3E";
-const FOTO_CAJA_HUEVOS = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 420'%3E%3Crect width='640' height='420' fill='%23f6efe0'/%3E%3Crect x='66' y='118' width='508' height='222' rx='38' fill='%23b98f54'/%3E%3Crect x='106' y='154' width='428' height='150' rx='28' fill='%23dfbe7f'/%3E%3Cg fill='%23fff9e9' stroke='%23d7c19c' stroke-width='4'%3E%3Cellipse cx='168' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='229' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='290' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='351' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='412' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='473' cy='205' rx='30' ry='39'/%3E%3Cellipse cx='168' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='229' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='290' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='351' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='412' cy='270' rx='30' ry='39'/%3E%3Cellipse cx='473' cy='270' rx='30' ry='39'/%3E%3C/g%3E%3Ctext x='320' y='82' text-anchor='middle' font-family='Arial' font-size='36' font-weight='800' fill='%231f2a1d'%3E1 caja de huevos grandes%3C/text%3E%3C/svg%3E";
-const VENTA_ASOCIADA_INICIAL: VentaAsociada = { activa: false, vertical: "HueverosYa", producto: PRODUCTOS_HUEVEROS_YA[0], precio: 0, foto: "", linkPago: "", precioMediaCaja: 0, linkPagoMediaCaja: "", precioCaja: 0, linkPagoCaja: "", entrega: ENTREGA_VENTA_ASOCIADA };
 
 const HUBS_DISPONIBLES = [
   "Hub Tipal",
@@ -215,15 +205,7 @@ const trabajoRealizadoInicial = "Mantenimiento integral de espacios verdes, cort
 const trabajoPendienteInicial = "Validación final con cada cliente y próximos repasos programados.";
 const observacionGeneralInicial = "Resumen cargado manualmente. Sin cálculos automáticos obligatorios.";
 const contactoDudasReporte = "Por cualquier duda, comunicarse al 3874142770.";
-const sobreHubYaLineas = [
-  "HUBYA TECH es inteligencia salteña al servicio de una cooperación colaborativa y meritocrática.",
-  "Parte de una convicción: cuando las necesidades dispersas se agrupan y las capacidades productivas se ordenan, aparece una fuerza nueva.",
-  "Esa fuerza no nace solo de estar juntos, sino de organizar mejor lo que cada persona puede aportar.",
-  "HUBYA busca transformar lo individual en cooperación, lo aislado en comunidad operativa y el mérito del trabajo bien hecho en estabilidad para todos los integrantes del Hub.",
-  "“El todo es más que la suma de sus partes.”",
-  "Principio aristotélico",
-  "www.hubya.tech",
-];
+const sobreHubYaLineas: string[] = [];
 const clientesBasePorHub: Record<HubDisponible, string[]> = {
   "Hub Tipal": [],
   "Hub Punto": [],
@@ -349,7 +331,6 @@ function datosHubInicial(hub: HubDisponible): DatosHub {
     actores: ["Hernán Llanes", "Armando Castillo", "Mauricio Vallejos"].map((nombre, index) => ({ id: hubIndex * 100000 + index, nombre, activo: true, participacion: 1, ajusteManual: 0 })),
     resumen: resumenInicial(),
     clienteActivoId: clientesIngresos[0]?.id || 0,
-    ventaAsociada: { ...VENTA_ASOCIADA_INICIAL },
   };
 }
 
@@ -428,7 +409,7 @@ function importeCliente(cliente: Pick<FilaClienteIngreso, "importe"> | undefined
 }
 
 function estadoVisitaCliente(cliente: Pick<FilaClienteIngreso, "importe"> | undefined) {
-  return importeCliente(cliente) > 0 ? "Visitado" : "Saltea visita";
+  return importeCliente(cliente) > 0 ? "Participa" : "Saltea la visita";
 }
 
 function observacionCliente(cliente: Pick<FilaClienteIngreso, "importe" | "trabajoRealizado"> | undefined) {
@@ -439,24 +420,6 @@ function observacionCliente(cliente: Pick<FilaClienteIngreso, "importe" | "traba
 function conceptoTarifaCliente(cliente: Pick<FilaClienteIngreso, "importe" | "tarifaCliente"> | undefined) {
   const etiqueta = etiquetaTarifa(cliente?.tarifaCliente);
   return importeCliente(cliente) > 0 ? `Tarifa aplicada: ${etiqueta}` : `Tarifa de referencia: ${etiqueta}`;
-}
-
-function normalizarVentaAsociada(venta: Partial<VentaAsociada> | undefined): VentaAsociada {
-  const vertical = venta?.vertical === "HueverosYa" || venta?.vertical === "VerdulerosYa" ? venta.vertical : venta?.vertical === "Otro" || venta?.vertical === "Otro servicio" ? "Otro" : "HueverosYa";
-  const productoPorDefecto = vertical === "HueverosYa" ? PRODUCTOS_HUEVEROS_YA[0] : "";
-  return {
-    activa: Boolean(venta?.activa),
-    vertical,
-    producto: String(venta?.producto || productoPorDefecto),
-    precio: venta?.precio ?? 0,
-    foto: String(venta?.foto || ""),
-    linkPago: String(venta?.linkPago || ""),
-    precioMediaCaja: venta?.precioMediaCaja ?? (venta?.producto === PRODUCTOS_HUEVEROS_YA[0] ? venta?.precio : 0) ?? 0,
-    linkPagoMediaCaja: String(venta?.linkPagoMediaCaja || (venta?.producto === PRODUCTOS_HUEVEROS_YA[0] ? venta?.linkPago || "" : "")),
-    precioCaja: venta?.precioCaja ?? (venta?.producto === PRODUCTOS_HUEVEROS_YA[1] ? venta?.precio : 0) ?? 0,
-    linkPagoCaja: String(venta?.linkPagoCaja || (venta?.producto === PRODUCTOS_HUEVEROS_YA[1] ? venta?.linkPago || "" : "")),
-    entrega: ENTREGA_VENTA_ASOCIADA,
-  };
 }
 
 function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partial<FilaActor> & { actor?: string; importe?: CampoNumerico })[] }) | undefined, hub: HubDisponible): DatosHub {
@@ -471,7 +434,6 @@ function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partia
     actores: actoresFuente.map(normalizarActor),
     resumen: { ...resumenInicial(), ...datos?.resumen },
     clienteActivoId: clientesIngresos.some((cliente) => cliente.id === datos?.clienteActivoId) ? Number(datos?.clienteActivoId) : clientesIngresos[0]?.id || 0,
-    ventaAsociada: normalizarVentaAsociada(datos?.ventaAsociada),
   };
 }
 
@@ -505,7 +467,6 @@ function normalizarResumenGuardado(resumen: Partial<ResumenGuardadoHub>, hub: Hu
     observacion: resumen.observacion || datos.resumen.observacionGeneral || "",
     notaInstitucional: resumen.notaInstitucional || sobreHubYaLineas,
     reporteTexto: resumen.reporteTexto || "",
-    ventaAsociada: normalizarVentaAsociada(resumen.ventaAsociada || datos.ventaAsociada),
   };
 }
 
@@ -813,7 +774,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const [confirmacionEnvioReporte, setConfirmacionEnvioReporte] = useState(false);
   const [enviosReporte, setEnviosReporte] = useState<ResumenEnvioReporte[]>([]);
   const [emailPruebaReporte, setEmailPruebaReporte] = useState("lamboisgaston@gmail.com");
-  const [incluirConsultaParametros, setIncluirConsultaParametros] = useState(false);
   const [seccionActiva, setSeccionActiva] = useState<"reporte" | "informacion" | "importar" | "consultas" | "equipos" | "nuevoHub" | "vinculos">(initialSection);
   const [hubInformacion, setHubInformacion] = useState<HubDisponible | "">("");
   const [asuntoInformacion, setAsuntoInformacion] = useState("");
@@ -857,10 +817,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const seleccionReporteEditadaManualmenteRef = useRef(false);
   const hubsOperativos = useMemo(() => fusionarNombresHubs(hubsCanonicos), [hubsCanonicos]);
   const hubActual = useMemo(() => initialHub || hubsCanonicos.find((hub) => hub.nombre === jornada.hub), [hubsCanonicos, initialHub, jornada.hub]);
-  const ramaReporte = `${hubActual?.rama || ""}`.toLowerCase();
-  const tituloReporteHub = /jardiner|jardinería|jardineria|espacios? verdes?/.test(ramaReporte) ? "Reporte de Espacios Verdes" : /fumigadores|control de plagas|plagas/.test(ramaReporte) ? "Reporte de Control de Plagas" : "Reporte del Hub";
-  const informacionReporte = hubActual?.informacionImportante?.mostrarEnReporte && hubActual.informacionImportante.texto ? hubActual.informacionImportante : null;
-  const parametrosJardinerosYaReporte = hubActual?.moduloOperativo === "jardinerosya" ? hubActual.parametrosOperativos?.jardinerosYa : null;
+  const tituloReporteHub = "Reporte del día del Hub";
+  const servicioRealizadoReporte = datosHub.resumen.estadoOperativo || hubActual?.rama || "Servicio del Hub";
   const contactosImportadosFiltrados = useMemo(() => {
     const busquedaNormalizada = normalizarContactoBusqueda(busquedaContactos);
     const busquedaSinEspacios = busquedaNormalizada.replace(/\s+/g, "");
@@ -1070,30 +1028,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     return { ...actor, importeDistribuido, importeFinal };
   });
   const totalDistribuido = distribucionCalculada.reduce((total, actor) => total + actor.importeFinal, 0);
-  const ventaAsociada = normalizarVentaAsociada(datosHub.ventaAsociada);
-  const bloqueVentaTexto = useMemo(() => {
-    if (!ventaAsociada.activa) return [];
-    if (ventaAsociada.vertical === "HueverosYa") return [
-      "",
-      "OPORTUNIDADES PARA ESTA VISITA",
-      TEXTO_ENTREGA_VENTA_ASOCIADA,
-      "HueverosYa",
-      `${PRODUCTOS_HUEVEROS_YA[0]}: ${formatoPlano(ventaAsociada.precioMediaCaja) || formatoMoneda(0)}`,
-      `Link Mercado Pago media caja: ${ventaAsociada.linkPagoMediaCaja || "Sin link de pago cargado"}`,
-      `${PRODUCTOS_HUEVEROS_YA[1]}: ${formatoPlano(ventaAsociada.precioCaja) || formatoMoneda(0)}`,
-      `Link Mercado Pago 1 caja: ${ventaAsociada.linkPagoCaja || "Sin link de pago cargado"}`,
-    ];
-    return [
-      "",
-      "OPORTUNIDADES PARA ESTA VISITA",
-      TEXTO_ENTREGA_VENTA_ASOCIADA,
-      ventaAsociada.vertical,
-      `Producto: ${ventaAsociada.producto || "Sin producto seleccionado"}`,
-      `Precio: ${formatoPlano(ventaAsociada.precio) || formatoMoneda(0)}`,
-      `Link de pago Mercado Pago: ${ventaAsociada.linkPago || "Sin link de pago cargado"}`,
-      ENTREGA_VENTA_ASOCIADA,
-    ];
-  }, [ventaAsociada.activa, ventaAsociada.linkPago, ventaAsociada.linkPagoCaja, ventaAsociada.linkPagoMediaCaja, ventaAsociada.precio, ventaAsociada.precioCaja, ventaAsociada.precioMediaCaja, ventaAsociada.producto, ventaAsociada.vertical]);
   const resumenesDelHub = historialResumenes[jornada.hub] || [];
   const borradoresDelHub = borradoresReportes[jornada.hub] || [];
   const clientesSinEmailReporte = datosHub.clientesIngresos.filter((cliente) => !cliente.email.trim());
@@ -1107,11 +1041,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function actualizarDatosHub(cambios: Partial<DatosHub>) {
     setJornada((actual) => ({ ...actual, datosPorHub: { ...actual.datosPorHub, [actual.hub]: { ...normalizarDatosHub(actual.datosPorHub[actual.hub], actual.hub), ...cambios } } }));
-  }
-
-  function actualizarVentaAsociada(cambios: Partial<VentaAsociada>) {
-    const ventaActual = normalizarVentaAsociada(datosHub.ventaAsociada);
-    actualizarDatosHub({ ventaAsociada: normalizarVentaAsociada({ ...ventaActual, ...cambios }) });
   }
 
   function seleccionarHubTrabajo(hub: HubDisponible) {
@@ -1198,9 +1127,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   }
 
   const nombrePrivado = useCallback((cliente: FilaClienteIngreso, index: number) => cliente.id === clienteActivo?.id ? cliente.nombre : aliasVecino(index), [clienteActivo?.id]);
-  const moduloOperativoReporte = hubActual?.moduloOperativo === "jardinerosya" ? "JardinerosYa" : (hubActual?.rama || hubActual?.moduloOperativo || "Sin módulo operativo");
-  const integrantesHubReporte = hubActual?.clientesActivos || datosHub.clientesIngresos.length || datosHub.clientesIngresos.filter((cliente) => cliente.nombre.trim()).length;
-  const nivelEstabilidadReporte = Math.min(10, Math.max(1, Math.round(Number(hubActual?.nivelEstabilidad || 8))));
   const destinatariosSeleccionados = destinatariosInformacion.filter((destinatario) => destinatario.incluido);
   const destinatariosConEmailInformacion = destinatariosInformacion.filter((destinatario) => emailValido(destinatario.email || ""));
 
@@ -1324,32 +1250,26 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     return clientesDelHub.map((cliente, index) => `${nombreVecinoParaReporte(cliente, destinatario, index)}: ${formatoPlano(cliente.importe) || formatoMoneda(0)}`);
   }
 
+  function estadoVisitaReporte(cliente: FilaClienteIngreso) {
+    return numero(cliente.importe) === 0 ? "Saltea la visita" : "Participa";
+  }
+
+  function lineaIntegranteReporte(cliente: FilaClienteIngreso, destinatario: FilaClienteIngreso | undefined, index: number) {
+    return `${nombreVecinoParaReporte(cliente, destinatario, index)}: ${formatoPlano(cliente.importe) || formatoMoneda(0)} — ${estadoVisitaReporte(cliente)}`;
+  }
+
   function textoReportePrevioParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
-    const importesNormales = clientesDelHub.filter((cliente) => cliente.id !== clienteReporte?.id && importeCliente(cliente) > 0).map((cliente) => importeCliente(cliente));
-    const importeNormal = importesNormales.length > 0 ? importesNormales.reduce((total, valor) => total + valor, 0) / importesNormales.length : importeCliente(clienteReporte);
-    const desvioNormal = importeNormal > 0 ? Math.round(((importeCliente(clienteReporte) - importeNormal) / importeNormal) * 100) : 0;
     return [
-      "TU ÚLTIMA VISITA",
-      `Importe última visita: ${formatoPlano(clienteReporte?.importe) || formatoMoneda(0)}`,
-      `Desvío respecto a la normal: ${desvioNormal}%`,
+      "REPORTE DEL DÍA DEL HUB",
+      `HUBYA · ${jornada.hub}`,
+      `Fecha: ${fechaFormateada}`,
+      `Servicio realizado: ${servicioRealizadoReporte}`,
       "",
-      "Para ver detalles del reporte de jardinería:",
-      "www.jardinerosya.online",
+      "Integrantes del Hub:",
+      ...clientesDelHub.map((cliente, index) => lineaIntegranteReporte(cliente, clienteReporte, index)),
       "",
-      "Calificá la visita anterior del jardinero:",
-      "[ ] Mala",
-      "[ ] Regular",
-      "[ ] Buena",
-      "[ ] Muy buena",
-      ...bloqueVentaTexto.filter(Boolean),
-      "",
-      "RESUMEN ANTERIOR DEL HUB",
-      `Hub: ${jornada.hub}`,
-      `Fecha anterior: ${fechaFormateada}`,
-      `Estado general del Hub: ${nivelEstabilidadReporte}/10`,
-      `Horas trabajadas: ${datosHub.resumen.tiempoEfectivo || "Sin cargar"}`,
-      "Facturación del Hub:",
+      "Facturación del día:",
       ...lineasDistribucionVecinos(clienteReporte),
       `Total del Hub: ${formatoPlano(totalFacturadoHub) || formatoMoneda(0)}`,
       "",
@@ -1360,22 +1280,21 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       `Total de gastos: ${formatoPlano(totalGastos) || formatoMoneda(0)}`,
       "",
       "Distribución operativa:",
-      `Saldo a distribuir: ${formatoPlano(totalADistribuir) || formatoMoneda(0)}`,
-      `Jardinero / equipo operativo: ${formatoMoneda(totalJardinerosEquipoOperativo)}`,
-      `Hub de oferta / administración: ${formatoMoneda(totalHubOfertaAdministracion)}`,
-      `Otros participantes, si corresponde: ${formatoMoneda(totalOtrosParticipantes)}`,
+      `Equipo operativo / jardineros: ${formatoMoneda(totalJardinerosEquipoOperativo)}`,
+      `Administración del Hub: ${formatoMoneda(totalHubOfertaAdministracion)}`,
+      `Otros participantes: ${formatoMoneda(totalOtrosParticipantes)}`,
       `Total distribuido: ${formatoPlano(totalDistribuido) || formatoMoneda(0)}`,
-      `Observaciones rápidas: ${datosHub.resumen.observacionGeneral || "Sin cargar"}`,
-    ].join("\n");
+      datosHub.resumen.observacionGeneral ? `Observaciones del día: ${datosHub.resumen.observacionGeneral}` : "",
+    ].filter(Boolean).join("\n");
   }
 
-  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, bloqueVentaTexto, clientesDelHub, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, gastosRealesDelDia, jornada.hub, nivelEstabilidadReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalHubOfertaAdministracion, totalJardinerosEquipoOperativo, totalOtrosParticipantes]);
+  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, fechaFormateada, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalHubOfertaAdministracion, totalJardinerosEquipoOperativo, totalOtrosParticipantes]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return textoReportePrevioParaCliente(clienteObjetivo);
   }
 
-  const asuntoReporte = `Reporte diario HUBYA — ${jornada.hub} — ${fechaFormateada}`;
+  const asuntoReporte = `Reporte del día del Hub — ${jornada.hub} — ${fechaFormateada}`;
   const firmaDatosHub = JSON.stringify(datosHub);
 
   const emailPrivado = useMemo(() => [
@@ -1393,40 +1312,34 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     setBorradoresReportes((actual) => ({ ...actual, [jornada.hub]: [borrador, ...(actual[jornada.hub] || []).filter((item) => item.id !== borrador.id)] }));
   }, [firmaDatosHub, isMounted, hubSeleccionado, jornada.fecha, jornada.hub, jornada.nombreResumen, reporteTexto, seccionActiva]);
 
-  const ventaAsociadaHtml = ventaAsociada.activa ? `<section style="margin-top:18px;border:1px solid #d8dfd1;background:#fbfcf9;padding:14px;font-size:12px;line-height:1.5;border-radius:18px;"><h2 style="margin:0 0 4px;color:#1f2a1d;font-size:16px;font-weight:900;">Oportunidades para esta visita</h2><p style="margin:0 0 12px;color:#4f5f47;font-weight:700;">${escaparHtml(TEXTO_ENTREGA_VENTA_ASOCIADA)}</p>${ventaAsociada.vertical === "HueverosYa" ? `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">${[
-    { producto: PRODUCTOS_HUEVEROS_YA[0], foto: FOTO_MEDIA_CAJA_HUEVOS, precio: ventaAsociada.precioMediaCaja, link: ventaAsociada.linkPagoMediaCaja, campo: "Link Mercado Pago media caja" },
-    { producto: PRODUCTOS_HUEVEROS_YA[1], foto: FOTO_CAJA_HUEVOS, precio: ventaAsociada.precioCaja, link: ventaAsociada.linkPagoCaja, campo: "Link Mercado Pago 1 caja" },
-  ].map((opcion) => `<article style="border:1px solid #cfd8c6;background:#ffffff;border-radius:18px;padding:12px;overflow:hidden;"><p style="margin:0 0 8px;color:#66745c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">HueverosYa</p><img src="${opcion.foto}" alt="${escaparHtml(opcion.producto)}" style="width:100%;max-height:150px;object-fit:cover;border-radius:14px;border:1px solid #eef1e9;margin-bottom:10px;" /><h3 style="margin:0;font-size:17px;font-weight:900;">${escaparHtml(opcion.producto)}</h3><p style="margin:8px 0 0;font-size:18px;font-weight:900;color:#1f2a1d;">${escaparHtml(formatoPlano(opcion.precio) || formatoMoneda(0))}</p><p style="margin:8px 0 0;color:#66745c;font-size:11px;font-weight:900;">${escaparHtml(opcion.campo)}</p>${opcion.link ? `<a href="${escaparHtml(opcion.link)}" style="display:inline-block;margin-top:10px;background:#1f2a1d;color:#fff;padding:10px 12px;border-radius:12px;text-decoration:none;font-weight:900;">Concretar venta</a>` : `<p style="margin:10px 0 0;color:#743c3c;font-weight:900;">Sin link de pago Mercado Pago cargado.</p>`}</article>`).join("")}</div>` : `<article style="border:1px solid #cfd8c6;background:#ffffff;border-radius:18px;padding:12px;overflow:hidden;"><p style="margin:0 0 8px;color:#66745c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">${escaparHtml(ventaAsociada.vertical)}</p>${ventaAsociada.foto ? `<img src="${escaparHtml(ventaAsociada.foto)}" alt="${escaparHtml(ventaAsociada.producto || ventaAsociada.vertical)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid #eef1e9;margin-bottom:10px;" />` : `<div style="height:120px;border-radius:14px;border:1px dashed #cfd8c6;background:#f8faf5;margin-bottom:10px;display:flex;align-items:center;justify-content:center;color:#66745c;font-weight:900;">Foto del producto</div>`}<h3 style="margin:0;font-size:17px;font-weight:900;">${escaparHtml(ventaAsociada.producto || "Producto sin nombre")}</h3><p style="margin:8px 0 0;font-size:18px;font-weight:900;color:#1f2a1d;">${escaparHtml(formatoPlano(ventaAsociada.precio) || formatoMoneda(0))}</p>${ventaAsociada.linkPago ? `<a href="${escaparHtml(ventaAsociada.linkPago)}" style="display:inline-block;margin-top:10px;background:#1f2a1d;color:#fff;padding:10px 12px;border-radius:12px;text-decoration:none;font-weight:900;">Concretar venta</a>` : `<p style="margin:10px 0 0;color:#743c3c;font-weight:900;">Sin link de pago Mercado Pago cargado.</p>`}</article>`}</section>` : "";
+
 
   function armarReporteHtmlParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
-    const importe = formatoPlano(clienteReporte?.importe) || formatoMoneda(0);
-    const importesNormales = clientesDelHub.filter((cliente) => cliente.id !== clienteReporte?.id && importeCliente(cliente) > 0).map((cliente) => importeCliente(cliente));
-    const importeNormal = importesNormales.length > 0 ? importesNormales.reduce((total, valor) => total + valor, 0) / importesNormales.length : importeCliente(clienteReporte);
-    const desvioNormal = importeNormal > 0 ? Math.round(((importeCliente(clienteReporte) - importeNormal) / importeNormal) * 100) : 0;
-    // Preparado para segunda etapa: este HTML formal puede reutilizarse como fuente de PDF/imagen adjunta sin cambiar el envío actual.
+    const listaIntegrantes = clientesDelHub.map((cliente, index) => `<p style="margin:0 0 6px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(nombreVecinoParaReporte(cliente, clienteReporte, index))}</span><strong>${escaparHtml(estadoVisitaReporte(cliente))}</strong></p>`).join("");
+    const facturacion = clientesDelHub.map((cliente, index) => `<p style="margin:0 0 6px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(nombreVecinoParaReporte(cliente, clienteReporte, index))}</span><strong>${escaparHtml(formatoPlano(cliente.importe) || formatoMoneda(0))}</strong></p>`).join("");
     return `
     <article style="width:100%;max-width:760px;border:1px solid #6f7968;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;">
       <section style="padding:16px;">
-        <section style="border:1px solid #1f2a1d;background:#fbfcf9;padding:14px;border-radius:18px;">
-          <h2 style="margin:0 0 10px;font-size:18px;font-weight:900;text-transform:uppercase;">Tu última visita</h2>
-          <p style="margin:0 0 8px;font-size:15px;font-weight:900;">Importe última visita: ${escaparHtml(importe)}</p>
-          <p style="margin:0 0 12px;font-size:15px;font-weight:900;">Desvío respecto a la normal: ${desvioNormal}%</p>
-          <p style="margin:0 0 14px;color:#4f5f47;font-weight:800;">Para ver detalles del reporte de jardinería:<br><a href="https://www.jardinerosya.online" style="color:#1f2a1d;font-weight:900;">www.jardinerosya.online</a></p>
-          <div style="margin-top:12px;border-top:1px solid #d8dfd1;padding-top:12px;">
-            <p style="margin:0 0 8px;color:#1f2a1d;font-size:14px;font-weight:900;">Calificá la visita anterior del jardinero:</p>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-              ${["Mala", "Regular", "Buena", "Muy buena"].map((opcion) => `<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid #cfd8c6;background:#ffffff;border-radius:999px;padding:7px 10px;color:#1f2a1d;font-size:13px;font-weight:800;"><span style="display:inline-block;width:12px;height:12px;border:1.5px solid #6f7968;border-radius:3px;background:#fff;"></span>${opcion}</span>`).join("")}
-            </div>
-          </div>
+        <header style="border:1px solid #1f2a1d;background:#fbfcf9;padding:14px;border-radius:18px;">
+          <p style="margin:0 0 4px;color:#66745c;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">HUBYA</p>
+          <h1 style="margin:0 0 10px;font-size:22px;font-weight:900;">Reporte del día del Hub</h1>
+          <p style="margin:0 0 5px;font-size:14px;"><strong>Hub:</strong> ${escaparHtml(jornada.hub)}</p>
+          <p style="margin:0 0 5px;font-size:14px;"><strong>Fecha:</strong> ${escaparHtml(fechaFormateada)}</p>
+          <p style="margin:0;font-size:14px;"><strong>Servicio realizado:</strong> ${escaparHtml(servicioRealizadoReporte)}</p>
+        </header>
+        <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:18px;font-size:12px;line-height:1.45;">
+          <div style="background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Integrantes del Hub</h2>${listaIntegrantes}</div>
+          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Facturación del día</h2>${facturacion}<p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total del Hub</span><strong>${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</strong></p></div>
+          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Gastos del día</h2><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de maquinaria y transporte</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("maquinaria")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de administración del Hub</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("administracion")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros insumos</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("otros")))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total de gastos</span><strong>${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</strong></p></div>
+          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Distribución operativa</h2><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Equipo operativo / jardineros</span><strong>${escaparHtml(formatoMoneda(totalJardinerosEquipoOperativo))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Administración del Hub</span><strong>${escaparHtml(formatoMoneda(totalHubOfertaAdministracion))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros participantes</span><strong>${escaparHtml(formatoMoneda(totalOtrosParticipantes))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total distribuido</span><strong>${escaparHtml(formatoPlano(totalDistribuido) || formatoMoneda(0))}</strong></p></div>
+          ${datosHub.resumen.observacionGeneral ? `<div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h2 style="margin:0 0 6px;font-size:15px;font-weight:900;">Observaciones del día</h2><p style="margin:0;color:#4f5f47;font-weight:700;">${escaparHtml(datosHub.resumen.observacionGeneral)}</p></div>` : ""}
         </section>
-        ${ventaAsociadaHtml}
-        <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:18px;font-size:12px;line-height:1.45;"><h2 style="margin:0 0 12px;font-size:17px;font-weight:900;">Resumen anterior del Hub</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;"><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Hub</strong><br>${escaparHtml(jornada.hub)}</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Fecha anterior</strong><br>${escaparHtml(fechaFormateada)}</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Estado general del Hub</strong><br>${nivelEstabilidadReporte}/10</div><div style="background:#fff;border:1px solid #e1e6dc;border-radius:12px;padding:10px;"><strong>Horas trabajadas</strong><br>${escaparHtml(datosHub.resumen.tiempoEfectivo || "Sin cargar")}</div></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Facturación del Hub</h3>${clientesDelHub.map((cliente, index) => `<p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(nombreVecinoParaReporte(cliente, clienteReporte, index))}</span><strong>${escaparHtml(formatoPlano(cliente.importe) || formatoMoneda(0))}</strong></p>`).join("")}<p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total del Hub</span><strong>${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</strong></p></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Gastos</h3><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de maquinaria y transporte</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("maquinaria")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de administración del Hub</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("administracion")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros insumos</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("otros")))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total de gastos</span><strong>${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</strong></p></div><div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h3 style="margin:0 0 8px;font-size:14px;font-weight:900;">Distribución</h3><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Saldo a distribuir</span><strong>${escaparHtml(formatoPlano(totalADistribuir) || formatoMoneda(0))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Jardinero / equipo operativo</span><strong>${escaparHtml(formatoMoneda(totalJardinerosEquipoOperativo))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Hub de oferta / administración</span><strong>${escaparHtml(formatoMoneda(totalHubOfertaAdministracion))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros participantes, si corresponde</span><strong>${escaparHtml(formatoMoneda(totalOtrosParticipantes))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total distribuido</span><strong>${escaparHtml(formatoPlano(totalDistribuido) || formatoMoneda(0))}</strong></p></div>${datosHub.resumen.observacionGeneral ? `<div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h3 style="margin:0 0 6px;font-size:14px;font-weight:900;">Observaciones rápidas</h3><p style="margin:0;color:#4f5f47;font-weight:700;">${escaparHtml(datosHub.resumen.observacionGeneral)}</p></div>` : ""}</section>
       </section>
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, datosHub.resumen.tiempoEfectivo, fechaFormateada, gastosRealesDelDia, jornada.hub, nivelEstabilidadReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalHubOfertaAdministracion, totalJardinerosEquipoOperativo, totalOtrosParticipantes, ventaAsociadaHtml]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, fechaFormateada, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalHubOfertaAdministracion, totalJardinerosEquipoOperativo, totalOtrosParticipantes]);
 
 
 
@@ -1471,7 +1384,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             hubId: initialHub?.id,
             reportId: `reporte-${jornada.hub}-${jornada.fecha}`,
             contactId: cliente.contactoId || String(cliente.id),
-            incluirConsultaParametros: tipo === "definitivo" && incluirConsultaParametros,
+            incluirConsultaParametros: false,
             baseUrl: window.location.origin,
           }),
         });
@@ -1641,7 +1554,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       observacion: datosHub.resumen.observacionGeneral,
       notaInstitucional: sobreHubYaLineas,
       reporteTexto,
-      ventaAsociada,
     };
   }
 
@@ -2084,7 +1996,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           <p className="mt-1 text-[11px] font-semibold text-[#66745c]">{mensajeGuardado} · Carga principal editable con sumas y distribución automáticas. · Equipo activo vinculado: <span className="font-black text-[#1f2a1d]">{equipoVinculadoAlHub?.nombre || "Sin equipo vinculado"}</span></p>
           {fichaHubActual && <dl className="mt-2 grid gap-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs sm:grid-cols-2 xl:grid-cols-6"><div><dt className="font-black uppercase text-[#66745c]">Ficha única</dt><dd className="font-bold">Web pública + operativo</dd></div><div><dt className="font-black uppercase text-[#66745c]">Ciudad / zona</dt><dd className="font-bold">{fichaHubActual.zona}</dd></div><div><dt className="font-black uppercase text-[#66745c]">Vecinos</dt><dd className="font-bold">{fichaHubActual.clientesActivos}</dd></div><div><dt className="font-black uppercase text-[#66745c]">Rama</dt><dd className="font-bold">{fichaHubActual.rama}</dd></div><div><dt className="font-black uppercase text-[#66745c]">Equipo operativo</dt><dd className="font-bold">{fichaHubActual.equipoOperativo}</dd></div><div><dt className="font-black uppercase text-[#66745c]">Servicios / vínculos</dt><dd className="font-bold">{fichaHubActual.servicios.length}</dd></div></dl>}
           <div className="mt-3 flex flex-wrap gap-2 border-t border-[#d8dfd1] pt-3">
-            <button onClick={() => setSeccionActiva("reporte")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "reporte" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Reporte diario</button>
+            <button onClick={() => setSeccionActiva("reporte")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "reporte" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Reporte del día</button>
             <button onClick={() => setSeccionActiva("informacion")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "informacion" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Envío por WhatsApp</button>
             <button onClick={() => setSeccionActiva("importar")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "importar" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Importar contactos</button>
             <a href="/operativo/solicitudes" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Solicitudes de ingreso</a><button onClick={() => setSeccionActiva("nuevoHub")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "nuevoHub" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Nuevo Hub</button><button onClick={() => setSeccionActiva("consultas")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "consultas" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Consultas del Hub</button><a href="/web-publica" className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-3 py-2 text-xs font-black text-[#1f2a1d]">Web pública</a><button onClick={() => setSeccionActiva("vinculos")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "vinculos" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Vínculos</button><button onClick={() => setSeccionActiva("equipos")} className={`h-8 rounded-lg px-3 text-xs font-black ${seccionActiva === "equipos" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white text-[#1f2a1d]"}`}>Equipos activos</button>
@@ -2231,7 +2143,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
         {seccionActiva === "reporte" && <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-3">
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black uppercase tracking-wide">Zona A · Carga operativa</h2><span className="text-xs font-bold text-[#66745c]">Planilla compacta</span></div>
-              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 1 — Carga del reporte</h3><div className="mb-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs"><p className="font-bold text-[#66745c]">Cargá solo lo que corresponde a este reporte. La selección de destinatarios y el envío quedan más adelante.</p></div>{confirmacionEnvioReporte && <div className="mb-2 rounded-xl border border-[#1f2a1d] bg-white p-3 text-xs shadow-sm"><h4 className="text-sm font-black">Vas a enviar este reporte a {destinatariosSeleccionadosReporte.length} personas.</h4><div className="mt-2 grid gap-3 md:grid-cols-2"><div><h5 className="font-black">Clientes del Hub</h5><ul className="mt-1 max-h-36 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.filter((d) => d.grupo === "cliente").map((cliente, index) => <li key={`confirmar-cliente-${cliente.id}-${index}`} className="font-semibold">{cliente.nombre || `Cliente ${index + 1}`} — <a className="underline" href={`mailto:${cliente.email}`}>{cliente.email}</a></li>)}{clientesSinEmailReporte.map((cliente) => <li key={`sin-email-cliente-${cliente.id}`} className="font-black text-[#743c3c]">{cliente.nombre || "Cliente sin nombre"} — Sin email cargado — no recibirá el reporte.</li>)}</ul></div><div><h5 className="font-black">Hub Operativo</h5><ul className="mt-1 max-h-36 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.filter((d) => d.grupo === "operativo").map((actor, index) => <li key={`confirmar-actor-${actor.id}-${index}`} className="font-semibold">{actor.nombre || `Integrante ${index + 1}`} — {actor.rol || "Rol operativo"} — <a className="underline" href={`mailto:${actor.email}`}>{actor.email}</a></li>)}{datosHub.actores.filter((actor) => !emailValido(actor.email || "")).map((actor) => <li key={`sin-email-actor-${actor.id}`} className="font-black text-[#743c3c]">{actor.nombre || "Integrante sin nombre"} — {actor.rol || "Rol operativo"} — Sin email cargado — no recibirá el reporte.</li>)}</ul></div></div>{clientesEmailInvalidoReporte.length > 0 && <p className="mt-1 font-black text-[#743c3c]">{clientesEmailInvalidoReporte.length} cliente{clientesEmailInvalidoReporte.length === 1 ? "" : "s"} tiene{clientesEmailInvalidoReporte.length === 1 ? "" : "n"} email inválido y no se seleccionó automáticamente.</p>}<div className="mt-3 flex flex-wrap gap-2"><button onClick={() => ejecutarEnvioReporte(destinatariosSeleccionadosReporte)} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 font-black text-white disabled:opacity-50">Confirmar envío</button><button onClick={() => setConfirmacionEnvioReporte(false)} className="h-8 rounded-lg border border-[#cfd8c6] px-3 font-black">Cancelar</button></div></div>}<div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Cliente</th><th className="border p-1">Tarifa del cliente</th><th className="border p-1">Importe</th><th className="border p-1">Estado de visita</th><th className="border p-1">Observación simple</th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente, index) => { const tieneEmailValido = emailValido(cliente.email); const seleccionadoReporte = clientesReporteSeleccionados.includes(cliente.id) && tieneEmailValido; return <tr key={`cliente-edit-${cliente.id}-${index}`} className={seleccionadoReporte ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1"><select value={cliente.tarifaCliente} onChange={(e) => actualizarCliente(cliente.id, { tarifaCliente: e.target.value as TarifaCliente })} className="min-w-36 rounded border bg-white px-2 py-1">{TARIFAS_CLIENTE.map((tarifa) => <option key={tarifa.value} value={tarifa.value}>{tarifa.label}</option>)}</select></td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className={`border border-[#e1e6dc] p-1 font-black ${estadoVisitaCliente(cliente) === "Saltea visita" ? "text-[#8a6a16]" : "text-[#2f6d32]"}`}>{estadoVisitaCliente(cliente)}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.trabajoRealizado || "", (valor) => actualizarCliente(cliente.id, { trabajoRealizado: valor }), "min-w-48")}</td></tr>; })}</tbody></table></div><div className="mt-2 flex flex-wrap gap-2"><button onClick={guardarJornada} className="h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar carga</button><a href="#paso-gastos" className="h-7 rounded-md border border-[#cfd8c6] px-3 py-1 text-xs font-black">Continuar</a></div>{ultimoEnvioReporte && <div className="mt-3 rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs"><h4 className="text-sm font-black">{ultimoEnvioReporte.tipo === "prueba" ? "Envío de prueba" : "Envío generado"}</h4><p className="mt-1 font-semibold">Este reporte se intentó enviar a estas personas.</p><div className="mt-2 grid gap-2 md:grid-cols-4"><div><p className="font-black text-[#66745c]">Fecha y hora</p><p>{new Date(ultimoEnvioReporte.fechaHora).toLocaleString("es-AR")}</p></div><div><p className="font-black text-[#66745c]">Hub</p><p>{ultimoEnvioReporte.hub}</p></div><div><p className="font-black text-[#66745c]">Reporte</p><p>{ultimoEnvioReporte.reporte}</p></div><div><p className="font-black text-[#66745c]">Destinatarios seleccionados</p><p>{ultimoEnvioReporte.destinatariosSeleccionados}</p></div><div><p className="font-black text-[#66745c]">Enviados a proveedor</p><p>{ultimoEnvioReporte.enviadosAProveedor}</p></div><div><p className="font-black text-[#66745c]">Errores</p><p>{ultimoEnvioReporte.errores}</p></div><div><p className="font-black text-[#66745c]">Sin email</p><p>{ultimoEnvioReporte.sinEmail}</p></div><div><p className="font-black text-[#66745c]">Pendientes de respuesta</p><p>{ultimoEnvioReporte.pendientesRespuesta}</p></div><div><p className="font-black text-[#66745c]">From usado</p><p>{ultimoEnvioReporte.fromUsado || "—"}</p></div><div><p className="font-black text-[#66745c]">Reply-To usado</p><p>{ultimoEnvioReporte.replyToUsado || "—"}</p></div></div><div className="mt-3 overflow-x-auto rounded-lg border border-[#d8dfd1] bg-white"><table className="w-full border-collapse"><thead className="bg-[#f1f4ec] text-left uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Email</th><th className="border p-1">Estado</th><th className="border p-1">Error</th><th className="border p-1">Fecha/hora</th><th className="border p-1">Provider ID / Resend ID</th><th className="border p-1">Acción</th></tr></thead><tbody>{ultimoEnvioReporte.destinatarios.map((destinatario, index) => <tr key={`envio-reporte-${ultimoEnvioReporte.id}-${destinatario.id}-${index}`}><td className="border p-1 font-black">{destinatario.nombre}</td><td className="border p-1">{destinatario.email || "Sin email cargado"}</td><td className="border p-1 font-black">{destinatario.estado}</td><td className="border p-1 text-[#743c3c]">{destinatario.error || "—"}</td><td className="border p-1">{destinatario.fechaHora ? new Date(destinatario.fechaHora).toLocaleString("es-AR") : "—"}</td><td className="border p-1">{destinatario.providerMessageId || destinatario.resendId || "—"}</td><td className="border p-1"><button onClick={() => ejecutarEnvioReporte(datosHub.clientesIngresos.filter((cliente) => cliente.id === destinatario.id && emailValido(cliente.email)).map((cliente) => ({ ...cliente, grupo: "cliente" as const })))} disabled={estadoEnvio === "enviando" || !emailValido(destinatario.email)} className="rounded border border-[#cfd8c6] px-2 py-1 font-black disabled:opacity-50">Reenviar</button></td></tr>)}</tbody></table></div></div>}
+              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 1 — Carga del reporte</h3><div className="mb-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs"><p className="font-bold text-[#66745c]">Cargá solo lo que corresponde a este reporte. La selección de destinatarios y el envío quedan más adelante.</p></div>{confirmacionEnvioReporte && <div className="mb-2 rounded-xl border border-[#1f2a1d] bg-white p-3 text-xs shadow-sm"><h4 className="text-sm font-black">Vas a enviar este reporte a {destinatariosSeleccionadosReporte.length} personas.</h4><div className="mt-2 grid gap-3 md:grid-cols-2"><div><h5 className="font-black">Clientes del Hub</h5><ul className="mt-1 max-h-36 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.filter((d) => d.grupo === "cliente").map((cliente, index) => <li key={`confirmar-cliente-${cliente.id}-${index}`} className="font-semibold">{cliente.nombre || `Cliente ${index + 1}`} — <a className="underline" href={`mailto:${cliente.email}`}>{cliente.email}</a></li>)}{clientesSinEmailReporte.map((cliente) => <li key={`sin-email-cliente-${cliente.id}`} className="font-black text-[#743c3c]">{cliente.nombre || "Cliente sin nombre"} — Sin email cargado — no recibirá el reporte.</li>)}</ul></div><div><h5 className="font-black">Hub Operativo</h5><ul className="mt-1 max-h-36 space-y-1 overflow-auto">{destinatariosSeleccionadosReporte.filter((d) => d.grupo === "operativo").map((actor, index) => <li key={`confirmar-actor-${actor.id}-${index}`} className="font-semibold">{actor.nombre || `Integrante ${index + 1}`} — {actor.rol || "Rol operativo"} — <a className="underline" href={`mailto:${actor.email}`}>{actor.email}</a></li>)}{datosHub.actores.filter((actor) => !emailValido(actor.email || "")).map((actor) => <li key={`sin-email-actor-${actor.id}`} className="font-black text-[#743c3c]">{actor.nombre || "Integrante sin nombre"} — {actor.rol || "Rol operativo"} — Sin email cargado — no recibirá el reporte.</li>)}</ul></div></div>{clientesEmailInvalidoReporte.length > 0 && <p className="mt-1 font-black text-[#743c3c]">{clientesEmailInvalidoReporte.length} cliente{clientesEmailInvalidoReporte.length === 1 ? "" : "s"} tiene{clientesEmailInvalidoReporte.length === 1 ? "" : "n"} email inválido y no se seleccionó automáticamente.</p>}<div className="mt-3 flex flex-wrap gap-2"><button onClick={() => ejecutarEnvioReporte(destinatariosSeleccionadosReporte)} disabled={estadoEnvio === "enviando"} className="h-8 rounded-lg bg-[#1f2a1d] px-3 font-black text-white disabled:opacity-50">Confirmar envío</button><button onClick={() => setConfirmacionEnvioReporte(false)} className="h-8 rounded-lg border border-[#cfd8c6] px-3 font-black">Cancelar</button></div></div>}<div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Cliente</th><th className="border p-1">Tarifa del cliente</th><th className="border p-1">Importe</th><th className="border p-1">Estado de visita</th><th className="border p-1">Observación simple</th></tr></thead><tbody>{datosHub.clientesIngresos.map((cliente, index) => { const tieneEmailValido = emailValido(cliente.email); const seleccionadoReporte = clientesReporteSeleccionados.includes(cliente.id) && tieneEmailValido; return <tr key={`cliente-edit-${cliente.id}-${index}`} className={seleccionadoReporte ? "bg-[#eef4ea]" : "bg-white"}><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.nombre, (valor) => actualizarCliente(cliente.id, { nombre: valor }))}</td><td className="border border-[#e1e6dc] p-1"><select value={cliente.tarifaCliente} onChange={(e) => actualizarCliente(cliente.id, { tarifaCliente: e.target.value as TarifaCliente })} className="min-w-36 rounded border bg-white px-2 py-1">{TARIFAS_CLIENTE.map((tarifa) => <option key={tarifa.value} value={tarifa.value}>{tarifa.label}</option>)}</select></td><td className="border border-[#e1e6dc] p-1">{inputNumero(cliente.importe, (valor) => actualizarCliente(cliente.id, { importe: valor }))}</td><td className={`border border-[#e1e6dc] p-1 font-black ${estadoVisitaCliente(cliente) === "Saltea la visita" ? "text-[#8a6a16]" : "text-[#2f6d32]"}`}>{estadoVisitaCliente(cliente)}</td><td className="border border-[#e1e6dc] p-1">{inputTexto(cliente.trabajoRealizado || "", (valor) => actualizarCliente(cliente.id, { trabajoRealizado: valor }), "min-w-48")}</td></tr>; })}</tbody></table></div><div className="mt-2 flex flex-wrap gap-2"><button onClick={guardarJornada} className="h-7 rounded-md bg-[#1f2a1d] px-3 text-xs font-black text-white">Guardar carga</button><a href="#paso-gastos" className="h-7 rounded-md border border-[#cfd8c6] px-3 py-1 text-xs font-black">Continuar</a></div>{ultimoEnvioReporte && <div className="mt-3 rounded-xl border border-[#cfd8c6] bg-[#f8faf5] p-3 text-xs"><h4 className="text-sm font-black">{ultimoEnvioReporte.tipo === "prueba" ? "Envío de prueba" : "Envío generado"}</h4><p className="mt-1 font-semibold">Este reporte se intentó enviar a estas personas.</p><div className="mt-2 grid gap-2 md:grid-cols-4"><div><p className="font-black text-[#66745c]">Fecha y hora</p><p>{new Date(ultimoEnvioReporte.fechaHora).toLocaleString("es-AR")}</p></div><div><p className="font-black text-[#66745c]">Hub</p><p>{ultimoEnvioReporte.hub}</p></div><div><p className="font-black text-[#66745c]">Reporte</p><p>{ultimoEnvioReporte.reporte}</p></div><div><p className="font-black text-[#66745c]">Destinatarios seleccionados</p><p>{ultimoEnvioReporte.destinatariosSeleccionados}</p></div><div><p className="font-black text-[#66745c]">Enviados a proveedor</p><p>{ultimoEnvioReporte.enviadosAProveedor}</p></div><div><p className="font-black text-[#66745c]">Errores</p><p>{ultimoEnvioReporte.errores}</p></div><div><p className="font-black text-[#66745c]">Sin email</p><p>{ultimoEnvioReporte.sinEmail}</p></div><div><p className="font-black text-[#66745c]">Pendientes de respuesta</p><p>{ultimoEnvioReporte.pendientesRespuesta}</p></div><div><p className="font-black text-[#66745c]">From usado</p><p>{ultimoEnvioReporte.fromUsado || "—"}</p></div><div><p className="font-black text-[#66745c]">Reply-To usado</p><p>{ultimoEnvioReporte.replyToUsado || "—"}</p></div></div><div className="mt-3 overflow-x-auto rounded-lg border border-[#d8dfd1] bg-white"><table className="w-full border-collapse"><thead className="bg-[#f1f4ec] text-left uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Email</th><th className="border p-1">Estado</th><th className="border p-1">Error</th><th className="border p-1">Fecha/hora</th><th className="border p-1">Provider ID / Resend ID</th><th className="border p-1">Acción</th></tr></thead><tbody>{ultimoEnvioReporte.destinatarios.map((destinatario, index) => <tr key={`envio-reporte-${ultimoEnvioReporte.id}-${destinatario.id}-${index}`}><td className="border p-1 font-black">{destinatario.nombre}</td><td className="border p-1">{destinatario.email || "Sin email cargado"}</td><td className="border p-1 font-black">{destinatario.estado}</td><td className="border p-1 text-[#743c3c]">{destinatario.error || "—"}</td><td className="border p-1">{destinatario.fechaHora ? new Date(destinatario.fechaHora).toLocaleString("es-AR") : "—"}</td><td className="border p-1">{destinatario.providerMessageId || destinatario.resendId || "—"}</td><td className="border p-1"><button onClick={() => ejecutarEnvioReporte(datosHub.clientesIngresos.filter((cliente) => cliente.id === destinatario.id && emailValido(cliente.email)).map((cliente) => ({ ...cliente, grupo: "cliente" as const })))} disabled={estadoEnvio === "enviando" || !emailValido(destinatario.email)} className="rounded border border-[#cfd8c6] px-2 py-1 font-black disabled:opacity-50">Reenviar</button></td></tr>)}</tbody></table></div></div>}
             </section>
 
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
@@ -2258,58 +2170,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Datos operativos</h3><div className="grid gap-2 lg:grid-cols-3"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Tiempo efectivo por operario<input value={datosHub.resumen.tiempoEfectivo} onChange={(e) => actualizarResumen({ tiempoEfectivo: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Estado operativo<input value={datosHub.resumen.estadoOperativo} onChange={(e) => actualizarResumen({ estadoOperativo: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Observación general<input value={datosHub.resumen.observacionGeneral} onChange={(e) => actualizarResumen({ observacionGeneral: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label></div></section>
 
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
-              <h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Venta asociada</h3>
-              <p className="mb-2 text-xs font-bold text-[#66745c]">¿Este reporte lleva venta asociada?</p>
-              <div className="mb-3 flex flex-wrap gap-2 text-xs">
-                <button type="button" onClick={() => actualizarVentaAsociada({ activa: false })} className={`h-8 rounded-md px-3 font-black ${!ventaAsociada.activa ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>No</button>
-                <button type="button" onClick={() => actualizarVentaAsociada({ activa: true })} className={`h-8 rounded-md px-3 font-black ${ventaAsociada.activa ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-white"}`}>Sí</button>
-              </div>
-              {ventaAsociada.activa && <div className="grid gap-3 lg:grid-cols-3">
-                <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Vertical
-                  <select value={ventaAsociada.vertical} onChange={(e) => actualizarVentaAsociada({ vertical: e.target.value as VentaAsociadaVertical, producto: e.target.value === "HueverosYa" ? PRODUCTOS_HUEVEROS_YA[0] : "" })} className="h-8 rounded-lg border px-2 text-sm normal-case">
-                    <option>HueverosYa</option><option>VerdulerosYa</option><option>Otro</option>
-                  </select>
-                </label>
-                {ventaAsociada.vertical === "HueverosYa" && <>
-                  <div className="rounded-xl border border-[#cfd8c6] bg-[#fbfcf9] p-3 lg:col-span-3">
-                    <p className="mb-2 text-xs font-black text-[#1f2a1d]">Opción izquierda — {PRODUCTOS_HUEVEROS_YA[0]}</p>
-                    <img src={FOTO_MEDIA_CAJA_HUEVOS} alt="Media caja de huevos grandes" className="mb-2 h-24 w-full rounded-lg border object-cover" />
-                    <div className="grid gap-2 lg:grid-cols-2">
-                      <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio editable
-                        <input type="number" step="1" min="0" value={ventaAsociada.precioMediaCaja} onChange={(e) => actualizarVentaAsociada({ precioMediaCaja: normalizarNumero(e.target.value), producto: PRODUCTOS_HUEVEROS_YA[0], precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                      </label>
-                      <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Link Mercado Pago media caja
-                        <input value={ventaAsociada.linkPagoMediaCaja || ""} onChange={(e) => actualizarVentaAsociada({ linkPagoMediaCaja: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                      </label>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#cfd8c6] bg-[#fbfcf9] p-3 lg:col-span-3">
-                    <p className="mb-2 text-xs font-black text-[#1f2a1d]">Opción derecha — {PRODUCTOS_HUEVEROS_YA[1]}</p>
-                    <img src={FOTO_CAJA_HUEVOS} alt="Caja completa de huevos grandes" className="mb-2 h-24 w-full rounded-lg border object-cover" />
-                    <div className="grid gap-2 lg:grid-cols-2">
-                      <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Precio editable
-                        <input type="number" step="1" min="0" value={ventaAsociada.precioCaja} onChange={(e) => actualizarVentaAsociada({ precioCaja: normalizarNumero(e.target.value), producto: PRODUCTOS_HUEVEROS_YA[1], precio: normalizarNumero(e.target.value) })} className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                      </label>
-                      <label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Link Mercado Pago 1 caja
-                        <input value={ventaAsociada.linkPagoCaja || ""} onChange={(e) => actualizarVentaAsociada({ linkPagoCaja: e.target.value })} placeholder="https://www.mercadopago.com.ar/..." className="h-8 rounded-lg border px-2 text-sm normal-case" />
-                      </label>
-                    </div>
-                  </div>
-                  <p className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-xs font-bold text-[#4f5f47] lg:col-span-3">{TEXTO_ENTREGA_VENTA_ASOCIADA}</p>
-                </>}
-              </div>}
-            </section>
-
-            {parametrosJardinerosYaReporte && <section className="rounded-xl border border-[#bfd3b8] bg-[#fbfdf8] p-3 shadow-sm">
-              <h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Paso 5 — Parámetros de referencia del Hub</h3>
-              <p className="mb-2 text-xs font-bold text-[#4f5f47]">Estos valores no son gastos del día. Son referencias que utiliza el sistema para organizar el funcionamiento del Hub.</p><div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-[#cfd8c6] bg-white p-2 text-xs"><span className="font-black text-[#66745c]">Incluir parámetros en el reporte enviado</span><button type="button" onClick={() => setIncluirConsultaParametros(false)} className={`h-7 rounded-md px-2 font-black ${!incluirConsultaParametros ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6]"}`}>No incluir</button><button type="button" onClick={() => setIncluirConsultaParametros(true)} className={`h-7 rounded-md px-2 font-black ${incluirConsultaParametros ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6]"}`}>Incluir</button></div>
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                {[["Valor hora de trabajo", formatoMoneda(parametrosJardinerosYaReporte.valorHoraTrabajo)], ["Comisión cuadrilla", `${parametrosJardinerosYaReporte.comisionResponsableCuadrillaPorcentaje}%`], ["Traslado", formatoMoneda(parametrosJardinerosYaReporte.traslado)], ["Aceite", formatoMoneda(parametrosJardinerosYaReporte.aceite)], ["Nafta", formatoMoneda(parametrosJardinerosYaReporte.nafta)], ["Cortadora", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraCortadoraCesped)}/h`], ["Bordeadora", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraBordeadora)}/h`], ["Máquina de empuje", `${formatoMoneda(parametrosJardinerosYaReporte.valorHoraMaquinaEmpuje)}/h`]].map(([etiqueta, valor]) => <div key={etiqueta} className="rounded-lg border border-[#cfd8c6] bg-white p-2"><p className="text-[10px] font-black uppercase text-[#66745c]">{etiqueta}</p><p className="text-sm font-black">{valor}</p></div>)}
-              </div>
-            </section>}
-
-            <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
-              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 6 — Destinatarios</h3>
+              <h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 5 — Destinatarios</h3>
               <p className="mb-2 text-xs font-bold text-[#66745c]">Elegí exactamente quién recibirá este reporte. Solo se envía a quienes están marcados.</p>
               <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-[#d8dfd1] bg-[#f8faf5] p-2 text-xs"><span className="font-black">Seleccionados: {destinatariosSeleccionadosReporte.length} personas</span><button onClick={seleccionarTodosClientesConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar clientes</button><button onClick={seleccionarTodosActoresConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar Hub Operativo</button><button onClick={seleccionarTodosDestinatariosConEmailValidoReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Seleccionar todos con email válido</button><button onClick={desmarcarTodosClientesReporte} className="h-7 rounded-md border border-[#cfd8c6] bg-white px-2 font-black">Desmarcar todos</button></div>
               <div className="grid gap-3 lg:grid-cols-2">
@@ -2324,7 +2185,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           <section className="border border-[#b9c5ae] bg-white p-3 shadow-sm">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[#d8dfd1] pb-2">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Paso 7 — Vista previa y envío</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Paso 6 — Revisar distribución y enviar</p>
                 <h2 className="text-lg font-black">{tituloReporteHub}</h2>
                 <p className="text-xs font-bold text-[#66745c]">La imagen generada usa este informe amable, claro y confiable.</p>
                 <p className={`mt-1 text-xs font-black ${estadoEnvio === "error" ? "text-[#743c3c]" : estadoEnvio === "enviado" ? "text-[#2f6d32]" : "text-[#66745c]"}`}>{mensajeEnvio}</p>
@@ -2336,9 +2197,10 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           </section>
 
           <details className="rounded-xl border border-[#1f2a1d] bg-[#1f2a1d] p-3 text-white shadow-sm"><summary className="cursor-pointer text-sm font-black uppercase tracking-wide">Mail corto para enviar con el documento</summary><div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]"><select value={datosHub.clienteActivoId} onChange={(e) => actualizarDatosHub({ clienteActivoId: Number(e.target.value) })} className="h-8 rounded-lg bg-white px-2 text-sm font-semibold text-[#182018]">{datosHub.clientesIngresos.map((cliente, index) => <option key={`cliente-activo-${cliente.id}-${index}`} value={cliente.id}>{cliente.nombre || "Sin cliente"}</option>)}</select><button onClick={() => copiarTexto(emailPrivado, "Email privado")} className="h-8 rounded-lg bg-white px-3 text-xs font-black text-[#1f2a1d]">Copiar texto del mail</button></div><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/10 p-3 text-xs leading-5">{emailPrivado}</pre></details>
-          <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm">
+          <details className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><summary className="cursor-pointer text-sm font-black text-[#1f2a1d]">Ver reportes anteriores</summary>
+          <section className="mt-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Reportes del Hub</p><h2 className="text-lg font-black">{jornada.hub}</h2><p className="text-xs font-bold text-[#66745c]">Bandejas separadas: borradores de trabajo e historial guardado.</p></div>
+              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#66745c]">Historial de reportes del Hub</p><h2 className="text-lg font-black">{jornada.hub}</h2><p className="text-xs font-bold text-[#66745c]">Bandejas separadas: borradores de trabajo e historial guardado.</p></div>
               <details className="relative"><summary className="cursor-pointer rounded-lg border border-[#cfd8c6] px-3 py-2 text-xs font-black">Más opciones</summary><div className="absolute right-0 z-10 mt-2 grid min-w-48 gap-1 rounded-lg border border-[#cfd8c6] bg-white p-2 shadow-lg"><button onClick={crearNuevoReporteHub} className="rounded-md px-2 py-1 text-left text-xs font-black">Crear nuevo reporte</button><button onClick={() => guardarResumenHub("GUARDADO")} className="rounded-md px-2 py-1 text-left text-xs font-black">Guardar definitivo</button></div></details>
             </div>
             <div className="mb-3 flex gap-2"><button onClick={() => setBandejaReportes("borradores")} className={`rounded-lg px-3 py-2 text-xs font-black ${bandejaReportes === "borradores" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-[#f8faf5]"}`}>Borradores ({borradoresDelHub.length})</button><button onClick={() => setBandejaReportes("guardados")} className={`rounded-lg px-3 py-2 text-xs font-black ${bandejaReportes === "guardados" ? "bg-[#1f2a1d] text-white" : "border border-[#cfd8c6] bg-[#f8faf5]"}`}>Guardados ({resumenesDelHub.length})</button></div>
@@ -2346,6 +2208,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
               {bandejaReportes === "borradores" ? <table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1.5">Fecha</th><th className="border p-1.5">Nombre del reporte</th><th className="border p-1.5 text-right">Clientes</th><th className="border p-1.5 text-right">Total facturado</th><th className="border p-1.5">Estado</th><th className="border p-1.5">Última edición</th><th className="border p-1.5">Acciones</th></tr></thead><tbody>{borradoresDelHub.length === 0 ? <tr><td colSpan={7} className="border p-3 text-center font-bold text-[#66745c]">Todavía no hay borradores para {jornada.hub}.</td></tr> : borradoresDelHub.map((resumen, index) => <tr key={`borrador-${resumen.id}-${index}`}><td className="border p-1.5 font-semibold">{formatoFecha(resumen.fecha)}</td><td className="border p-1.5 font-bold">{resumen.nombre}</td><td className="border p-1.5 text-right font-black">{resumen.datos.clientesIngresos.length}</td><td className="border p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalFacturado)}</td><td className="border p-1.5 font-black text-[#8a6a16]">BORRADOR</td><td className="border p-1.5">{new Date(resumen.ultimaEdicion || resumen.guardadoEn).toLocaleString("es-AR")}</td><td className="border p-1.5"><div className="flex flex-wrap gap-1"><button onClick={() => abrirResumenHub(resumen)} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Continuar editando</button><button onClick={() => cerrarBorradorHub(resumen, "ENVIADO")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Enviar</button><button onClick={() => cerrarBorradorHub(resumen, "GUARDADO")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Guardar como definitivo</button><button onClick={() => eliminarResumenHub(resumen)} className="h-7 rounded-md border border-[#d6b7b7] bg-[#fff7f7] px-2 text-[11px] font-black text-[#743c3c]">Eliminar</button></div></td></tr>)}</tbody></table> : <table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1.5">Fecha</th><th className="border p-1.5">Nombre del reporte</th><th className="border p-1.5 text-right">Clientes</th><th className="border p-1.5 text-right">Facturado</th><th className="border p-1.5 text-right">Gastos</th><th className="border p-1.5 text-right">A distribuir</th><th className="border p-1.5">Estado</th><th className="border p-1.5">Envío</th><th className="border p-1.5">Acciones</th></tr></thead><tbody>{resumenesDelHub.length === 0 ? <tr><td colSpan={9} className="border p-3 text-center font-bold text-[#66745c]">Todavía no hay reportes guardados para {jornada.hub}.</td></tr> : resumenesDelHub.map((resumen, index) => <tr key={`resumen-${resumen.id}-${index}`}><td className="border p-1.5 font-semibold">{formatoFecha(resumen.fecha)}</td><td className="border p-1.5 font-bold">{resumen.nombre}</td><td className="border p-1.5 text-right font-black">{resumen.datos.clientesIngresos.length}</td><td className="border p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalFacturado)}</td><td className="border p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalGastos)}</td><td className="border p-1.5 text-right font-black">{formatoMoneda(resumen.totales.totalADistribuir)}</td><td className="border p-1.5 font-black">{resumen.estado || "GUARDADO"}</td><td className="border p-1.5">{resumen.fechaEnvio ? new Date(resumen.fechaEnvio).toLocaleString("es-AR") : "—"}</td><td className="border p-1.5"><div className="flex flex-wrap gap-1"><button onClick={() => abrirResumenHub(resumen)} className="h-7 rounded-md bg-[#1f2a1d] px-2 text-[11px] font-black text-white">Ver reporte</button><button onClick={() => guardarResumenHub("ENVIADO")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Reenviar</button><button onClick={() => copiarTexto(resumen.reporteTexto || reporteTexto, "Reporte guardado")} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Copiar</button><button onClick={descargarImagenReporte} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Descargar imagen</button><button onClick={() => duplicarResumenHub(resumen)} className="h-7 rounded-md border border-[#cfd8c6] px-2 text-[11px] font-black">Duplicar como nuevo borrador</button></div></td></tr>)}</tbody></table>}
             </div>
           </section>
+          </details>
 
         </aside>
         </section>}
