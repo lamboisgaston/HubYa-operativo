@@ -816,9 +816,6 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const firmaSeleccionReporteRef = useRef("");
   const seleccionReporteEditadaManualmenteRef = useRef(false);
   const hubsOperativos = useMemo(() => fusionarNombresHubs(hubsCanonicos), [hubsCanonicos]);
-  const hubActual = useMemo(() => initialHub || hubsCanonicos.find((hub) => hub.nombre === jornada.hub), [hubsCanonicos, initialHub, jornada.hub]);
-  const tituloReporteHub = "Reporte del día del Hub";
-  const servicioRealizadoReporte = datosHub.resumen.estadoOperativo || hubActual?.rama || "Servicio del Hub";
   const contactosImportadosFiltrados = useMemo(() => {
     const busquedaNormalizada = normalizarContactoBusqueda(busquedaContactos);
     const busquedaSinEspacios = busquedaNormalizada.replace(/\s+/g, "");
@@ -985,6 +982,9 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const integrantesEquipoActivo = equipoActivo?.integrantes ?? [];
   const integrantesDestinoMensaje = integrantesEquipoActivo.filter((integrante) => integrantesMensajeSeleccionados.includes(integrante.id));
   const datosHub = useMemo(() => normalizarDatosHub(jornada.datosPorHub[jornada.hub], jornada.hub), [jornada.datosPorHub, jornada.hub]);
+  const hubActual = useMemo(() => initialHub || hubsCanonicos.find((hub) => hub.nombre === jornada.hub), [hubsCanonicos, initialHub, jornada.hub]);
+  const tituloReporteHub = "Reporte del día del Hub";
+  const servicioRealizadoReporte = datosHub.resumen.estadoOperativo || hubActual?.rama || "Servicio del Hub";
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
   const idsClientesValidosReporte = useMemo(() => datosHub.clientesIngresos
     .filter((cliente) => emailValido(cliente.email))
