@@ -13,9 +13,8 @@ export default async function OperativoPage() {
         <header className="rounded-[2rem] border border-[#DDE7E2] bg-white p-6 shadow-sm">
           <div className="flex items-center gap-4"><HubyaLogo className="h-14 w-auto" /><h1 className="text-3xl font-black sm:text-4xl">Operativo</h1></div>
           <p className="mt-2 max-w-2xl text-sm font-semibold text-[#53685C]">Elegí un Hub, elegí personas, enviá una comunicación y mirá qué respondió cada una.</p>
-          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <Link href="/operativo" className="rounded-2xl bg-[#1E8F4D] px-4 py-3 text-center text-sm font-black text-white">Hubs</Link>
-            <Link href="/operativo/usuarios" className="rounded-2xl border border-[#DDE7E2] bg-[#F8FAF7] px-4 py-3 text-center text-sm font-black text-[#0B1726]">Usuarios</Link>
             <Link href="#base-general" className="rounded-2xl border border-[#DDE7E2] bg-[#F8FAF7] px-4 py-3 text-center text-sm font-black text-[#0B1726]">Agregar usuario</Link>
             <Link href="#crear-hub" className="rounded-2xl border border-[#DDE7E2] bg-[#F8FAF7] px-4 py-3 text-center text-sm font-black text-[#0B1726]">Crear Hub</Link>
             <Link href="/operativo/comunicaciones" className="rounded-2xl border border-[#DDE7E2] bg-[#F8FAF7] px-4 py-3 text-center text-sm font-black text-[#0B1726]">Comunicaciones</Link>
