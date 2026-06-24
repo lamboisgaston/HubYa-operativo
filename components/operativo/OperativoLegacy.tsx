@@ -1233,62 +1233,61 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     return gastosPorCategoria(categoria).reduce((total, gasto) => total + numero(gasto.importe), 0);
   }
 
+  const totalGastosMaquinaria = totalGastosCategoria("maquinaria");
+  const totalGastosAdministracion = totalGastosCategoria("administracion");
+  const totalGastosOtrosInsumos = totalGastosCategoria("otros");
+  const totalPagarEquipoOperativo = totalFacturadoHub - totalGastos;
+  const integrantesParticipantesReporte = clientesDelHub.filter((cliente) => numero(cliente.importe) > 0).length;
+  const integrantesSalteanVisitaReporte = clientesDelHub.filter((cliente) => numero(cliente.importe) === 0).length;
+  const precioHoraMaquinariaReferencia = initialHub?.moduloOperativo === "jardinerosya" ? Math.max(
+    numero(initialHub.parametrosOperativos?.jardinerosYa?.valorHoraCortadoraCesped),
+    numero(initialHub.parametrosOperativos?.jardinerosYa?.valorHoraBordeadora),
+    numero(initialHub.parametrosOperativos?.jardinerosYa?.valorHoraMaquinaEmpuje),
+  ) : 0;
+  const horasMaquinariaReporte = precioHoraMaquinariaReferencia > 0 && totalGastosMaquinaria > 0 ? totalGastosMaquinaria / precioHoraMaquinariaReferencia : 0;
+  const formatoHorasMaquinaria = horasMaquinariaReporte > 0 ? horasMaquinariaReporte.toLocaleString("es-AR", { maximumFractionDigits: 2 }) : "—";
+  const formatoPrecioHoraMaquinaria = precioHoraMaquinariaReferencia > 0 ? formatoMoneda(precioHoraMaquinariaReferencia) : "—";
 
-  function totalDistribucionPorRol(patron: RegExp) {
-    return distribucionCalculada.filter((actor) => patron.test(`${actor.nombre} ${actor.rol || ""}`)).reduce((total, actor) => total + actor.importeFinal, 0);
-  }
-
-  const totalJardinerosEquipoOperativo = totalDistribucionPorRol(/jardiner|operativ|cuadrilla|mano|responsable/i);
-  const totalHubOfertaAdministracion = totalDistribucionPorRol(/hub|admin|oferta|coordin/i);
-  const totalOtrosParticipantes = Math.max(0, totalDistribuido - totalJardinerosEquipoOperativo - totalHubOfertaAdministracion);
-
-  function nombreVecinoParaReporte(cliente: FilaClienteIngreso, destinatario: FilaClienteIngreso | undefined, index: number) {
-    return cliente.id === destinatario?.id ? cliente.nombre : aliasVecino(index);
-  }
-
-  function lineasDistribucionVecinos(destinatario: FilaClienteIngreso | undefined) {
-    return clientesDelHub.map((cliente, index) => `${nombreVecinoParaReporte(cliente, destinatario, index)}: ${formatoPlano(cliente.importe) || formatoMoneda(0)}`);
-  }
-
-  function estadoVisitaReporte(cliente: FilaClienteIngreso) {
-    return numero(cliente.importe) === 0 ? "Saltea la visita" : "Participa";
-  }
-
-  function lineaIntegranteReporte(cliente: FilaClienteIngreso, destinatario: FilaClienteIngreso | undefined, index: number) {
-    return `${nombreVecinoParaReporte(cliente, destinatario, index)}: ${formatoPlano(cliente.importe) || formatoMoneda(0)} — ${estadoVisitaReporte(cliente)}`;
-  }
 
   function textoReportePrevioParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
     return [
       "REPORTE DEL DÍA DEL HUB",
-      `HUBYA · ${jornada.hub}`,
+      "",
+      `Hub: ${jornada.hub}`,
       `Fecha: ${fechaFormateada}`,
       `Servicio realizado: ${servicioRealizadoReporte}`,
       "",
-      "Integrantes del Hub:",
-      ...clientesDelHub.map((cliente, index) => lineaIntegranteReporte(cliente, clienteReporte, index)),
+      "Tu importe:",
+      formatoPlano(clienteReporte?.importe) || formatoMoneda(0),
       "",
-      "Facturación del día:",
-      ...lineasDistribucionVecinos(clienteReporte),
-      `Total del Hub: ${formatoPlano(totalFacturadoHub) || formatoMoneda(0)}`,
+      "Total del Hub:",
+      formatoPlano(totalFacturadoHub) || formatoMoneda(0),
       "",
-      "Gastos del día:",
-      `Servicios de maquinaria y transporte: ${formatoMoneda(totalGastosCategoria("maquinaria"))}`,
-      `Servicios de administración del Hub: ${formatoMoneda(totalGastosCategoria("administracion"))}`,
-      `Otros insumos: ${formatoMoneda(totalGastosCategoria("otros"))}`,
+      `Integrantes participantes: ${integrantesParticipantesReporte}`,
+      `Integrantes que saltean visita: ${integrantesSalteanVisitaReporte}`,
+      "",
+      "Gastos del Hub:",
+      "",
+      "1. Servicios de maquinaria al Hub",
+      `Horas de maquinaria: ${formatoHorasMaquinaria} h`,
+      `Precio por hora: ${formatoPrecioHoraMaquinaria}`,
+      `Subtotal maquinaria: ${formatoMoneda(totalGastosMaquinaria)}`,
+      "",
+      "2. Servicios de administración del Hub",
+      `Subtotal administración: ${formatoMoneda(totalGastosAdministracion)}`,
+      "",
+      "3. Otros insumos",
+      `Subtotal otros insumos: ${formatoMoneda(totalGastosOtrosInsumos)}`,
+      "",
       `Total de gastos: ${formatoPlano(totalGastos) || formatoMoneda(0)}`,
       "",
-      "Distribución operativa:",
-      `Equipo operativo / jardineros: ${formatoMoneda(totalJardinerosEquipoOperativo)}`,
-      `Administración del Hub: ${formatoMoneda(totalHubOfertaAdministracion)}`,
-      `Otros participantes: ${formatoMoneda(totalOtrosParticipantes)}`,
-      `Total distribuido: ${formatoPlano(totalDistribuido) || formatoMoneda(0)}`,
+      `Total a pagar al equipo operativo / jardineros: ${formatoMoneda(totalPagarEquipoOperativo)}`,
       datosHub.resumen.observacionGeneral ? `Observaciones del día: ${datosHub.resumen.observacionGeneral}` : "",
     ].filter(Boolean).join("\n");
   }
 
-  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, fechaFormateada, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalHubOfertaAdministracion, totalJardinerosEquipoOperativo, totalOtrosParticipantes]);
+  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return textoReportePrevioParaCliente(clienteObjetivo);
@@ -1316,30 +1315,31 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function armarReporteHtmlParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
-    const listaIntegrantes = clientesDelHub.map((cliente, index) => `<p style="margin:0 0 6px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(nombreVecinoParaReporte(cliente, clienteReporte, index))}</span><strong>${escaparHtml(estadoVisitaReporte(cliente))}</strong></p>`).join("");
-    const facturacion = clientesDelHub.map((cliente, index) => `<p style="margin:0 0 6px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(nombreVecinoParaReporte(cliente, clienteReporte, index))}</span><strong>${escaparHtml(formatoPlano(cliente.importe) || formatoMoneda(0))}</strong></p>`).join("");
+    const tuImporte = formatoPlano(clienteReporte?.importe) || formatoMoneda(0);
     return `
-    <article style="width:100%;max-width:760px;border:1px solid #6f7968;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;">
-      <section style="padding:16px;">
-        <header style="border:1px solid #1f2a1d;background:#fbfcf9;padding:14px;border-radius:18px;">
-          <p style="margin:0 0 4px;color:#66745c;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">HUBYA</p>
-          <h1 style="margin:0 0 10px;font-size:22px;font-weight:900;">Reporte del día del Hub</h1>
+    <article style="width:100%;max-width:760px;border:1px solid #d8dfd1;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;border-radius:22px;overflow:hidden;">
+      <section style="padding:18px;">
+        <header style="border:1px solid #d8dfd1;background:#fbfcf9;padding:16px;border-radius:18px;">
+          <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;letter-spacing:.02em;text-transform:uppercase;">Reporte del día del Hub</h1>
           <p style="margin:0 0 5px;font-size:14px;"><strong>Hub:</strong> ${escaparHtml(jornada.hub)}</p>
           <p style="margin:0 0 5px;font-size:14px;"><strong>Fecha:</strong> ${escaparHtml(fechaFormateada)}</p>
           <p style="margin:0;font-size:14px;"><strong>Servicio realizado:</strong> ${escaparHtml(servicioRealizadoReporte)}</p>
         </header>
         <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:18px;font-size:12px;line-height:1.45;">
-          <div style="background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Integrantes del Hub</h2>${listaIntegrantes}</div>
-          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Facturación del día</h2>${facturacion}<p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total del Hub</span><strong>${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</strong></p></div>
-          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Gastos del día</h2><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de maquinaria y transporte</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("maquinaria")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de administración del Hub</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("administracion")))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros insumos</span><strong>${escaparHtml(formatoMoneda(totalGastosCategoria("otros")))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total de gastos</span><strong>${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</strong></p></div>
-          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Distribución operativa</h2><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Equipo operativo / jardineros</span><strong>${escaparHtml(formatoMoneda(totalJardinerosEquipoOperativo))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Administración del Hub</span><strong>${escaparHtml(formatoMoneda(totalHubOfertaAdministracion))}</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros participantes</span><strong>${escaparHtml(formatoMoneda(totalOtrosParticipantes))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total distribuido</span><strong>${escaparHtml(formatoPlano(totalDistribuido) || formatoMoneda(0))}</strong></p></div>
+          <div style="display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr));">
+            <div style="background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:13px;font-weight:900;color:#66745c;">Tu importe</h2><p style="margin:0;font-size:22px;font-weight:900;">${escaparHtml(tuImporte)}</p></div>
+            <div style="background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:13px;font-weight:900;color:#66745c;">Total del Hub</h2><p style="margin:0;font-size:22px;font-weight:900;">${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</p></div>
+          </div>
+          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Participación</h2><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Integrantes participantes</span><strong>${integrantesParticipantesReporte}</strong></p><p style="margin:0;display:flex;justify-content:space-between;gap:12px;"><span>Integrantes que saltean visita</span><strong>${integrantesSalteanVisitaReporte}</strong></p></div>
+          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Gastos del Hub</h2><h3 style="margin:0 0 6px;font-size:13px;font-weight:900;color:#66745c;">1. Servicios de maquinaria al Hub</h3><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Horas de maquinaria</span><strong>${escaparHtml(formatoHorasMaquinaria)} h</strong></p><p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Precio por hora</span><strong>${escaparHtml(formatoPrecioHoraMaquinaria)}</strong></p><p style="margin:0 0 10px;display:flex;justify-content:space-between;gap:12px;"><span>Subtotal maquinaria</span><strong>${escaparHtml(formatoMoneda(totalGastosMaquinaria))}</strong></p><h3 style="margin:0 0 6px;font-size:13px;font-weight:900;color:#66745c;">2. Servicios de administración del Hub</h3><p style="margin:0 0 10px;display:flex;justify-content:space-between;gap:12px;"><span>Subtotal administración</span><strong>${escaparHtml(formatoMoneda(totalGastosAdministracion))}</strong></p><h3 style="margin:0 0 6px;font-size:13px;font-weight:900;color:#66745c;">3. Otros insumos</h3><p style="margin:0 0 10px;display:flex;justify-content:space-between;gap:12px;"><span>Subtotal otros insumos</span><strong>${escaparHtml(formatoMoneda(totalGastosOtrosInsumos))}</strong></p><p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;font-weight:900;"><span>Total de gastos</span><strong>${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</strong></p></div>
+          <div style="margin-top:10px;background:#1f2a1d;color:#fff;border-radius:16px;padding:14px;"><h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Total a pagar al equipo operativo / jardineros</h2><p style="margin:0;font-size:24px;font-weight:900;">${escaparHtml(formatoMoneda(totalPagarEquipoOperativo))}</p></div>
           ${datosHub.resumen.observacionGeneral ? `<div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h2 style="margin:0 0 6px;font-size:15px;font-weight:900;">Observaciones del día</h2><p style="margin:0;color:#4f5f47;font-weight:700;">${escaparHtml(datosHub.resumen.observacionGeneral)}</p></div>` : ""}
         </section>
       </section>
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, fechaFormateada, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalHubOfertaAdministracion, totalJardinerosEquipoOperativo, totalOtrosParticipantes]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo]);
 
 
 
