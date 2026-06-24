@@ -328,7 +328,11 @@ function datosHubInicial(hub: HubDisponible): DatosHub {
   return {
     clientesIngresos,
     gastos: ["Nafta", "Maquinaria", "Servicios de administración del Hub", "Tanza"].map((concepto, index) => ({ id: hubIndex * 10000 + index, concepto, importe: 0 })),
-    actores: ["Hernán Llanes", "Armando Castillo", "Mauricio Vallejos"].map((nombre, index) => ({ id: hubIndex * 100000 + index, nombre, activo: true, participacion: 1, ajusteManual: 0 })),
+    actores: [
+      { nombre: "", rol: "Capataz", participacion: 1.5 },
+      { nombre: "", rol: "Segundo jardinero", participacion: 1.2 },
+      { nombre: "", rol: "Ayudante", participacion: 1 },
+    ].map((actor, index) => ({ id: hubIndex * 100000 + index, nombre: actor.nombre, rol: actor.rol, activo: true, participacion: actor.participacion, ajusteManual: 0 })),
     resumen: resumenInicial(),
     clienteActivoId: clientesIngresos[0]?.id || 0,
   };
@@ -386,13 +390,21 @@ function normalizarCliente(cliente: Partial<FilaClienteIngreso>): FilaClienteIng
   };
 }
 
-function normalizarActor(actor: Partial<FilaActor> & { actor?: string; importe?: CampoNumerico }): FilaActor {
+function normalizarActor(actor: Partial<FilaActor> & { actor?: string; importe?: CampoNumerico }, index = 0): FilaActor {
+  const participacionesSugeridas = [1.5, 1.2, 1];
+  const rolesSugeridos = ["Capataz", "Segundo jardinero", "Ayudante"];
   return {
     id: actor.id || crearId(),
     nombre: actor.nombre || actor.actor || "",
     activo: actor.activo ?? true,
-    participacion: actor.participacion ?? 1,
+    participacion: actor.participacion ?? participacionesSugeridas[index] ?? 1,
     ajusteManual: actor.ajusteManual ?? actor.importe ?? 0,
+    email: actor.email || "",
+    whatsapp: actor.whatsapp || "",
+    rol: actor.rol || rolesSugeridos[index] || "Integrante",
+    recibeReportes: actor.recibeReportes ?? true,
+    participaDistribucion: actor.participaDistribucion ?? true,
+    observacion: actor.observacion || "",
   };
 }
 
@@ -431,7 +443,7 @@ function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partia
   return {
     clientesIngresos,
     gastos: gastosFuente.map((gasto) => ({ id: gasto.id || crearId(), concepto: gasto.concepto || "", importe: gasto.importe ?? 0 })),
-    actores: actoresFuente.map(normalizarActor),
+    actores: actoresFuente.map((actor, index) => normalizarActor(actor, index)),
     resumen: { ...resumenInicial(), ...datos?.resumen },
     clienteActivoId: clientesIngresos.some((cliente) => cliente.id === datos?.clienteActivoId) ? Number(datos?.clienteActivoId) : clientesIngresos[0]?.id || 0,
   };
@@ -983,7 +995,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const integrantesDestinoMensaje = integrantesEquipoActivo.filter((integrante) => integrantesMensajeSeleccionados.includes(integrante.id));
   const datosHub = useMemo(() => normalizarDatosHub(jornada.datosPorHub[jornada.hub], jornada.hub), [jornada.datosPorHub, jornada.hub]);
   const hubActual = useMemo(() => initialHub || hubsCanonicos.find((hub) => hub.nombre === jornada.hub), [hubsCanonicos, initialHub, jornada.hub]);
-  const tituloReporteHub = "Reporte del día del Hub";
+  const tituloReporteHub = jornada.hub;
   const servicioRealizadoReporte = datosHub.resumen.estadoOperativo || hubActual?.rama || "Servicio del Hub";
   const clienteActivo = datosHub.clientesIngresos.find((cliente) => cliente.id === datosHub.clienteActivoId) || datosHub.clientesIngresos[0];
   const idsClientesValidosReporte = useMemo(() => datosHub.clientesIngresos
@@ -1019,11 +1031,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const gastosRealesDelDia = useMemo(() => datosHub.gastos.filter(esGastoRealDelDia), [datosHub.gastos]);
   const totalGastos = gastosRealesDelDia.reduce((total, gasto) => total + numero(gasto.importe), 0);
   const totalADistribuir = totalFacturadoHub - totalGastos;
-  const actoresActivos = datosHub.actores.filter((actor) => actor.activo);
+  const actoresActivos = datosHub.actores.filter((actor) => actor.activo && actor.participaDistribucion !== false);
   const cantidadActoresActivos = actoresActivos.length;
   const totalParticipacion = actoresActivos.reduce((total, actor) => total + numero(actor.participacion), 0);
   const distribucionCalculada = datosHub.actores.map((actor) => {
-    const importeDistribuido = actor.activo && totalParticipacion > 0 ? totalADistribuir * numero(actor.participacion) / totalParticipacion : 0;
+    const participa = actor.activo && actor.participaDistribucion !== false;
+    const importeDistribuido = participa && totalParticipacion > 0 ? totalADistribuir * numero(actor.participacion) / totalParticipacion : 0;
     const importeFinal = importeDistribuido + numero(actor.ajusteManual);
     return { ...actor, importeDistribuido, importeFinal };
   });
@@ -1252,11 +1265,10 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   function textoReportePrevioParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
     return [
-      "REPORTE DEL DÍA DEL HUB",
+      jornada.hub,
       "",
-      `Hub: ${jornada.hub}`,
       `Fecha: ${fechaFormateada}`,
-      `Servicio realizado: ${servicioRealizadoReporte}`,
+      `Servicio: ${servicioRealizadoReporte}`,
       "",
       "Tu importe:",
       formatoPlano(clienteReporte?.importe) || formatoMoneda(0),
@@ -1282,18 +1294,25 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       "",
       `Total de gastos: ${formatoPlano(totalGastos) || formatoMoneda(0)}`,
       "",
-      `Total a pagar al equipo operativo / jardineros: ${formatoMoneda(totalPagarEquipoOperativo)}`,
+      `Total a pagar / saldo distribuible: ${formatoMoneda(totalPagarEquipoOperativo)}`,
+      "",
+      "Estimado de distribución:",
+      "Esta sección es un estimado interno de cómo se puede distribuir el saldo entre los jardineros/equipo. No es una liquidación definitiva.",
+      `Saldo distribuible: ${formatoMoneda(totalADistribuir)}`,
+      `Total de puntos: ${totalParticipacion.toLocaleString("es-AR", { maximumFractionDigits: 2 })}`,
+      ...distribucionCalculada.filter((actor) => actor.activo && actor.participaDistribucion !== false).map((actor) => `${actor.rol || "Integrante"}${actor.nombre ? ` (${actor.nombre})` : ""}: participación ${numero(actor.participacion).toLocaleString("es-AR", { maximumFractionDigits: 2 })} → ${formatoMoneda(actor.importeDistribuido)}`),
+      `Total estimado distribuido: ${formatoMoneda(totalDistribuido)}`,
       datosHub.resumen.observacionGeneral ? `Observaciones del día: ${datosHub.resumen.observacionGeneral}` : "",
     ].filter(Boolean).join("\n");
   }
 
-  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo]);
+  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return textoReportePrevioParaCliente(clienteObjetivo);
   }
 
-  const asuntoReporte = `Reporte del día del Hub — ${jornada.hub} — ${fechaFormateada}`;
+  const asuntoReporte = `${jornada.hub} — ${fechaFormateada}`;
   const firmaDatosHub = JSON.stringify(datosHub);
 
   const emailPrivado = useMemo(() => [
@@ -1320,10 +1339,9 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     <article style="width:100%;max-width:760px;border:1px solid #d8dfd1;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;border-radius:22px;overflow:hidden;">
       <section style="padding:18px;">
         <header style="border:1px solid #d8dfd1;background:#fbfcf9;padding:16px;border-radius:18px;">
-          <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;letter-spacing:.02em;text-transform:uppercase;">Reporte del día del Hub</h1>
-          <p style="margin:0 0 5px;font-size:14px;"><strong>Hub:</strong> ${escaparHtml(jornada.hub)}</p>
+          <h1 style="margin:0 0 12px;font-size:24px;font-weight:900;letter-spacing:.01em;">${escaparHtml(jornada.hub)}</h1>
           <p style="margin:0 0 5px;font-size:14px;"><strong>Fecha:</strong> ${escaparHtml(fechaFormateada)}</p>
-          <p style="margin:0;font-size:14px;"><strong>Servicio realizado:</strong> ${escaparHtml(servicioRealizadoReporte)}</p>
+          <p style="margin:0;font-size:14px;"><strong>Servicio:</strong> ${escaparHtml(servicioRealizadoReporte)}</p>
         </header>
         <section style="margin-top:14px;border:1px solid #d8dfd1;background:#f8faf5;padding:14px;border-radius:18px;font-size:12px;line-height:1.45;">
           <div style="background:#1f2a1d;color:#ffffff;border-radius:20px;padding:18px 16px;text-align:left;">
@@ -1344,8 +1362,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
             <p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;"><span>Total de gastos</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</strong></p>
           </div>
           <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;">
-            <h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Distribución operativa</h2>
-            <p style="margin:0;display:flex;justify-content:space-between;gap:12px;"><span>Total a pagar al equipo operativo / jardineros</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(totalPagarEquipoOperativo))}</strong></p>
+            <h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Estimado de distribución</h2>
+            <p style="margin:0 0 8px;color:#66745c;font-weight:700;">Esta sección es un estimado interno de cómo se puede distribuir el saldo entre los jardineros/equipo. No es una liquidación definitiva.</p>
+            <p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Total a pagar / saldo distribuible</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(totalPagarEquipoOperativo))}</strong></p>
+            <p style="margin:0 0 8px;display:flex;justify-content:space-between;gap:12px;"><span>Total de puntos</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(totalParticipacion.toLocaleString("es-AR", { maximumFractionDigits: 2 }))}</strong></p>
+            ${distribucionCalculada.filter((actor) => actor.activo && actor.participaDistribucion !== false).map((actor) => `<p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(actor.rol || "Integrante")}${actor.nombre ? ` · ${escaparHtml(actor.nombre)}` : ""}: participación ${escaparHtml(numero(actor.participacion).toLocaleString("es-AR", { maximumFractionDigits: 2 }))}</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(actor.importeDistribuido))}</strong></p>`).join("")}
+            <p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;"><span>Total estimado distribuido</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(totalDistribuido))}</strong></p>
           </div>
           ${datosHub.resumen.observacionGeneral ? `<div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:14px;padding:12px;"><h2 style="margin:0 0 6px;font-size:15px;font-weight:900;">Observaciones del día</h2><p style="margin:0;color:#4f5f47;font-weight:700;">${escaparHtml(datosHub.resumen.observacionGeneral)}</p></div>` : ""}
         </section>
@@ -1353,7 +1375,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
 
 
 
@@ -2178,7 +2200,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
               <div className="space-y-3">
                 <div id="paso-gastos" className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 3 — Gastos reales del día</h3><p className="mb-2 text-xs font-bold text-[#66745c]">Los gastos son valores reales del día. No cargues acá parámetros del Hub.</p>{datosHub.gastos.length === 0 && <p className="mb-2 rounded-lg bg-[#f8faf5] p-2 text-xs font-black text-[#66745c]">No se registraron gastos adicionales en este reporte.</p>}<table className="w-full border-collapse text-xs"><tbody>{datosHub.gastos.map((gasto, index) => <tr key={`gasto-${gasto.id}-${index}`}><td className="border p-1">{inputTexto(gasto.concepto, (valor) => actualizarGasto(gasto.id, { concepto: valor }), "min-w-28")}</td><td className="border p-1">{inputNumero(gasto.importe, (valor) => actualizarGasto(gasto.id, { importe: valor }))}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ gastos: datosHub.gastos.filter((fila) => fila.id !== gasto.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table><button onClick={() => actualizarDatosHub({ gastos: [...datosHub.gastos, { id: crearId(), concepto: "", importe: 0 }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar gasto</button></div>
               </div>
-              <div className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 4 — Distribución operativa</h3><p className="mb-2 text-xs font-bold text-[#66745c]">Revisá cuánto corresponde a cada actor operativo, si existe.</p><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Enviar</th><th className="border p-1">Actor</th><th className="border p-1">Rol</th><th className="border p-1">Email</th><th className="border p-1">Activo</th><th className="border p-1">Participación</th><th className="border p-1">Monto manual / ajuste</th><th className="border p-1">Monto a cobrar</th><th className="border p-1">Observación</th><th className="border p-1"></th></tr></thead><tbody>{distribucionCalculada.map((actor, index) => <tr key={`actor-${actor.id}-${index}`}><td className="border p-1 text-center"><input type="checkbox" checked={actoresReporteSeleccionados.includes(actor.id) && emailValido(actor.email || "")} disabled={!emailValido(actor.email || "")} onChange={(e) => actualizarSeleccionActorReporte(actor.id, e.target.checked)} /></td><td className="border p-1">{inputTexto(actor.nombre, (valor) => actualizarActor(actor.id, { nombre: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(actor.rol || "", (valor) => actualizarActor(actor.id, { rol: valor }), "min-w-28")}</td><td className="border p-1">{inputTexto(actor.email || "", (valor) => actualizarActor(actor.id, { email: valor }), "min-w-44")}</td><td className="border p-1 text-center"><input type="checkbox" checked={actor.activo} onChange={(e) => actualizarActor(actor.id, { activo: e.target.checked })} /></td><td className="border p-1">{inputNumero(actor.participacion, (valor) => actualizarActor(actor.id, { participacion: valor }))}</td><td className="border p-1">{inputNumero(actor.ajusteManual, (valor) => actualizarActor(actor.id, { ajusteManual: valor }))}</td><td className="border p-1 text-right font-black">{formatoMoneda(actor.importeFinal)}</td><td className="border p-1">{inputTexto(actor.observacion || "", (valor) => actualizarActor(actor.id, { observacion: valor }), "min-w-36")}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ actores: datosHub.actores.filter((item) => item.id !== actor.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div><button onClick={() => actualizarDatosHub({ actores: [...datosHub.actores, { id: crearId(), nombre: "", activo: true, participacion: 1, ajusteManual: 0 }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar actor</button></div>
+              <div className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 4 — Estimado de distribución</h3><p className="mb-2 text-xs font-bold text-[#66745c]">Calculadora interna editable para simular cómo se puede distribuir el saldo. No es una liquidación definitiva.</p><div className="mb-2 grid gap-2 text-xs sm:grid-cols-3"><div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><p className="font-black text-[#66745c]">Saldo distribuible</p><p className="font-black">{formatoMoneda(totalADistribuir)}</p></div><div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><p className="font-black text-[#66745c]">Total de puntos</p><p className="font-black">{totalParticipacion.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</p></div><div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><p className="font-black text-[#66745c]">Total estimado distribuido</p><p className="font-black">{formatoMoneda(totalDistribuido)}</p></div></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Rol</th><th className="border p-1">Participación</th><th className="border p-1">Estimado</th><th className="border p-1"></th></tr></thead><tbody>{distribucionCalculada.map((actor, index) => <tr key={`actor-${actor.id}-${index}`}><td className="border p-1">{inputTexto(actor.nombre, (valor) => actualizarActor(actor.id, { nombre: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(actor.rol || "", (valor) => actualizarActor(actor.id, { rol: valor }), "min-w-32")}</td><td className="border p-1">{inputNumero(actor.participacion, (valor) => actualizarActor(actor.id, { participacion: valor }))}</td><td className="border p-1 text-right font-black">{formatoMoneda(actor.importeDistribuido)}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ actores: datosHub.actores.filter((item) => item.id !== actor.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div><button onClick={() => actualizarDatosHub({ actores: [...datosHub.actores, { id: crearId(), nombre: "", rol: "Integrante", activo: true, participacion: 1, ajusteManual: 0, participaDistribucion: true, recibeReportes: true }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar integrante</button></div>
             </section>
 
             <section className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-2 text-xs font-black uppercase text-[#66745c]">Datos operativos</h3><div className="grid gap-2 lg:grid-cols-3"><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Tiempo efectivo por operario<input value={datosHub.resumen.tiempoEfectivo} onChange={(e) => actualizarResumen({ tiempoEfectivo: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Estado operativo<input value={datosHub.resumen.estadoOperativo} onChange={(e) => actualizarResumen({ estadoOperativo: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label><label className="grid gap-1 text-[11px] font-bold uppercase text-[#66745c]">Observación general<input value={datosHub.resumen.observacionGeneral} onChange={(e) => actualizarResumen({ observacionGeneral: e.target.value })} className="h-8 rounded-lg border px-2 text-sm normal-case" /></label></div></section>
