@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Cliente, HubOperativo, TarifaClienteHub, TipoDestinoContacto } from "@/lib/data/hubs";
 
-type Props = { hubs: HubOperativo[]; contactos: Cliente[] };
+type Props = { hubs: HubOperativo[]; contactos: Cliente[]; hubFijoId?: string };
 type ContactoEditable = Cliente & { seleccionado?: boolean; sucio?: boolean; eliminando?: boolean; nuevo?: boolean };
 type FiltroEstado = "todos" | "activos" | "pendientes" | "solicita_sumarse" | "saltea_visita" | "sin_hub";
 
@@ -40,7 +40,7 @@ function estadoLabel(fila: ContactoEditable) {
 
 function servicioInteres(fila: ContactoEditable, hubs: HubOperativo[]) {
   const hub = hubs.find((item) => item.id === fila.hubId);
-  return hub?.serviciosActivos[0]?.nombre_servicio || hub?.rama || fila.referencia || "Sin servicio indicado";
+  return fila.servicioInteres || hub?.serviciosActivos[0]?.nombre_servicio || hub?.rama || "Sin servicio indicado";
 }
 
 function prepararFilas(contactos: Cliente[]): ContactoEditable[] {
@@ -54,7 +54,10 @@ function crearFilaNueva(hubId = ""): ContactoEditable {
     nombre: "",
     email: "",
     whatsapp: "",
-    referencia: "Alta manual",
+    referencia: "",
+    direccion: "",
+    servicioInteres: "",
+    observaciones: "Alta manual",
     tarifaCliente: "sin_tarifa",
     hubId,
     tipoDestino: "cliente",
@@ -73,11 +76,11 @@ function emailInvalido(email: string) {
   return Boolean(limpio) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(limpio);
 }
 
-export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
+export function ContactosMesaTrabajo({ hubs, contactos, hubFijoId = "" }: Props) {
   const router = useRouter();
   const [filas, setFilas] = useState<ContactoEditable[]>(() => prepararFilas(contactos));
   const [busqueda, setBusqueda] = useState("");
-  const [hubFiltro, setHubFiltro] = useState("todos");
+  const [hubFiltro, setHubFiltro] = useState(hubFijoId || "todos");
   const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstado>("todos");
   const [mensaje, setMensaje] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -109,6 +112,9 @@ export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
       fila.email,
       fila.whatsapp,
       fila.referencia || "",
+      fila.direccion || "",
+      fila.servicioInteres || "",
+      fila.observaciones || "",
       fila.estado,
       estadoLabel(fila),
       hubPorId.get(fila.hubId) || fila.hubId,
@@ -125,8 +131,9 @@ export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
 
   function agregarUsuario() {
     setBusqueda("");
-    setFilas((actuales) => [crearFilaNueva(), ...actuales]);
-    setMensaje("Completá la fila nueva, seleccioná el Hub asignado y tocá Guardar cambios para agregar el usuario.");
+    setFilas((actuales) => [crearFilaNueva(hubFijoId), ...actuales]);
+    setHubFiltro(hubFijoId || "todos");
+    setMensaje(hubFijoId ? "Completá la fila nueva. El Hub ya quedó asignado automáticamente." : "Completá la fila nueva, seleccioná el Hub asignado y tocá Guardar cambios para agregar el usuario.");
   }
 
   async function guardar(ids?: string[]) {
@@ -134,11 +141,13 @@ export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
     if (pendientes.length === 0) { setMensaje("No hay cambios pendientes para guardar."); return; }
     const sinNombre = pendientes.find((fila) => !fila.nombre.trim());
     if (sinNombre) { setMensaje("No se puede guardar usuario sin nombre."); return; }
+    const emailErroneo = pendientes.find((fila) => emailInvalido(fila.email));
+    if (emailErroneo) { setMensaje(`Revisá el email de ${emailErroneo.nombre || "la fila nueva"}.`); return; }
     setMensaje("Guardando cambios en la base de datos...");
     const guardados = await Promise.all(pendientes.map((fila) => fetch(fila.nuevo ? "/api/contactos" : `/api/contactos/${fila.id}`, {
       method: fila.nuevo ? "POST" : "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre: fila.nombre, email: fila.email, whatsapp: fila.whatsapp, referencia: fila.referencia || "", tarifaCliente: fila.tarifaCliente, hubId: fila.hubId, tipoDestino: fila.tipoDestino }),
+      body: JSON.stringify({ nombre: fila.nombre, email: fila.email, whatsapp: fila.whatsapp, referencia: fila.direccion || fila.referencia || "", direccion: fila.direccion || fila.referencia || "", servicioInteres: fila.servicioInteres || "", observaciones: fila.observaciones || "", tarifaCliente: fila.tarifaCliente, hubId: fila.hubId, tipoDestino: fila.tipoDestino, estado: fila.estado }),
     }).then((res) => { if (!res.ok) throw new Error(`No se pudo guardar ${fila.nombre}`); return res.json() as Promise<Cliente>; }).then((contacto) => ({ temporalId: fila.id, contacto, eraNuevo: Boolean(fila.nuevo) }))));
 
     const guardadosPorId = new Map(guardados.map((item) => [item.temporalId, item]));
@@ -203,7 +212,7 @@ export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
         </label>
         <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-[#66745c]">
           Hub
-          <select value={hubFiltro} onChange={(e) => setHubFiltro(e.target.value)} className="rounded-xl border border-[#cfd8c6] bg-white px-4 py-3 text-sm font-bold normal-case">
+          <select value={hubFiltro} onChange={(e) => setHubFiltro(e.target.value)} disabled={Boolean(hubFijoId)} className="rounded-xl border border-[#cfd8c6] bg-white px-4 py-3 text-sm font-bold normal-case">
             <option value="todos">Todos los Hubs</option>
             <option value="sin_hub">Sin Hub asignado</option>
             {hubs.map((hub) => <option key={hub.id} value={hub.id}>{hub.nombre}</option>)}
@@ -246,6 +255,7 @@ export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
               <div><dt className="font-black text-[#66745c]">Email</dt><dd>{fila.email || "Sin email"}</dd></div>
               <div><dt className="font-black text-[#66745c]">Dirección / referencia</dt><dd>{fila.referencia || "Sin dirección cargada"}</dd></div>
               <div><dt className="font-black text-[#66745c]">Servicio de interés</dt><dd>{servicioInteres(fila, hubs)}</dd></div>
+              <div><dt className="font-black text-[#66745c]">Observaciones</dt><dd>{fila.observaciones || "Sin observaciones"}</dd></div>
             </dl>
             <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => guardarTransicion([fila.id])} disabled={isPending || !fila.sucio} className="rounded-xl bg-[#1f2a1d] px-3 py-2 text-xs font-black text-white disabled:opacity-40">Guardar edición</button><button onClick={() => fila.nuevo ? setFilas((actuales) => actuales.filter((item) => item.id !== fila.id)) : eliminar(fila.id)} disabled={fila.eliminando} className="rounded-xl border border-[#d6b7b7] px-3 py-2 text-xs font-black text-[#743c3c] disabled:opacity-40">Eliminar</button></div>
           </article>
@@ -253,15 +263,16 @@ export function ContactosMesaTrabajo({ hubs, contactos }: Props) {
       </div>
       <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-[#d8dfd1] lg:block">
         <table className="w-full min-w-[1280px] border-collapse text-sm">
-          <thead className="bg-[#f1f4ec] text-left text-[10px] uppercase tracking-wide text-[#66745c]"><tr>{["Marcar", "Nombre", "Email", "WhatsApp / teléfono", "Dirección / referencia", "Servicio de interés", "Hub asignado", "Tipo de destino", "Estado", "Acciones"].map((h) => <th key={h} className="border border-[#d8dfd1] p-2">{h}</th>)}</tr></thead>
-          <tbody>{filasFiltradas.length === 0 ? <tr><td colSpan={10} className="border p-6 text-center font-bold text-[#66745c]">No hay contactos que coincidan con la búsqueda.</td></tr> : filasFiltradas.map((fila) => <tr key={fila.id} className={fila.sucio ? "bg-[#fff8df]" : "bg-white"}>
+          <thead className="bg-[#f1f4ec] text-left text-[10px] uppercase tracking-wide text-[#66745c]"><tr>{["Marcar", "Nombre", "Email", "WhatsApp / teléfono", "Dirección / referencia", "Servicio de interés", "Observaciones", "Hub asignado", "Tipo de destino", "Estado", "Acciones"].map((h) => <th key={h} className="border border-[#d8dfd1] p-2">{h}</th>)}</tr></thead>
+          <tbody>{filasFiltradas.length === 0 ? <tr><td colSpan={11} className="border p-6 text-center font-bold text-[#66745c]">No hay contactos que coincidan con la búsqueda.</td></tr> : filasFiltradas.map((fila) => <tr key={fila.id} className={fila.sucio ? "bg-[#fff8df]" : "bg-white"}>
             <td className="border p-2 text-center"><input type="checkbox" checked={Boolean(fila.seleccionado)} onChange={(e) => actualizar(fila.id, { seleccionado: e.target.checked })} /></td>
             <td className="border p-1"><input value={fila.nombre} onChange={(e) => actualizar(fila.id, { nombre: e.target.value })} className="min-w-40 rounded border px-2 py-1 font-bold" /></td>
             <td className="border p-1"><input value={fila.email} onChange={(e) => actualizar(fila.id, { email: e.target.value })} className={`min-w-52 rounded border px-2 py-1 ${emailInvalido(fila.email) ? "border-[#743c3c] bg-[#fff4f4]" : ""}`} />{!fila.email.trim() && <p className="mt-1 text-[10px] font-black text-[#8a6a16]">Sin email cargado</p>}{emailInvalido(fila.email) && <p className="mt-1 text-[10px] font-black text-[#743c3c]">Email inválido</p>}</td>
             <td className="border p-1"><input value={fila.whatsapp} onChange={(e) => actualizar(fila.id, { whatsapp: e.target.value })} className="min-w-40 rounded border px-2 py-1" /></td>
-            <td className="border p-1"><input value={fila.referencia || ""} onChange={(e) => actualizar(fila.id, { referencia: e.target.value })} placeholder="Dirección o referencia" className="min-w-48 rounded border px-2 py-1" /></td>
-            <td className="border p-2 font-bold text-[#66745c]">{servicioInteres(fila, hubs)}<select value={fila.tarifaCliente || "sin_tarifa"} onChange={(e) => actualizar(fila.id, { tarifaCliente: e.target.value as TarifaClienteHub })} className="mt-1 min-w-40 rounded border bg-white px-2 py-1 text-xs">{tarifasCliente.map((tarifa) => <option key={tarifa.value} value={tarifa.value}>{tarifa.label}</option>)}</select></td>
-            <td className="border p-1"><select value={fila.hubId} onChange={(e) => actualizar(fila.id, { hubId: e.target.value })} className="min-w-48 rounded border bg-white px-2 py-1"><option value="">Sin Hub asignado</option>{hubs.map((hub) => <option key={hub.id} value={hub.id}>{hub.nombre}</option>)}</select></td>
+            <td className="border p-1"><input value={fila.direccion || fila.referencia || ""} onChange={(e) => actualizar(fila.id, { direccion: e.target.value, referencia: e.target.value })} placeholder="Dirección o referencia" className="min-w-48 rounded border px-2 py-1" /></td>
+            <td className="border p-2 font-bold text-[#66745c]"><input value={fila.servicioInteres || servicioInteres(fila, hubs)} onChange={(e) => actualizar(fila.id, { servicioInteres: e.target.value })} className="mb-1 min-w-48 rounded border px-2 py-1" /><select value={fila.tarifaCliente || "sin_tarifa"} onChange={(e) => actualizar(fila.id, { tarifaCliente: e.target.value as TarifaClienteHub })} className="mt-1 min-w-40 rounded border bg-white px-2 py-1 text-xs">{tarifasCliente.map((tarifa) => <option key={tarifa.value} value={tarifa.value}>{tarifa.label}</option>)}</select></td>
+            <td className="border p-1"><input value={fila.observaciones || ""} onChange={(e) => actualizar(fila.id, { observaciones: e.target.value })} placeholder="Observaciones" className="min-w-48 rounded border px-2 py-1" /></td>
+            <td className="border p-1"><select value={fila.hubId} onChange={(e) => actualizar(fila.id, { hubId: e.target.value })} disabled={Boolean(hubFijoId)} className="min-w-48 rounded border bg-white px-2 py-1"><option value="">Sin Hub asignado</option>{hubs.map((hub) => <option key={hub.id} value={hub.id}>{hub.nombre}</option>)}</select></td>
             <td className="border p-1"><select value={fila.tipoDestino || "cliente"} onChange={(e) => actualizar(fila.id, { tipoDestino: e.target.value as TipoDestinoContacto })} className="min-w-40 rounded border bg-white px-2 py-1">{tipos.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}</select></td>
             <td className="border p-2 font-bold capitalize text-[#66745c]">{estadoLabel(fila)}</td>
             <td className="border p-2"><div className="flex flex-wrap gap-2"><button onClick={() => guardarTransicion([fila.id])} disabled={isPending || !fila.sucio} className="font-black text-[#1f2a1d] disabled:opacity-40">Guardar</button><button onClick={() => fila.nuevo ? setFilas((actuales) => actuales.filter((item) => item.id !== fila.id)) : eliminar(fila.id)} disabled={fila.eliminando} className="font-black text-[#743c3c] disabled:opacity-40">Eliminar</button>{fila.tipoDestino === "actor" || fila.tipoDestino === "auxiliar" ? <Link href="/operativo/perfiles" className="font-black text-[#355f8f]">Ver perfil</Link> : <span className="font-bold text-[#9aa391]">Sin perfil</span>}</div></td>

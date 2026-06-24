@@ -11,7 +11,7 @@ export function JoinHubForm({ hubId, hubNombre, compacto = false }: { hubId: str
       body: JSON.stringify(Object.fromEntries(formData)),
       headers: { "Content-Type": "application/json" },
     });
-    setEstado(res.ok ? "Tu solicitud fue recibida dentro de este Hub." : "No se pudo enviar la solicitud.");
+    setEstado(res.ok ? "Tu solicitud fue recibida dentro de este Hub y quedó como Pendiente de aprobación." : "No se pudo enviar la solicitud.");
   }
 
   return (

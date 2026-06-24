@@ -55,7 +55,7 @@ export async function createSolicitudHub(input: Omit<SolicitudHub, "id" | "fecha
     const clientes = clienteExistente
       ? store.clientes.map((cliente) => cliente.id === clienteExistente.id ? { ...cliente, estado: cliente.estado === "inactivo" ? "pendiente_aprobacion" as const : cliente.estado, updatedAt: timestamp } : cliente)
       : [
-          { id: clienteId, hubId: solicitud.hubSolicitadoId, estado: "pendiente_aprobacion" as const, createdAt: timestamp, updatedAt: timestamp, nombre: nombreCompleto(solicitud), email: solicitud.email, whatsapp: solicitud.whatsapp, referencia: solicitud.direccion || solicitud.barrio || "Solicita sumarse", tarifaCliente: "sin_tarifa" as const, tipoDestino: "cliente" as const },
+          { id: clienteId, hubId: solicitud.hubSolicitadoId, estado: "pendiente_aprobacion" as const, createdAt: timestamp, updatedAt: timestamp, nombre: nombreCompleto(solicitud), email: solicitud.email, whatsapp: solicitud.whatsapp, referencia: solicitud.direccion || solicitud.barrio || "Solicita sumarse", direccion: solicitud.direccion || solicitud.barrio || "", servicioInteres: solicitud.servicio, observaciones: solicitud.mensaje || "Solicita sumarse", tarifaCliente: "sin_tarifa" as const, tipoDestino: "cliente" as const },
           ...store.clientes,
         ];
     return { ...store, clientes, solicitudes: [solicitudConCliente, ...(store.solicitudes as SolicitudHub[])] };
