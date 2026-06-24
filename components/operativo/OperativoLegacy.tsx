@@ -434,6 +434,10 @@ function conceptoTarifaCliente(cliente: Pick<FilaClienteIngreso, "importe" | "ta
   return importeCliente(cliente) > 0 ? `Tarifa aplicada: ${etiqueta}` : `Tarifa de referencia: ${etiqueta}`;
 }
 
+function etiquetaAporteCliente(cliente: Pick<FilaClienteIngreso, "importe"> | undefined) {
+  return importeCliente(cliente) > 0 ? formatoPlano(cliente?.importe) || formatoMoneda(0) : "Saltea la visita";
+}
+
 function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partial<FilaActor> & { actor?: string; importe?: CampoNumerico })[] }) | undefined, hub: HubDisponible): DatosHub {
   const base = datosHubInicial(hub);
   const clientesFuente = Array.isArray(datos?.clientesIngresos) ? datos.clientesIngresos : base.clientesIngresos;
@@ -1262,8 +1266,18 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const formatoPrecioHoraMaquinaria = precioHoraMaquinariaReferencia > 0 ? formatoMoneda(precioHoraMaquinariaReferencia) : "—";
 
 
+  function aportesHubParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
+    let contadorAnonimo = 1;
+    return clientesDelHub.map((cliente) => {
+      const esDestinatario = Boolean(clienteObjetivo && cliente.id === clienteObjetivo.id);
+      const nombreVisible = esDestinatario ? (cliente.nombre || "Tu domicilio") : `Vecino ${contadorAnonimo++}`;
+      return { ...cliente, nombreVisible, aporteVisible: etiquetaAporteCliente(cliente) };
+    });
+  }
+
   function textoReportePrevioParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
+    const aportesHub = aportesHubParaCliente(clienteReporte);
     return [
       jornada.hub,
       "",
@@ -1271,7 +1285,10 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       `Servicio: ${servicioRealizadoReporte}`,
       "",
       "Tu importe:",
-      formatoPlano(clienteReporte?.importe) || formatoMoneda(0),
+      etiquetaAporteCliente(clienteReporte),
+      "",
+      "Aportes del Hub:",
+      ...aportesHub.map((cliente) => `${cliente.nombreVisible}: ${cliente.aporteVisible}`),
       "",
       "Resumen del Hub:",
       `Total del Hub: ${formatoPlano(totalFacturadoHub) || formatoMoneda(0)}`,
@@ -1306,7 +1323,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     ].filter(Boolean).join("\n");
   }
 
-  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
+  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return textoReportePrevioParaCliente(clienteObjetivo);
@@ -1334,7 +1351,9 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
   function armarReporteHtmlParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
     const clienteReporte = clienteObjetivo || clienteActivoReporte;
-    const tuImporte = formatoPlano(clienteReporte?.importe) || formatoMoneda(0);
+    const tuImporte = etiquetaAporteCliente(clienteReporte);
+    const aportesHub = aportesHubParaCliente(clienteReporte);
+    const aportesHubHtml = aportesHub.map((cliente) => `<p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>${escaparHtml(cliente.nombreVisible)}</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(cliente.aporteVisible)}</strong></p>`).join("");
     return `
     <article style="width:100%;max-width:760px;border:1px solid #d8dfd1;background:#ffffff;color:#182018;font-family:Arial,Helvetica,sans-serif;box-shadow:none;border-radius:22px;overflow:hidden;">
       <section style="padding:18px;">
@@ -1347,6 +1366,12 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           <div style="background:#1f2a1d;color:#ffffff;border-radius:20px;padding:18px 16px;text-align:left;">
             <p style="margin:0 0 6px;font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#dce8d3;">Tu importe</p>
             <p style="margin:0;font-size:34px;line-height:1.05;font-weight:900;letter-spacing:-.03em;">${escaparHtml(tuImporte)}</p>
+          </div>
+          <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;">
+            <h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Aportes del Hub</h2>
+            <p style="margin:0 0 8px;color:#66745c;font-weight:700;">Para cuidar la privacidad, solo ves tu nombre real. Los demás nombres se ocultan, pero sus importes se muestran.</p>
+            ${aportesHubHtml}
+            <p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;"><span>Total del Hub</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoPlano(totalFacturadoHub) || formatoMoneda(0))}</strong></p>
           </div>
           <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;">
             <h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Resumen del Hub</h2>
@@ -1375,7 +1400,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
 
 
 
