@@ -48,7 +48,18 @@ export async function getSolicitudesHub() {
 export async function createSolicitudHub(input: Omit<SolicitudHub, "id" | "fecha" | "estado" | "origen" | "createdAt" | "updatedAt">) {
   const timestamp = new Date().toISOString();
   const solicitud: SolicitudHub = { id: `solicitud-${Date.now()}`, fecha: timestamp, estado: "pendiente", origen: "web pública", createdAt: timestamp, updatedAt: timestamp, ...input };
-  await updatePublicStore((store) => ({ ...store, solicitudes: [solicitud, ...(store.solicitudes as SolicitudHub[])] }));
+  await updatePublicStore((store) => {
+    const clienteExistente = store.clientes.find((cliente) => cliente.hubId === solicitud.hubSolicitadoId && ((cliente.email && cliente.email === solicitud.email) || (cliente.whatsapp && cliente.whatsapp === solicitud.whatsapp)));
+    const clienteId = clienteExistente?.id || `cliente-${Date.now()}`;
+    const solicitudConCliente = { ...solicitud, clienteId };
+    const clientes = clienteExistente
+      ? store.clientes.map((cliente) => cliente.id === clienteExistente.id ? { ...cliente, estado: cliente.estado === "inactivo" ? "pendiente_aprobacion" as const : cliente.estado, updatedAt: timestamp } : cliente)
+      : [
+          { id: clienteId, hubId: solicitud.hubSolicitadoId, estado: "pendiente_aprobacion" as const, createdAt: timestamp, updatedAt: timestamp, nombre: nombreCompleto(solicitud), email: solicitud.email, whatsapp: solicitud.whatsapp, referencia: solicitud.direccion || solicitud.barrio || "Solicita sumarse", tarifaCliente: "sin_tarifa" as const, tipoDestino: "cliente" as const },
+          ...store.clientes,
+        ];
+    return { ...store, clientes, solicitudes: [solicitudConCliente, ...(store.solicitudes as SolicitudHub[])] };
+  });
   return solicitud;
 }
 
@@ -133,6 +144,9 @@ export async function responderSolicitudHub(id: string, decision: DecisionSolici
         clienteCreado = true;
       } else if (decision === "aprobada") {
         clienteExistente = true;
+        if (decision === "aprobada" && clienteYaCreado) {
+          store.clientes = store.clientes.map((cliente) => cliente.id === clienteId || (cliente.hubId === solicitud.hubSolicitadoId && ((cliente.email && cliente.email === solicitud.email) || (cliente.whatsapp && cliente.whatsapp === solicitud.whatsapp))) ? { ...cliente, estado: "activo", updatedAt: timestamp } : cliente);
+        }
       }
       solicitudRespondida = { ...solicitud, estado: decision, decision, fechaRespuesta: timestamp, updatedAt: timestamp, mailEnviado: false, errorMail: undefined, mensajeAdministrativo: mensajeAdministrativo || undefined, clienteId };
       return solicitudRespondida;

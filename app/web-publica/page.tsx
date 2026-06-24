@@ -5,7 +5,7 @@ import { PublicFooter } from "@/components/public/PublicFooter";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { JoinOfferForm } from "@/components/public/JoinOfferForm";
 import { RequestHubForm } from "@/components/public/RequestHubForm";
-import { getHubs, MODELOS_SUGERIDOS } from "@/lib/data/hubs";
+import { getHubs } from "@/lib/data/hubs";
 
 const beneficiosDemandaAgrupada = [
   "más fuerza para contratar",
@@ -253,17 +253,17 @@ export default async function WebPublicaPage() {
             <h2 className="mt-3 text-3xl font-black text-white">Ejemplos de demanda organizada</h2>
           </div>
           <p className="max-w-xl text-sm text-[#9ca3af]">
-            Los Hubs agrupan demanda real alrededor de una necesidad compartida. Los módulos operativos pueden acoplarse
-            a esos Hubs para ordenar la ejecución sin exponer emails, teléfonos ni nombres completos de clientes.
+            Tarjetas resumidas para navegar rápido: mirá el servicio principal, abrí detalles solo si los necesitás o
+            sumate directamente al Hub que te interesa.
           </p>
         </div>
-        <div className="mt-8 grid gap-5 md:grid-cols-2">
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {hubs.map((hub) => (
             <HubCard key={hub.id} hub={hub} />
           ))}
         </div>
         <p className="mt-8 rounded-xl border border-[#4f46e5]/30 bg-[#4f46e5]/10 p-4 text-sm text-[#c7d2fe]">
-          {MODELOS_SUGERIDOS}
+          Si un Hub crece demasiado, más adelante podrá ordenarse por subhubs, sectores, días de servicio o grupos operativos.
         </p>
       </section>
 
