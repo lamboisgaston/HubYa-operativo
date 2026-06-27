@@ -5,9 +5,12 @@ import type { HubPublico } from "@/lib/data/hubs";
 import Link from "next/link";
 import { HubServiciosList } from "./public/HubServiciosList";
 import { JoinHubForm } from "./public/JoinHubForm";
+import { HubCategoryBadge } from "@/components/hubs/HubCategoryBadge";
+import { getHubCategoryConfig } from "@/lib/hubs/getHubCategoryConfig";
 
 function servicioPrincipal(hub: HubPublico) {
-  return hub.servicios[0]?.nombre_servicio || hub.rama || "Servicio a coordinar";
+  const config = getHubCategoryConfig(hub.categoriaId);
+  return hub.servicios[0]?.nombre_servicio || config.textos.servicioPrincipalFallback || hub.rama || "Servicio a coordinar";
 }
 
 export function HubCard({ hub, operativo = false }: { hub: HubPublico; operativo?: boolean }) {
@@ -21,6 +24,7 @@ export function HubCard({ hub, operativo = false }: { hub: HubPublico; operativo
           {hub.estado && <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#1E8F4D]">{hub.estado}</p>}
           <h3 className="mt-1 text-xl font-black text-[#0B1726]">{hub.nombre}</h3>
           {hub.zona && <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#53685C]">{hub.zona}</p>}
+          <div className="mt-2"><HubCategoryBadge category={hub.categoriaId} /></div>
         </div>
         <span className="shrink-0 rounded-full border border-[#BFE8CF] bg-[#EAF7EF] px-3 py-1 text-xs font-black text-[#1E8F4D]">
           {hub.clientesActivos} integrantes
@@ -70,7 +74,7 @@ export function HubCard({ hub, operativo = false }: { hub: HubPublico; operativo
           <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-[#53685C]">Próximos pasos</p>
-              <p className="mt-1 text-[#375243]">Sumar demanda, revisar cobertura y coordinar el servicio operativo.</p>
+              <p className="mt-1 text-[#375243]">{getHubCategoryConfig(hub.categoriaId).textos.proximoPaso}</p>
             </div>
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-[#53685C]">Estado operativo</p>
