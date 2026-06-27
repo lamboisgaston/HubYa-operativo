@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { HubCategorySelector } from "@/components/hubs/HubCategorySelector";
+import { BranchSelector } from "@/components/hubs/BranchSelector";
 
 type HubCreado = { nombre: string; slug: string };
 
@@ -24,6 +25,7 @@ export function CrearHubForm() {
       nombre: String(data.get("nombre") || ""),
       zona: String(data.get("zona") || ""),
       descripcionPublica: String(data.get("descripcionPublica") || ""),
+      branchId: String(data.get("branchId") || ""),
       categoriaId: String(data.get("categoriaId") || ""),
     };
 
@@ -71,7 +73,8 @@ export function CrearHubForm() {
         <form onSubmit={crearHub} className="mt-5 grid gap-3 rounded-2xl bg-[#f8faf5] p-4 md:grid-cols-2">
           <label className="grid gap-1 text-sm font-black text-[#66745c]">Nombre del Hub<input name="nombre" required className="rounded-xl border border-[#cfd8c6] bg-white px-3 py-2 font-bold text-[#1f2a1d] outline-none" placeholder="Hub Las Lomas" /></label>
           <label className="grid gap-1 text-sm font-black text-[#66745c]">Ciudad / zona<input name="zona" required className="rounded-xl border border-[#cfd8c6] bg-white px-3 py-2 font-bold text-[#1f2a1d] outline-none" placeholder="Las Lomas" /></label>
-          <div className="md:col-span-2"><HubCategorySelector /></div>
+          <BranchSelector />
+          <HubCategorySelector />
           <label className="grid gap-1 text-sm font-black text-[#66745c] md:col-span-2">Descripción opcional<textarea name="descripcionPublica" rows={3} className="rounded-xl border border-[#cfd8c6] bg-white px-3 py-2 font-bold text-[#1f2a1d] outline-none" placeholder="Descripción pública del Hub" /></label>
           <div className="flex flex-wrap gap-2 md:col-span-2">
             <button disabled={isPending} className="rounded-xl bg-[#1f2a1d] px-4 py-3 text-sm font-black text-white disabled:opacity-60">Guardar</button>
