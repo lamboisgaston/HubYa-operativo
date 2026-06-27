@@ -57,6 +57,15 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
             <input name="phone" required placeholder="Teléfono" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="address" required placeholder="Dirección" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="quantity" type="number" min="1" defaultValue="1" placeholder="Cantidad" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <label className="grid gap-1 text-sm font-black text-[#7c5a34]">Horario preferido de entrega
+              <select name="preferredDeliveryTime" required className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold text-[#2b1705]">
+                <option value="">Elegir horario</option>
+                <option value="Mañana">Mañana</option>
+                <option value="Mediodía">Mediodía</option>
+                <option value="Tarde">Tarde</option>
+                <option value="Otro horario">Otro horario</option>
+              </select>
+            </label>
             <fieldset className="grid gap-2 rounded-2xl border border-[#f3d2a5] p-4 font-bold">
               <legend className="px-1 text-sm font-black text-[#B45309]">¿Vas a estar para recibir el pedido?</legend>
               <label className="flex gap-2"><input name="deliveryAvailability" type="radio" value="Sí, voy a estar" required /> Sí, voy a estar</label>
