@@ -3,7 +3,7 @@ import { getHubs, readStore, saveStore, type Cliente } from "@/lib/data/hubs";
 import { mensajeErrorResend, obtenerRemitenteResend, obtenerReplyToResend } from "@/lib/email/resend";
 
 export type SalesProposalStatus = "Borrador" | "Abierta" | "Cerrada" | "Confirmada" | "Entregada" | "Cancelada";
-export type SalesResponseStatus = "Pendiente" | "Aceptó" | "No aceptó";
+export type SalesResponseStatus = "Pendiente" | "Participa" | "No participa";
 export type SalesProposalPricingMode = "automatic" | "manual";
 
 export type SalesProposalPriceScale = {
@@ -44,21 +44,16 @@ export type SalesProposal = {
 export type SalesProposalResponse = {
   id: string;
   proposalId: string;
+  targetHubId: string;
   userId?: string;
   customerName: string;
   phone: string;
   address: string;
-  email: string;
   responseStatus: SalesResponseStatus;
   quantity: number;
-  paidStatus?: "Pendiente" | "Pendiente de pago" | "Pagado" | "Pago manual" | "Cancelado";
-  paidAmount?: number;
-  finalUnitPrice?: number;
-  differenceAmount?: number;
-  compensationType?: "Sin diferencia" | "Saldo a favor" | "Cupón" | "Mercadería equivalente";
-  couponStatus?: "Sin cupón" | "Pendiente" | "Acreditado" | "Usado" | "Bonificado con mercadería";
-  total: number;
-  notes: string;
+  deliveryAvailability: "Sí, voy a estar" | "No voy a estar" | "";
+  deliveryPreference: "" | "Dejar en portería / guardia" | "Dejar con vecino" | "Coordinar observación" | "Otra indicación";
+  deliveryNotes: string;
   respondedAt: string;
 };
 
@@ -100,8 +95,16 @@ const money = (value: FormDataEntryValue | null) => Number(String(value || "0").
 const count = (value: FormDataEntryValue | null) => Math.max(0, Math.round(money(value)));
 const text = (value: FormDataEntryValue | null) => String(value || "").trim();
 
+function responseParticipates(response: SalesProposalResponse) {
+  return response.responseStatus === "Participa" || String(response.responseStatus) === "Aceptó";
+}
+
+function responseDoesNotParticipate(response: SalesProposalResponse) {
+  return response.responseStatus === "No participa" || String(response.responseStatus) === "No aceptó";
+}
+
 function acceptedParticipantsCount(responses: SalesProposalResponse[]) {
-  return responses.filter((response) => response.responseStatus === "Aceptó").length;
+  return responses.filter(responseParticipates).length;
 }
 
 function normalizePricingMode(value: FormDataEntryValue | string | null | undefined): SalesProposalPricingMode {
@@ -194,8 +197,8 @@ export async function getSalesProposalByToken(publicLink: string) {
 }
 
 export function summarizeSalesProposal(proposal: SalesProposal, responses: SalesProposalResponse[], clientes: Cliente[] = []) {
-  const accepted = responses.filter((response) => response.responseStatus === "Aceptó");
-  const rejected = responses.filter((response) => response.responseStatus === "No aceptó");
+  const accepted = responses.filter(responseParticipates);
+  const rejected = responses.filter(responseDoesNotParticipate);
   const pendingCount = Math.max(0, clientes.filter((cliente) => cliente.hubId === proposal.hubId && cliente.estado === "activo").length - responses.length);
   const realAcceptedCount = accepted.length;
   const normalizedProposal = normalizeProposal(proposal, responses);
@@ -213,7 +216,7 @@ async function sendSalesProposalEmail(proposal: SalesProposal, clientes: Cliente
   if (!apiKey || destinatarios.length === 0) return;
   const publicLink = `${BASE_URL}/propuestas/${proposal.publicLink}`;
   const scales = proposal.priceScales.map((scale) => `* Si participan ${scale.maxParticipants === null || scale.maxParticipants >= 999 ? `más de ${scale.minParticipants - 1} personas` : `de ${scale.minParticipants} a ${scale.maxParticipants} personas`}: ${formatCurrency(scale.price)}`).join("\n");
-  const textBody = `Hola,\n\nHUBYA te acerca una propuesta para tu Hub.\n\nTu Hub tiene actualmente ${hubUserCount} usuarios registrados.\n\nEsta semana estamos organizando reparto de ${proposal.productName} a domicilio para el día ${proposal.deliveryDay}.\n\nProducto:\n${proposal.productName}\n\nLa propuesta cierra en:\n${proposal.countdownHours} horas\n\nLink de pago:\n${proposal.paymentLink}\n\nEscala de precio grupal:\n\n${scales}\n\nMientras más integrantes del Hub participen, mejor precio consigue el grupo.\n\nPor ahora el link de pago es único. Si al cerrar la propuesta corresponde un precio menor al pagado, la diferencia quedará acreditada en tu cuenta o podrá bonificarse con mercadería equivalente.\n\nPara responder:\n${publicLink}`;
+  const textBody = `Hola,\n\nHUBYA te acerca una propuesta para tu Hub.\n\nTu Hub tiene actualmente ${hubUserCount} usuarios registrados.\n\nEsta semana estamos organizando reparto de ${proposal.productName} a domicilio para el día ${proposal.deliveryDay}.\n\nProducto:\n${proposal.productName}\n\nLa propuesta cierra en:\n${proposal.countdownHours} horas\n\nLink de pago:\n${proposal.paymentLink}\n\nEscala de precio grupal:\n\n${scales}\n\nMientras más integrantes del Hub participen, mejor precio consigue el grupo.\n\nEl cobro se realiza por Mercado Pago. HUBYA registra tu participación y, al cerrar la oferta, calcula el precio final por escala. Si corresponde diferencia a favor, se informa en ficha física junto con la mercadería.\n\nPara responder:\n${publicLink}`;
   const respuesta = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: obtenerRemitenteResend(), reply_to: obtenerReplyToResend(), to: destinatarios, subject: `Propuesta HUBYA: ${proposal.productName.toLowerCase()} para este ${proposal.deliveryDay.toLowerCase()}`, text: textBody }) });
   if (!respuesta.ok) {
     const data = await respuesta.json().catch(() => ({}));
@@ -306,25 +309,22 @@ export async function respondSalesProposal(formData: FormData) {
   const proposalId = text(formData.get("proposalId"));
   const proposal = store.salesProposals!.find((item) => item.id === proposalId);
   if (!proposal || normalizeStatus(proposal) === "Cerrada") return;
-  const responseStatus = text(formData.get("responseStatus")) === "Aceptó" ? "Aceptó" : "No aceptó";
-  const quantity = responseStatus === "Aceptó" ? Math.max(1, money(formData.get("quantity"))) : 0;
+  const responseStatus: SalesResponseStatus = text(formData.get("responseStatus")) === "Participa" ? "Participa" : "No participa";
+  const quantity = responseStatus === "Participa" ? Math.max(1, money(formData.get("quantity")) || 1) : 0;
+  const deliveryAvailability = responseStatus === "Participa" ? text(formData.get("deliveryAvailability")) : "";
   const response: SalesProposalResponse = {
     id: `sales-response-${Date.now()}-${token()}`,
     proposalId,
+    targetHubId: proposal.hubId,
+    userId: text(formData.get("userId")) || undefined,
     customerName: text(formData.get("customerName")) || "Integrante del Hub",
     phone: text(formData.get("phone")),
     address: text(formData.get("address")),
-    email: text(formData.get("email")),
     responseStatus,
     quantity,
-    paidStatus: responseStatus === "Aceptó" ? (text(formData.get("paidStatus")) as SalesProposalResponse["paidStatus"]) || "Pendiente" : "Cancelado",
-    paidAmount: 0,
-    finalUnitPrice: proposal.price,
-    differenceAmount: 0,
-    compensationType: "Sin diferencia",
-    couponStatus: "Sin cupón",
-    total: quantity * proposal.price,
-    notes: text(formData.get("notes")),
+    deliveryAvailability: deliveryAvailability === "No voy a estar" ? "No voy a estar" : deliveryAvailability === "Sí, voy a estar" ? "Sí, voy a estar" : "",
+    deliveryPreference: responseStatus === "Participa" ? (text(formData.get("deliveryPreference")) as SalesProposalResponse["deliveryPreference"]) : "",
+    deliveryNotes: text(formData.get("deliveryNotes")),
     respondedAt: new Date().toISOString(),
   };
   store.salesProposalResponses = [response, ...store.salesProposalResponses!];

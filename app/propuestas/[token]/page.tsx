@@ -32,7 +32,7 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
         </section>
 
         <section className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-black">Precio según participación</h2>
+          <h2 className="text-xl font-black">Escala de precios</h2>
           <div className="mt-4 grid gap-2">
             {proposal.priceScales.map((scale) => (
               <div key={`${scale.minParticipants}-${scale.maxParticipants ?? "plus"}`} className="flex items-center justify-between gap-3 rounded-2xl bg-[#fff8ed] px-4 py-3 font-black">
@@ -45,21 +45,38 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
 
         <section className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.16em] text-[#B45309]">Link de pago</p>
-          <a href={proposal.paymentLink || "#"} className="mt-3 inline-flex rounded-2xl bg-[#B45309] px-6 py-3 font-black text-white">Pagar</a>
-          <p className="mt-5 rounded-2xl bg-[#fff8ed] p-4 text-sm font-bold leading-6 text-[#7c5a34]">Mientras más integrantes del Hub participen, mejor precio consigue el grupo.<br /><br />Si al cierre corresponde un precio menor al pagado, la diferencia queda acreditada o se bonifica con mercadería equivalente.</p>
+          <a href={proposal.paymentLink || "#"} className="mt-3 inline-flex rounded-2xl bg-[#B45309] px-6 py-3 font-black text-white">Pagar con Mercado Pago</a>
+          <p className="mt-5 rounded-2xl bg-[#fff8ed] p-4 text-sm font-bold leading-6 text-[#7c5a34]">Mercado Pago cobra por fuera. Al cerrar la oferta, HUBYA calcula el precio final por escala. Si corresponde diferencia a favor, se informa en ficha física junto con la mercadería.</p>
         </section>
 
         <section className="grid gap-3 rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
           <form action={respondSalesProposalAction} className="grid gap-3">
             <input type="hidden" name="proposalId" value={proposal.id} />
-            <input type="hidden" name="responseStatus" value="Aceptó" />
+            <input type="hidden" name="responseStatus" value="Participa" />
             <input name="customerName" required placeholder="Nombre" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="phone" required placeholder="Teléfono" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <input name="address" required placeholder="Dirección" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <input name="quantity" type="number" min="1" defaultValue="1" placeholder="Cantidad" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <fieldset className="grid gap-2 rounded-2xl border border-[#f3d2a5] p-4 font-bold">
+              <legend className="px-1 text-sm font-black text-[#B45309]">¿Vas a estar para recibir el pedido?</legend>
+              <label className="flex gap-2"><input name="deliveryAvailability" type="radio" value="Sí, voy a estar" required /> Sí, voy a estar</label>
+              <label className="flex gap-2"><input name="deliveryAvailability" type="radio" value="No voy a estar" /> No voy a estar</label>
+            </fieldset>
+            <label className="grid gap-1 text-sm font-black text-[#7c5a34]">Si no vas a estar, ¿qué hacemos?
+              <select name="deliveryPreference" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold text-[#2b1705]">
+                <option value="">No aplica</option>
+                <option value="Dejar en portería / guardia">Dejar en portería / guardia</option>
+                <option value="Dejar con vecino">Dejar con vecino</option>
+                <option value="Coordinar observación">Coordinar observación</option>
+                <option value="Otra indicación">Otra indicación</option>
+              </select>
+            </label>
+            <textarea name="deliveryNotes" placeholder="Observación de entrega" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <button disabled={isClosed} className="rounded-2xl bg-[#B45309] px-5 py-3 font-black text-white disabled:opacity-50">Participo</button>
           </form>
           <form action={respondSalesProposalAction}>
             <input type="hidden" name="proposalId" value={proposal.id} />
-            <input type="hidden" name="responseStatus" value="No aceptó" />
+            <input type="hidden" name="responseStatus" value="No participa" />
             <button disabled={isClosed} className="w-full rounded-2xl border border-[#B45309] px-5 py-3 font-black text-[#B45309] disabled:opacity-50">No participo</button>
           </form>
         </section>

@@ -33,7 +33,7 @@ export function OfertaGrupalHubyaWizard({ hubs, action }: Props) {
       <input type="hidden" name="title" value="Oferta grupal HUBYA" />
       <input type="hidden" name="description" value="Tu Hub fue invitado a participar de esta oferta grupal." />
       <input type="hidden" name="deliveryMode" value="Entrega coordinada HUBYA" />
-      <input type="hidden" name="notes" value="Mientras más integrantes del Hub participen, mejor precio consigue el grupo. Si al cierre corresponde un precio menor al pagado, la diferencia queda acreditada o se bonifica con mercadería equivalente." />
+      <input type="hidden" name="notes" value="Mientras más integrantes del Hub participen, mejor precio consigue el grupo. Si al cierre corresponde diferencia a favor, se informa en ficha física junto con la mercadería." />
 
       <div className="flex items-start justify-between gap-4">
         <div>
