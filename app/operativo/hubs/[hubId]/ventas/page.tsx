@@ -36,7 +36,8 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
             <input name="price" defaultValue="45000" placeholder="Precio base / respaldo" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="deliveryDay" defaultValue="Miércoles" placeholder="Día de entrega" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="deliveryMode" defaultValue="Entrega a domicilio" placeholder="Modalidad de envío" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-            <input name="responseDeadline" type="date" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <input name="paymentLink" defaultValue="https://www.mercadopago.com.ar/link-de-pago-demo-hubya" placeholder="Link de pago editable" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <input name="countdownHours" type="number" min="1" defaultValue="5" placeholder="Horas abierta (ej: 5)" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <div className="grid gap-2 rounded-2xl border border-[#f3d2a5] bg-[#fff8ed] p-4 md:col-span-2">
               <p className="text-sm font-black text-[#B45309]">Escala de precios por participantes</p>
               <div className="grid gap-2 md:grid-cols-4">
@@ -61,6 +62,7 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-[#B45309]">Estado: {proposal.status}</p>
                   <h2 className="mt-2 text-2xl font-black">{proposal.title}</h2>
                   <p className="mt-2 font-bold text-[#7c5a34]">{proposal.productName} · {proposal.format} · {formatCurrency(proposal.price)} · Entrega: {proposal.deliveryDay} · {proposal.deliveryMode}</p>
+                  <p className="mt-1 font-bold text-[#7c5a34]">Cierre: {new Date(proposal.responseDeadline).toLocaleString("es-AR")} · Cuenta regresiva inicial: {proposal.countdownHours} horas</p>
                   <p className="mt-2 break-all rounded-2xl bg-[#fff8ed] p-3 text-sm font-black">Link compartible: {link}</p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">

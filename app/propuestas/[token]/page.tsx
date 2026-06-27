@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { formatCurrency, getSalesProposalByToken } from "@/lib/sales/proposals";
 import { respondSalesProposalAction } from "./actions";
+import { SalesProposalCountdown } from "@/components/SalesProposalCountdown";
 
 function escalaTexto(min: number, max: number | null) {
   if (max === null || max >= 999) return `más de ${min - 1} participantes`;
@@ -12,6 +13,7 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
   const data = await getSalesProposalByToken(token);
   if (!data) notFound();
   const { proposal, hub } = data;
+  const isClosed = proposal.status === "Cerrada";
 
   return (
     <main className="min-h-screen bg-[#fff8ed] px-4 py-8 text-[#2b1705]">
@@ -22,6 +24,12 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
           <p className="mt-3 text-lg font-black">Tu Hub tiene actualmente {hub?.clientesActivos || 0} usuarios registrados.</p>
           <p className="mt-2 text-sm font-bold leading-6 text-[#7c5a34]">{proposal.description || `Esta semana estamos organizando reparto de ${proposal.productName} a domicilio para el día ${proposal.deliveryDay}.`}</p>
         </header>
+
+        <section className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 text-center shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#B45309]">Esta propuesta cierra en</p>
+          <p className="mt-2 text-4xl font-black"><SalesProposalCountdown deadline={proposal.responseDeadline} status={proposal.status} /></p>
+          <p className="mt-2 text-sm font-bold text-[#7c5a34]">Estado: {proposal.status} · Límite configurado: {proposal.countdownHours} horas</p>
+        </section>
 
         <section className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
           <dl className="grid gap-4 text-base font-bold">
@@ -39,7 +47,7 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
             </div>
           </dl>
 
-          <div className="mt-6 grid gap-2 sm:grid-cols-3"><a href="#aceptar" className="rounded-2xl border border-[#B45309] px-5 py-3 text-center font-black text-[#B45309]">Acepto participar</a><a href="#no-participo" className="rounded-2xl border border-[#f3d2a5] px-5 py-3 text-center font-black">No participo esta vez</a><a href={proposal.paymentLink || "#aceptar"} className="rounded-2xl bg-[#B45309] px-5 py-3 text-center font-black text-white">Pagar propuesta</a></div>
+          <div className="mt-6 grid gap-2 sm:grid-cols-3"><a href="#aceptar" className="rounded-2xl border border-[#B45309] px-5 py-3 text-center font-black text-[#B45309]">Acepto participar</a><a href="#no-participo" className="rounded-2xl border border-[#f3d2a5] px-5 py-3 text-center font-black">No participo esta vez</a><a href={proposal.paymentLink || "#aceptar"} className="rounded-2xl bg-[#B45309] px-5 py-3 text-center font-black text-white">Pagar con Mercado Pago</a></div>
 
           <div className="mt-6 rounded-3xl bg-[#fff8ed] p-5">
             <h2 className="text-lg font-black">Escala de precio grupal</h2>
@@ -67,16 +75,18 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
               <input type="hidden" name="responseStatus" value="Aceptó" />
               <input name="customerName" required placeholder="Nombre" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
               <input name="phone" required placeholder="Teléfono" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+              <input name="email" type="email" required placeholder="Email" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
               <input name="address" required placeholder="Dirección" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
               <input name="quantity" type="number" min="1" defaultValue="1" placeholder="Cantidad" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+              <select name="paidStatus" defaultValue="Pendiente" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold"><option>Pendiente</option><option>Pagado</option><option>Pago manual</option></select>
               <textarea name="notes" placeholder="Observaciones" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-              <button className="rounded-2xl bg-[#B45309] px-5 py-3 font-black text-white">Acepto participar</button>
+              <button disabled={isClosed} className="rounded-2xl bg-[#B45309] px-5 py-3 font-black text-white disabled:opacity-50">{isClosed ? "Propuesta cerrada" : "Acepto participar"}</button>
             </form>
             <form id="no-participo" action={respondSalesProposalAction} className="rounded-3xl border border-[#f3d2a5] p-5">
               <input type="hidden" name="proposalId" value={proposal.id} />
               <input type="hidden" name="responseStatus" value="No aceptó" />
               <input name="customerName" placeholder="Nombre (opcional)" className="mb-3 w-full rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-              <button className="w-full rounded-2xl border border-[#B45309] px-5 py-3 font-black text-[#B45309]">No participo esta vez</button>
+              <button disabled={isClosed} className="w-full rounded-2xl border border-[#B45309] px-5 py-3 font-black text-[#B45309] disabled:opacity-50">No participo esta vez</button>
             </form>
           </div>
         </section>
