@@ -3,6 +3,13 @@ import { readStore, saveStore, type Cliente } from "@/lib/data/hubs";
 
 export type SalesProposalStatus = "Borrador" | "Enviada" | "Abierta" | "Cerrada" | "Confirmada" | "Entregada" | "Cancelada";
 export type SalesResponseStatus = "Pendiente" | "Aceptó" | "No aceptó";
+export type SalesProposalPricingMode = "automatic" | "manual";
+
+export type SalesProposalPriceScale = {
+  minParticipants: number;
+  maxParticipants: number;
+  price: number;
+};
 
 export type SalesProposal = {
   id: string;
@@ -12,6 +19,13 @@ export type SalesProposal = {
   productName: string;
   format: string;
   price: number;
+  priceScales: SalesProposalPriceScale[];
+  acceptedParticipantsCount: number;
+  pricingParticipantsCount: number;
+  pricingMode: SalesProposalPricingMode;
+  pricingOverrideReason: string;
+  pricingUpdatedAt: string;
+  pricingUpdatedBy: string;
   deliveryDay: string;
   deliveryMode: string;
   notes: string;
@@ -40,13 +54,75 @@ type SalesStore = Omit<Awaited<ReturnType<typeof readStore>>, "salesProposals" |
   salesProposalResponses?: SalesProposalResponse[];
 };
 
+const DEFAULT_PRICE_SCALES: SalesProposalPriceScale[] = [
+  { minParticipants: 1, maxParticipants: 5, price: 45000 },
+  { minParticipants: 6, maxParticipants: 10, price: 42000 },
+  { minParticipants: 11, maxParticipants: 30, price: 39000 },
+];
+
 const token = () => Math.random().toString(36).slice(2, 10);
 const money = (value: FormDataEntryValue | null) => Number(String(value || "0").replace(/[^0-9.-]/g, "")) || 0;
+const count = (value: FormDataEntryValue | null) => Math.max(0, Math.round(money(value)));
 const text = (value: FormDataEntryValue | null) => String(value || "").trim();
+
+function acceptedParticipantsCount(responses: SalesProposalResponse[]) {
+  return responses.filter((response) => response.responseStatus === "Aceptó").length;
+}
+
+function normalizePricingMode(value: FormDataEntryValue | string | null | undefined): SalesProposalPricingMode {
+  return value === "manual" ? "manual" : "automatic";
+}
+
+function parsePriceScales(formData: FormData, fallbackPrice: number): SalesProposalPriceScale[] {
+  const scales = [0, 1, 2].map((index) => ({
+    minParticipants: count(formData.get(`scale${index}Min`)),
+    maxParticipants: count(formData.get(`scale${index}Max`)),
+    price: money(formData.get(`scale${index}Price`)),
+  })).filter((scale) => scale.minParticipants > 0 && scale.maxParticipants >= scale.minParticipants && scale.price > 0);
+  if (scales.length > 0) return scales.sort((a, b) => a.minParticipants - b.minParticipants);
+  return fallbackPrice > 0 ? [{ minParticipants: 1, maxParticipants: 9999, price: fallbackPrice }] : DEFAULT_PRICE_SCALES;
+}
+
+function normalizePriceScales(proposal: Partial<SalesProposal>): SalesProposalPriceScale[] {
+  const scales = (proposal.priceScales || []).filter((scale) => scale.minParticipants > 0 && scale.maxParticipants >= scale.minParticipants && scale.price > 0);
+  if (scales.length > 0) return scales.sort((a, b) => a.minParticipants - b.minParticipants);
+  const fallbackPrice = proposal.price || 0;
+  return fallbackPrice > 0 ? [{ minParticipants: 1, maxParticipants: 9999, price: fallbackPrice }] : DEFAULT_PRICE_SCALES;
+}
+
+
+export function getFinalPriceForParticipants(scales: SalesProposalPriceScale[], participants: number) {
+  const normalized = [...scales].sort((a, b) => a.minParticipants - b.minParticipants);
+  const firstScale = normalized[0];
+  if (!firstScale) return 0;
+  if (participants < firstScale.minParticipants) return firstScale.price;
+  return normalized.find((scale) => participants >= scale.minParticipants && participants <= scale.maxParticipants)?.price || normalized.at(-1)?.price || 0;
+}
+
+function normalizeProposal(proposal: SalesProposal, responses: SalesProposalResponse[] = []): SalesProposal {
+  const realAcceptedCount = acceptedParticipantsCount(responses);
+  const pricingMode = normalizePricingMode(proposal.pricingMode);
+  const pricingCount = pricingMode === "manual" ? Math.max(0, proposal.pricingParticipantsCount || realAcceptedCount) : realAcceptedCount;
+  const priceScales = normalizePriceScales(proposal);
+  const price = getFinalPriceForParticipants(priceScales, pricingCount) || proposal.price || 0;
+  return {
+    ...proposal,
+    priceScales,
+    price,
+    acceptedParticipantsCount: realAcceptedCount,
+    pricingMode,
+    pricingParticipantsCount: pricingCount,
+    pricingOverrideReason: proposal.pricingOverrideReason || "",
+    pricingUpdatedAt: proposal.pricingUpdatedAt || proposal.createdAt,
+    pricingUpdatedBy: proposal.pricingUpdatedBy || "Operador",
+  };
+}
 
 function withSales(store: Awaited<ReturnType<typeof readStore>>): SalesStore {
   const raw = store as SalesStore;
-  return { ...store, salesProposals: (raw.salesProposals || []) as SalesProposal[], salesProposalResponses: (raw.salesProposalResponses || []) as SalesProposalResponse[] };
+  const responses = (raw.salesProposalResponses || []) as SalesProposalResponse[];
+  const proposals = ((raw.salesProposals || []) as SalesProposal[]).map((proposal) => normalizeProposal(proposal, responses.filter((response) => response.proposalId === proposal.id)));
+  return { ...store, salesProposals: proposals, salesProposalResponses: responses };
 }
 
 export function formatCurrency(value: number) {
@@ -64,18 +140,21 @@ export async function getSalesProposalByToken(publicLink: string) {
   if (!proposal) return null;
   const hub = store.hubs.find((item) => item.id === proposal.hubId) || null;
   const responses = store.salesProposalResponses!.filter((response) => response.proposalId === proposal.id);
-  return { proposal, hub, responses };
+  return { proposal: normalizeProposal(proposal, responses), hub, responses };
 }
 
 export function summarizeSalesProposal(proposal: SalesProposal, responses: SalesProposalResponse[], clientes: Cliente[] = []) {
   const accepted = responses.filter((response) => response.responseStatus === "Aceptó");
   const rejected = responses.filter((response) => response.responseStatus === "No aceptó");
   const pendingCount = Math.max(0, clientes.filter((cliente) => cliente.hubId === proposal.hubId && cliente.estado === "activo").length - responses.length);
+  const realAcceptedCount = accepted.length;
+  const normalizedProposal = normalizeProposal(proposal, responses);
+  const finalPrice = getFinalPriceForParticipants(normalizedProposal.priceScales, normalizedProposal.pricingParticipantsCount);
   const totalQuantity = accepted.reduce((sum, response) => sum + response.quantity, 0);
-  const totalToCollect = accepted.reduce((sum, response) => sum + response.total, 0);
+  const totalToCollect = accepted.reduce((sum, response) => sum + (response.quantity * finalPrice), 0);
   const respondedNames = new Set(responses.map((response) => response.customerName.trim().toLowerCase()).filter(Boolean));
   const pending = clientes.filter((cliente) => cliente.hubId === proposal.hubId && cliente.estado === "activo" && !respondedNames.has(cliente.nombre.trim().toLowerCase()));
-  return { acceptedCount: accepted.length, rejectedCount: rejected.length, pendingCount, totalQuantity, totalToCollect, accepted, rejected, pending };
+  return { acceptedCount: realAcceptedCount, rejectedCount: rejected.length, pendingCount, totalQuantity, totalToCollect, acceptedParticipantsCount: realAcceptedCount, pricingParticipantsCount: normalizedProposal.pricingParticipantsCount, pricingMode: normalizedProposal.pricingMode, finalPrice, accepted, rejected, pending };
 }
 
 export async function createSalesProposal(formData: FormData) {
@@ -84,6 +163,7 @@ export async function createSalesProposal(formData: FormData) {
   const id = `sales-proposal-${Date.now()}`;
   const productName = text(formData.get("productName")) || "Huevos";
   const format = text(formData.get("format")) || "Media caja";
+  const scales = parsePriceScales(formData, money(formData.get("price")));
   const proposal: SalesProposal = {
     id,
     branchId: "ventas",
@@ -91,7 +171,14 @@ export async function createSalesProposal(formData: FormData) {
     title: text(formData.get("title")) || `${format} de ${productName}`,
     productName,
     format,
-    price: money(formData.get("price")),
+    priceScales: scales,
+    price: getFinalPriceForParticipants(scales, 0),
+    acceptedParticipantsCount: 0,
+    pricingParticipantsCount: 0,
+    pricingMode: "automatic",
+    pricingOverrideReason: "",
+    pricingUpdatedAt: new Date().toISOString(),
+    pricingUpdatedBy: "Operador",
     deliveryDay: text(formData.get("deliveryDay")),
     deliveryMode: text(formData.get("deliveryMode")),
     notes: text(formData.get("notes")),
@@ -115,6 +202,25 @@ export async function updateSalesProposalStatus(formData: FormData) {
     if (proposal.id !== proposalId) return proposal;
     hubId = proposal.hubId;
     return { ...proposal, status };
+  });
+  await saveStore(store);
+  if (hubId) revalidatePath(`/operativo/hubs/${hubId}/ventas`);
+}
+
+export async function updateSalesProposalPricing(formData: FormData) {
+  const store = withSales(await readStore());
+  const proposalId = text(formData.get("proposalId"));
+  const mode = normalizePricingMode(formData.get("pricingMode"));
+  let hubId = "";
+  const now = new Date().toISOString();
+  store.salesProposals = store.salesProposals!.map((proposal) => {
+    if (proposal.id !== proposalId) return proposal;
+    const responses = store.salesProposalResponses!.filter((response) => response.proposalId === proposal.id);
+    const realAcceptedCount = acceptedParticipantsCount(responses);
+    const pricingCount = mode === "manual" ? count(formData.get("pricingParticipantsCount")) : realAcceptedCount;
+    hubId = proposal.hubId;
+    const price = getFinalPriceForParticipants(proposal.priceScales, pricingCount);
+    return { ...proposal, acceptedParticipantsCount: realAcceptedCount, pricingMode: mode, pricingParticipantsCount: pricingCount, price, pricingOverrideReason: text(formData.get("pricingOverrideReason")), pricingUpdatedAt: now, pricingUpdatedBy: text(formData.get("pricingUpdatedBy")) || "Operador" };
   });
   await saveStore(store);
   if (hubId) revalidatePath(`/operativo/hubs/${hubId}/ventas`);
