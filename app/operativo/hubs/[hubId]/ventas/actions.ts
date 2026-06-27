@@ -1,9 +1,13 @@
 "use server";
 
-import { createSalesProposal, updateSalesProposalPricing, updateSalesProposalStatus } from "@/lib/sales/proposals";
+import { createGroupedSalesProposal, createSalesProposal, updateSalesProposalPricing, updateSalesProposalStatus } from "@/lib/sales/proposals";
 
 export async function createSalesProposalAction(formData: FormData) {
   await createSalesProposal(formData);
+}
+
+export async function createGroupedSalesProposalAction(formData: FormData) {
+  await createGroupedSalesProposal(formData);
 }
 
 export async function updateSalesProposalStatusAction(formData: FormData) {

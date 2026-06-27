@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { readStore, saveStore, type Cliente } from "@/lib/data/hubs";
+import { getHubs, readStore, saveStore, type Cliente } from "@/lib/data/hubs";
 
 export type SalesProposalStatus = "Borrador" | "Enviada" | "Abierta" | "Cerrada" | "Confirmada" | "Entregada" | "Cancelada";
 export type SalesResponseStatus = "Pendiente" | "Aceptó" | "No aceptó";
@@ -15,9 +15,12 @@ export type SalesProposal = {
   id: string;
   branchId: "ventas";
   hubId: string;
+  proposalGroupId?: string;
   title: string;
   productName: string;
   format: string;
+  description?: string;
+  paymentLink?: string;
   price: number;
   priceScales: SalesProposalPriceScale[];
   acceptedParticipantsCount: number;
@@ -33,6 +36,7 @@ export type SalesProposal = {
   status: SalesProposalStatus;
   publicLink: string;
   createdAt: string;
+  closedAt?: string;
 };
 
 export type SalesProposalResponse = {
@@ -44,6 +48,12 @@ export type SalesProposalResponse = {
   address: string;
   responseStatus: SalesResponseStatus;
   quantity: number;
+  paidStatus?: "Pendiente de pago" | "Pagado" | "Pago manual" | "Cancelado";
+  paidAmount?: number;
+  finalUnitPrice?: number;
+  differenceAmount?: number;
+  compensationType?: "Sin diferencia" | "Saldo a favor" | "Cupón" | "Mercadería equivalente";
+  couponStatus?: "Sin cupón" | "Pendiente" | "Acreditado" | "Usado" | "Bonificado con mercadería";
   total: number;
   notes: string;
   respondedAt: string;
@@ -75,7 +85,7 @@ function normalizePricingMode(value: FormDataEntryValue | string | null | undefi
 }
 
 function parsePriceScales(formData: FormData, fallbackPrice: number): SalesProposalPriceScale[] {
-  const scales = [0, 1, 2, 3].map((index) => ({
+  const scales = Array.from({ length: 8 }, (_, index) => ({
     minParticipants: count(formData.get(`scale${index}Min`)),
     maxParticipants: text(formData.get(`scale${index}Max`)) ? count(formData.get(`scale${index}Max`)) : null,
     price: money(formData.get(`scale${index}Price`)),
@@ -130,6 +140,17 @@ export function formatCurrency(value: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(value || 0);
 }
 
+export async function getSalesDashboardData() {
+  const store = withSales(await readStore());
+  const hubs = await getHubs();
+  const proposals = store.salesProposals!.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((proposal) => ({
+    ...proposal,
+    hub: hubs.find((hub) => hub.id === proposal.hubId) || null,
+    responses: store.salesProposalResponses!.filter((response) => response.proposalId === proposal.id),
+  }));
+  return { hubs, clientes: store.clientes, proposals };
+}
+
 export async function getSalesProposalsByHub(hubId: string): Promise<Array<SalesProposal & { responses: SalesProposalResponse[] }>> {
   const store = withSales(await readStore());
   return store.salesProposals!.filter((proposal) => proposal.hubId === hubId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((proposal) => ({ ...proposal, responses: store.salesProposalResponses!.filter((response) => response.proposalId === proposal.id) }));
@@ -173,8 +194,10 @@ export async function createSalesProposal(formData: FormData) {
     title: text(formData.get("title")) || `${format} de ${productName}`,
     productName,
     format,
+    description: text(formData.get("description")),
+    paymentLink: text(formData.get("paymentLink")),
     priceScales: scales,
-    price: getFinalPriceForParticipants(scales, 0),
+    price: getFinalPriceForParticipants(scales, 1),
     acceptedParticipantsCount: 0,
     pricingParticipantsCount: 0,
     pricingMode: "automatic",
@@ -187,12 +210,14 @@ export async function createSalesProposal(formData: FormData) {
     responseDeadline: text(formData.get("responseDeadline")),
     status: "Abierta",
     publicLink: token(),
+    proposalGroupId: text(formData.get("proposalGroupId")) || id,
     createdAt: new Date().toISOString(),
   };
   store.salesProposals = [proposal, ...store.salesProposals!];
   await saveStore(store);
   revalidatePath(`/operativo/hubs/${hubId}/ventas`);
   revalidatePath(`/operativo?rama=ventas`);
+  revalidatePath(`/operativo/ventas`);
 }
 
 export async function updateSalesProposalStatus(formData: FormData) {
@@ -203,10 +228,11 @@ export async function updateSalesProposalStatus(formData: FormData) {
   store.salesProposals = store.salesProposals!.map((proposal) => {
     if (proposal.id !== proposalId) return proposal;
     hubId = proposal.hubId;
-    return { ...proposal, status };
+    return { ...proposal, status, closedAt: status === "Cerrada" ? new Date().toISOString() : proposal.closedAt };
   });
   await saveStore(store);
   if (hubId) revalidatePath(`/operativo/hubs/${hubId}/ventas`);
+  revalidatePath(`/operativo/ventas`);
 }
 
 export async function updateSalesProposalPricing(formData: FormData) {
@@ -226,6 +252,7 @@ export async function updateSalesProposalPricing(formData: FormData) {
   });
   await saveStore(store);
   if (hubId) revalidatePath(`/operativo/hubs/${hubId}/ventas`);
+  revalidatePath(`/operativo/ventas`);
 }
 
 export async function respondSalesProposal(formData: FormData) {
@@ -243,6 +270,12 @@ export async function respondSalesProposal(formData: FormData) {
     address: text(formData.get("address")),
     responseStatus,
     quantity,
+    paidStatus: responseStatus === "Aceptó" ? "Pendiente de pago" : "Cancelado",
+    paidAmount: 0,
+    finalUnitPrice: proposal.price,
+    differenceAmount: 0,
+    compensationType: "Sin diferencia",
+    couponStatus: "Sin cupón",
     total: quantity * proposal.price,
     notes: text(formData.get("notes")),
     respondedAt: new Date().toISOString(),
@@ -251,4 +284,21 @@ export async function respondSalesProposal(formData: FormData) {
   await saveStore(store);
   revalidatePath(`/propuestas/${proposal.publicLink}`);
   revalidatePath(`/operativo/hubs/${proposal.hubId}/ventas`);
+  revalidatePath(`/operativo/ventas`);
+}
+
+
+export async function createGroupedSalesProposal(formData: FormData) {
+  const selectedHubIds = formData.getAll("targetHubIds").map((value) => text(value)).filter(Boolean);
+  if (selectedHubIds.length === 0) return;
+  const groupId = `sales-group-${Date.now()}`;
+  for (const hubId of selectedHubIds) {
+    const next = new FormData();
+    for (const [key, value] of formData.entries()) {
+      if (key !== "targetHubIds") next.append(key, value);
+    }
+    next.set("hubId", hubId);
+    next.set("proposalGroupId", groupId);
+    await createSalesProposal(next);
+  }
 }
