@@ -73,7 +73,9 @@ export function summarizeSalesProposal(proposal: SalesProposal, responses: Sales
   const pendingCount = Math.max(0, clientes.filter((cliente) => cliente.hubId === proposal.hubId && cliente.estado === "activo").length - responses.length);
   const totalQuantity = accepted.reduce((sum, response) => sum + response.quantity, 0);
   const totalToCollect = accepted.reduce((sum, response) => sum + response.total, 0);
-  return { acceptedCount: accepted.length, rejectedCount: rejected.length, pendingCount, totalQuantity, totalToCollect, accepted, rejected };
+  const respondedNames = new Set(responses.map((response) => response.customerName.trim().toLowerCase()).filter(Boolean));
+  const pending = clientes.filter((cliente) => cliente.hubId === proposal.hubId && cliente.estado === "activo" && !respondedNames.has(cliente.nombre.trim().toLowerCase()));
+  return { acceptedCount: accepted.length, rejectedCount: rejected.length, pendingCount, totalQuantity, totalToCollect, accepted, rejected, pending };
 }
 
 export async function createSalesProposalAction(formData: FormData) {
@@ -102,6 +104,7 @@ export async function createSalesProposalAction(formData: FormData) {
   store.salesProposals = [proposal, ...store.salesProposals!];
   await saveStore(store);
   revalidatePath(`/operativo/hubs/${hubId}/ventas`);
+  revalidatePath(`/operativo?rama=ventas`);
 }
 
 export async function updateSalesProposalStatusAction(formData: FormData) {
