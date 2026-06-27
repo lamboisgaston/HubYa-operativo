@@ -30,22 +30,23 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
           <h2 className="mt-2 text-2xl font-black">Nueva propuesta para compartir</h2>
           <form action={createSalesProposalAction} className="mt-5 grid gap-3 md:grid-cols-2">
             <input type="hidden" name="hubId" value={hub.id} />
-            <input name="title" placeholder="Título: Media caja de huevos" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-            <input name="productName" defaultValue="Huevos" placeholder="Producto" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <input name="title" defaultValue="Huevos a domicilio — Entrega miércoles" placeholder="Título: Media caja de huevos" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <input name="productName" defaultValue="Media caja de huevos" placeholder="Producto" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="format" defaultValue="Media caja" placeholder="Formato" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="price" defaultValue="45000" placeholder="Precio base / respaldo" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="deliveryDay" defaultValue="Miércoles" placeholder="Día de entrega" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-            <input name="deliveryMode" defaultValue="Envío a domicilio" placeholder="Modalidad de envío" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <input name="deliveryMode" defaultValue="Entrega a domicilio" placeholder="Modalidad de envío" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="responseDeadline" type="date" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <div className="grid gap-2 rounded-2xl border border-[#f3d2a5] bg-[#fff8ed] p-4 md:col-span-2">
               <p className="text-sm font-black text-[#B45309]">Escala de precios por participantes</p>
-              <div className="grid gap-2 md:grid-cols-3">
+              <div className="grid gap-2 md:grid-cols-4">
                 <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34]">1 a 5<input type="hidden" name="scale0Min" value="1" /><input type="hidden" name="scale0Max" value="5" /><input name="scale0Price" defaultValue="45000" className="rounded-xl border border-[#f3d2a5] px-3 py-2 text-base text-[#2b1705]" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34]">6 a 10<input type="hidden" name="scale1Min" value="6" /><input type="hidden" name="scale1Max" value="10" /><input name="scale1Price" defaultValue="42000" className="rounded-xl border border-[#f3d2a5] px-3 py-2 text-base text-[#2b1705]" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34]">11 a 30<input type="hidden" name="scale2Min" value="11" /><input type="hidden" name="scale2Max" value="30" /><input name="scale2Price" defaultValue="39000" className="rounded-xl border border-[#f3d2a5] px-3 py-2 text-base text-[#2b1705]" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34]">+30<input type="hidden" name="scale3Min" value="31" /><input type="hidden" name="scale3Max" value="" /><input name="scale3Price" defaultValue="37000" className="rounded-xl border border-[#f3d2a5] px-3 py-2 text-base text-[#2b1705]" /></label>
               </div>
             </div>
-            <textarea name="notes" placeholder="Observaciones" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold md:col-span-2" />
+            <textarea name="notes" defaultValue="Si el Hub alcanza una escala mejor, la diferencia queda acreditada o se bonifica con mercadería." placeholder="Observaciones" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold md:col-span-2" />
             <button className="rounded-2xl bg-[#B45309] px-5 py-3 font-black text-white md:col-span-2">Generar link de propuesta</button>
           </form>
         </section>
