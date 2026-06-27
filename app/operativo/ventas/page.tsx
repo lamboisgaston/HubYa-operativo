@@ -28,8 +28,8 @@ export default async function VentasPage() {
           <input name="format" defaultValue="Media caja" placeholder="Formato" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
           <input name="deliveryDay" defaultValue="Miércoles" placeholder="Día de entrega" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
           <input name="deliveryMode" defaultValue="Envío a domicilio" placeholder="Modalidad de entrega" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-          <input name="responseDeadline" type="date" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-          <input name="paymentLink" placeholder="Link de pago único" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold md:col-span-2" />
+          <input name="countdownHours" type="number" min="1" defaultValue="5" placeholder="Horas abierta (ej: 5)" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+          <input name="paymentLink" defaultValue="https://www.mercadopago.com.ar/link-de-pago-demo-hubya" placeholder="Link de pago único" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold md:col-span-2" />
           <textarea name="description" defaultValue="Esta semana estamos organizando reparto de huevos a domicilio." placeholder="Descripción breve" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold md:col-span-2" />
           <textarea name="notes" defaultValue="Por ahora el link de pago se genera con un precio único. Cuando cierre la propuesta, HUBYA revisará cuántos participantes tuvo el Hub. Si por la cantidad de participantes corresponde un precio menor al pagado, la diferencia quedará acreditada en tu cuenta o podrá bonificarse con mercadería equivalente." placeholder="Observaciones" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold md:col-span-2" />
         </div>
@@ -62,7 +62,7 @@ export default async function VentasPage() {
           return <article key={proposal.id} className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#B45309]">{proposal.status} · {proposal.hub?.nombre}</p>
             <h2 className="mt-2 text-2xl font-black">{proposal.productName}</h2>
-            <p className="mt-2 font-bold text-[#7c5a34]">Entrega: {proposal.deliveryDay} · Link de pago: {proposal.paymentLink || "pendiente"}</p>
+            <p className="mt-2 font-bold text-[#7c5a34]">Entrega: {proposal.deliveryDay} · Link de pago: {proposal.paymentLink || "pendiente"}</p><p className="mt-1 font-bold text-[#7c5a34]">Cierre: {new Date(proposal.responseDeadline).toLocaleString("es-AR")} · Cuenta regresiva inicial: {proposal.countdownHours} horas</p>
             <div className="mt-4 grid gap-2 md:grid-cols-4">
               {[["Usuarios del Hub", proposal.hub?.clientesActivos || 0], ["Aceptaron", summary.acceptedCount], ["No aceptaron", summary.rejectedCount], ["Pendientes", summary.pendingCount], ["Participantes para calcular precio", summary.pricingParticipantsCount], ["Precio del link de pago", formatCurrency(paidLinkPrice)], ["Precio final por escala", formatCurrency(summary.finalPrice)], ["Total a compensar", formatCurrency(difference * summary.acceptedCount)]].map(([label, value]) => <div key={label} className="rounded-2xl bg-[#fff8ed] p-4"><p className="text-xs font-black uppercase text-[#B45309]">{label}</p><p className="text-xl font-black">{value}</p></div>)}
             </div>

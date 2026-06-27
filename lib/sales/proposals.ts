@@ -1,7 +1,8 @@
 import { revalidatePath } from "next/cache";
 import { getHubs, readStore, saveStore, type Cliente } from "@/lib/data/hubs";
+import { mensajeErrorResend, obtenerRemitenteResend, obtenerReplyToResend } from "@/lib/email/resend";
 
-export type SalesProposalStatus = "Borrador" | "Enviada" | "Abierta" | "Cerrada" | "Confirmada" | "Entregada" | "Cancelada";
+export type SalesProposalStatus = "Borrador" | "Abierta" | "Cerrada" | "Confirmada" | "Entregada" | "Cancelada";
 export type SalesResponseStatus = "Pendiente" | "Aceptó" | "No aceptó";
 export type SalesProposalPricingMode = "automatic" | "manual";
 
@@ -33,6 +34,7 @@ export type SalesProposal = {
   deliveryMode: string;
   notes: string;
   responseDeadline: string;
+  countdownHours: number;
   status: SalesProposalStatus;
   publicLink: string;
   createdAt: string;
@@ -46,9 +48,10 @@ export type SalesProposalResponse = {
   customerName: string;
   phone: string;
   address: string;
+  email: string;
   responseStatus: SalesResponseStatus;
   quantity: number;
-  paidStatus?: "Pendiente de pago" | "Pagado" | "Pago manual" | "Cancelado";
+  paidStatus?: "Pendiente" | "Pendiente de pago" | "Pagado" | "Pago manual" | "Cancelado";
   paidAmount?: number;
   finalUnitPrice?: number;
   differenceAmount?: number;
@@ -63,6 +66,27 @@ type SalesStore = Omit<Awaited<ReturnType<typeof readStore>>, "salesProposals" |
   salesProposals?: SalesProposal[];
   salesProposalResponses?: SalesProposalResponse[];
 };
+
+
+const DEFAULT_PAYMENT_LINK = "https://www.mercadopago.com.ar/link-de-pago-demo-hubya";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+function hours(value: FormDataEntryValue | null) {
+  const parsed = Number(String(value || "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
+}
+
+function deadlineFromHours(countdownHours: number, createdAt = new Date()) {
+  return new Date(createdAt.getTime() + countdownHours * 60 * 60 * 1000).toISOString();
+}
+
+function proposalIsExpired(proposal: Pick<SalesProposal, "responseDeadline" | "status">) {
+  return proposal.status === "Abierta" && Boolean(proposal.responseDeadline) && new Date(proposal.responseDeadline).getTime() <= Date.now();
+}
+
+function normalizeStatus(proposal: SalesProposal): SalesProposalStatus {
+  return proposalIsExpired(proposal) ? "Cerrada" : proposal.status || "Borrador";
+}
 
 const DEFAULT_PRICE_SCALES: SalesProposalPriceScale[] = [
   { minParticipants: 1, maxParticipants: 5, price: 45000 },
@@ -120,6 +144,9 @@ function normalizeProposal(proposal: SalesProposal, responses: SalesProposalResp
     ...proposal,
     priceScales,
     price,
+    countdownHours: proposal.countdownHours || 5,
+    responseDeadline: proposal.responseDeadline || deadlineFromHours(proposal.countdownHours || 5, new Date(proposal.createdAt || Date.now())),
+    status: normalizeStatus(proposal),
     acceptedParticipantsCount: realAcceptedCount,
     pricingMode,
     pricingParticipantsCount: pricingCount,
@@ -180,6 +207,20 @@ export function summarizeSalesProposal(proposal: SalesProposal, responses: Sales
   return { acceptedCount: realAcceptedCount, rejectedCount: rejected.length, pendingCount, totalQuantity, totalToCollect, acceptedParticipantsCount: realAcceptedCount, pricingParticipantsCount: normalizedProposal.pricingParticipantsCount, pricingMode: normalizedProposal.pricingMode, finalPrice, accepted, rejected, pending };
 }
 
+async function sendSalesProposalEmail(proposal: SalesProposal, clientes: Cliente[], hubUserCount: number) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const destinatarios = clientes.map((cliente) => cliente.email).filter((email) => email.includes("@"));
+  if (!apiKey || destinatarios.length === 0) return;
+  const publicLink = `${BASE_URL}/propuestas/${proposal.publicLink}`;
+  const scales = proposal.priceScales.map((scale) => `* Si participan ${scale.maxParticipants === null || scale.maxParticipants >= 999 ? `más de ${scale.minParticipants - 1} personas` : `de ${scale.minParticipants} a ${scale.maxParticipants} personas`}: ${formatCurrency(scale.price)}`).join("\n");
+  const textBody = `Hola,\n\nHUBYA te acerca una propuesta para tu Hub.\n\nTu Hub tiene actualmente ${hubUserCount} usuarios registrados.\n\nEsta semana estamos organizando reparto de ${proposal.productName} a domicilio para el día ${proposal.deliveryDay}.\n\nProducto:\n${proposal.productName}\n\nLa propuesta cierra en:\n${proposal.countdownHours} horas\n\nLink de pago:\n${proposal.paymentLink}\n\nEscala de precio grupal:\n\n${scales}\n\nMientras más integrantes del Hub participen, mejor precio consigue el grupo.\n\nPor ahora el link de pago es único. Si al cerrar la propuesta corresponde un precio menor al pagado, la diferencia quedará acreditada en tu cuenta o podrá bonificarse con mercadería equivalente.\n\nPara responder:\n${publicLink}`;
+  const respuesta = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: obtenerRemitenteResend(), reply_to: obtenerReplyToResend(), to: destinatarios, subject: `Propuesta HUBYA: ${proposal.productName.toLowerCase()} para este ${proposal.deliveryDay.toLowerCase()}`, text: textBody }) });
+  if (!respuesta.ok) {
+    const data = await respuesta.json().catch(() => ({}));
+    console.error("No se pudo enviar email de propuesta comercial", mensajeErrorResend(data));
+  }
+}
+
 export async function createSalesProposal(formData: FormData) {
   const store = withSales(await readStore());
   const hubId = text(formData.get("hubId"));
@@ -187,6 +228,8 @@ export async function createSalesProposal(formData: FormData) {
   const productName = text(formData.get("productName")) || "Huevos";
   const format = text(formData.get("format")) || "Media caja";
   const scales = parsePriceScales(formData, money(formData.get("price")));
+  const countdownHours = hours(formData.get("countdownHours"));
+  const createdAt = new Date();
   const proposal: SalesProposal = {
     id,
     branchId: "ventas",
@@ -195,7 +238,7 @@ export async function createSalesProposal(formData: FormData) {
     productName,
     format,
     description: text(formData.get("description")),
-    paymentLink: text(formData.get("paymentLink")),
+    paymentLink: text(formData.get("paymentLink")) || DEFAULT_PAYMENT_LINK,
     priceScales: scales,
     price: getFinalPriceForParticipants(scales, 1),
     acceptedParticipantsCount: 0,
@@ -207,14 +250,17 @@ export async function createSalesProposal(formData: FormData) {
     deliveryDay: text(formData.get("deliveryDay")),
     deliveryMode: text(formData.get("deliveryMode")),
     notes: text(formData.get("notes")),
-    responseDeadline: text(formData.get("responseDeadline")),
+    responseDeadline: text(formData.get("responseDeadline")) || deadlineFromHours(countdownHours, createdAt),
+    countdownHours,
     status: "Abierta",
     publicLink: token(),
     proposalGroupId: text(formData.get("proposalGroupId")) || id,
-    createdAt: new Date().toISOString(),
+    createdAt: createdAt.toISOString(),
   };
   store.salesProposals = [proposal, ...store.salesProposals!];
   await saveStore(store);
+  const clientesDelHub = store.clientes.filter((cliente) => cliente.hubId === hubId && cliente.estado === "activo");
+  await sendSalesProposalEmail(proposal, clientesDelHub, clientesDelHub.length);
   revalidatePath(`/operativo/hubs/${hubId}/ventas`);
   revalidatePath(`/operativo?rama=ventas`);
   revalidatePath(`/operativo/ventas`);
@@ -259,7 +305,7 @@ export async function respondSalesProposal(formData: FormData) {
   const store = withSales(await readStore());
   const proposalId = text(formData.get("proposalId"));
   const proposal = store.salesProposals!.find((item) => item.id === proposalId);
-  if (!proposal) return;
+  if (!proposal || normalizeStatus(proposal) === "Cerrada") return;
   const responseStatus = text(formData.get("responseStatus")) === "Aceptó" ? "Aceptó" : "No aceptó";
   const quantity = responseStatus === "Aceptó" ? Math.max(1, money(formData.get("quantity"))) : 0;
   const response: SalesProposalResponse = {
@@ -268,9 +314,10 @@ export async function respondSalesProposal(formData: FormData) {
     customerName: text(formData.get("customerName")) || "Integrante del Hub",
     phone: text(formData.get("phone")),
     address: text(formData.get("address")),
+    email: text(formData.get("email")),
     responseStatus,
     quantity,
-    paidStatus: responseStatus === "Aceptó" ? "Pendiente de pago" : "Cancelado",
+    paidStatus: responseStatus === "Aceptó" ? (text(formData.get("paidStatus")) as SalesProposalResponse["paidStatus"]) || "Pendiente" : "Cancelado",
     paidAmount: 0,
     finalUnitPrice: proposal.price,
     differenceAmount: 0,
