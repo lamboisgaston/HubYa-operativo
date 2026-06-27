@@ -27,7 +27,7 @@ export type HubOperativo = HubPublico & { cantidadClientes: number; cantidadRepo
 export type HubDetalleOperativo = HubOperativo & { ficha: HubPublico; clientes: Cliente[]; reportesBorrador: ReporteHub[]; reportesGuardados: ReporteHub[]; reportesEnviados: ReporteHub[]; vinculos: HubServicioVinculo[]; postulantes: HubServicioVinculo[] };
 export type NuevoHubDemandaInput = { nombre: string; zona: string; branchId?: BranchSlug; categoriaId?: HubCategorySlug; descripcionPublica?: string; rama?: string; equipoOperativo?: string };
 
-type Store = { branches?: BranchConfig[]; hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[]; reportes?: ReporteHub[]; mensajes_operativos?: unknown[]; respuestas_operativas?: unknown[]; parameterResponses?: unknown[] };
+type Store = { branches?: BranchConfig[]; hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[]; reportes?: ReporteHub[]; mensajes_operativos?: unknown[]; respuestas_operativas?: unknown[]; parameterResponses?: unknown[]; salesProposals?: unknown[]; salesProposalResponses?: unknown[] };
 const DATA_FILE = path.join(process.cwd(), "data", "hubya-public.json");
 const now = new Date().toISOString();
 const seedHubDefinitions: Array<{ zona: string; branchId: BranchSlug; categoriaId: HubCategorySlug; equipoOperativo: string; moduloOperativo: ModuloOperativoHub }> = [
@@ -162,7 +162,7 @@ function normalizeStore(store: Partial<Store>): Store {
   const clientes = (store.clientes || seedClientes).map((cliente) => ({ ...cliente, direccion: cliente.direccion || cliente.referencia || "", servicioInteres: cliente.servicioInteres || "", observaciones: cliente.observaciones || "", tipoDestino: cliente.tipoDestino || "cliente", tarifaCliente: normalizarTarifaCliente(cliente.tarifaCliente), hubId: idCanonico.get(cliente.hubId) || hubPorClave.get(normalizarClaveHub(cliente.hubId || "")) || cliente.hubId || "" }));
   const reportes = (store.reportes || []).map((reporte) => ({ ...reporte, hubId: (reporte.hubId && (idCanonico.get(reporte.hubId) || hubPorClave.get(normalizarClaveHub(reporte.hubId)))) || (reporte.hub && hubPorClave.get(normalizarClaveHub(reporte.hub))) || reporte.hubId }));
 
-  return { branches: BRANCHES, hubs, clientes, solicitudes: store.solicitudes || [], hub_servicios, hub_servicio_vinculos, reportes, mensajes_operativos: store.mensajes_operativos || [], respuestas_operativas: store.respuestas_operativas || [], parameterResponses: store.parameterResponses || [] };
+  return { branches: BRANCHES, hubs, clientes, solicitudes: store.solicitudes || [], hub_servicios, hub_servicio_vinculos, reportes, mensajes_operativos: store.mensajes_operativos || [], respuestas_operativas: store.respuestas_operativas || [], parameterResponses: store.parameterResponses || [], salesProposals: store.salesProposals || [], salesProposalResponses: store.salesProposalResponses || [] };
 }
 export async function readStore(): Promise<Store> { try { return normalizeStore(JSON.parse(await readFile(DATA_FILE, "utf8"))); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; const store = normalizeStore({}); await saveStore(store); return store; } }
 export async function saveStore(store: Store) { await mkdir(path.dirname(DATA_FILE), { recursive: true }); await writeFile(DATA_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf8"); }
