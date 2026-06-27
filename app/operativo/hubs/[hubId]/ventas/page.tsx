@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getClientesByHubId } from "@/lib/data/hubs";
 import { getHubOr404 } from "../utils";
-import { createSalesProposalAction, formatCurrency, getSalesProposalsByHub, summarizeSalesProposal, updateSalesProposalStatusAction } from "@/lib/sales/proposals";
+import { formatCurrency, getSalesProposalsByHub, summarizeSalesProposal } from "@/lib/sales/proposals";
+import { createSalesProposalAction, updateSalesProposalStatusAction } from "./actions";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 

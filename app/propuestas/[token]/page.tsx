@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { formatCurrency, getSalesProposalByToken, respondSalesProposalAction } from "@/lib/sales/proposals";
+import { formatCurrency, getSalesProposalByToken } from "@/lib/sales/proposals";
+import { respondSalesProposalAction } from "./actions";
 
 export default async function PublicSalesProposalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
