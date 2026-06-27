@@ -18,9 +18,9 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
           <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-3xl font-black">Hub de Huevos por propuestas comerciales</h1>
-              <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-[#7c5a34]">Este espacio no usa reportes de mantenimiento verde ni lógica sanitaria. Trabaja con productos, propuestas, aceptación/rechazo, entregas, cobros y links compartibles.</p>
+              <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-[#7c5a34]">Este Hub funciona por propuestas comerciales al Hub: producto, precio, aceptación/rechazo, pedidos confirmados, entregas, cobros y links compartibles. No mezcla reportes de mantenimiento verde ni control de plagas.</p>
             </div>
-            <Link href={`/operativo?rama=ventas`} className="rounded-2xl border border-[#f3d2a5] bg-[#fff8ed] px-4 py-3 text-center text-sm font-black">Volver a Ventas</Link>
+            <Link href="/operativo?rama=ventas" className="rounded-2xl border border-[#f3d2a5] bg-[#fff8ed] px-4 py-3 text-center text-sm font-black">Volver a Ventas</Link>
           </div>
         </header>
 
@@ -50,8 +50,8 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-[#B45309]">Estado: {proposal.status}</p>
                   <h2 className="mt-2 text-2xl font-black">{proposal.title}</h2>
-                  <p className="mt-2 font-bold text-[#7c5a34]">{proposal.format} · {formatCurrency(proposal.price)} · Entrega: {proposal.deliveryDay} · {proposal.deliveryMode}</p>
-                  <p className="mt-2 break-all rounded-2xl bg-[#fff8ed] p-3 text-sm font-black">Link: {link}</p>
+                  <p className="mt-2 font-bold text-[#7c5a34]">{proposal.productName} · {proposal.format} · {formatCurrency(proposal.price)} · Entrega: {proposal.deliveryDay} · {proposal.deliveryMode}</p>
+                  <p className="mt-2 break-all rounded-2xl bg-[#fff8ed] p-3 text-sm font-black">Link compartible: {link}</p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {[["Aceptaron", summary.acceptedCount], ["No aceptaron", summary.rejectedCount], ["Pendientes", summary.pendingCount], ["Total vendido", `${summary.totalQuantity} ${proposal.format}`], ["Total a cobrar", formatCurrency(summary.totalToCollect)]].map(([label, value]) => <div key={label} className="rounded-2xl bg-[#fff8ed] p-4"><p className="text-xs font-black uppercase text-[#B45309]">{label}</p><p className="text-xl font-black">{value}</p></div>)}
@@ -60,9 +60,15 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
               <div className="mt-4 flex flex-wrap gap-2 text-sm font-black">
                 <a href={link} className="rounded-xl bg-[#B45309] px-4 py-3 text-white">Abrir / copiar link</a>
                 <form action={updateSalesProposalStatusAction}><input type="hidden" name="proposalId" value={proposal.id} /><button name="status" value="Cerrada" className="rounded-xl border border-[#f3d2a5] px-4 py-3">Cerrar propuesta</button></form>
+                <form action={updateSalesProposalStatusAction}><input type="hidden" name="proposalId" value={proposal.id} /><button name="status" value="Confirmada" className="rounded-xl border border-[#f3d2a5] px-4 py-3">Confirmar pedidos</button></form>
                 <form action={updateSalesProposalStatusAction}><input type="hidden" name="proposalId" value={proposal.id} /><button name="status" value="Entregada" className="rounded-xl border border-[#f3d2a5] px-4 py-3">Marcar entregado</button></form>
-                <span className="rounded-xl border border-[#f3d2a5] px-4 py-3">Ver aceptados</span><span className="rounded-xl border border-[#f3d2a5] px-4 py-3">Ver rechazados</span><span className="rounded-xl border border-[#f3d2a5] px-4 py-3">Generar hoja de reparto</span>
               </div>
+              <div className="mt-5 grid gap-3 lg:grid-cols-3">
+                <details className="rounded-2xl border border-[#f3d2a5] p-4" open><summary className="cursor-pointer font-black">Ver aceptados</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.accepted.length === 0 ? <p>Sin aceptaciones todavía.</p> : summary.accepted.map((item) => <p key={item.id}>{item.customerName} · {item.quantity} · {formatCurrency(item.total)} · {item.address || "Sin dirección"}</p>)}</div></details>
+                <details className="rounded-2xl border border-[#f3d2a5] p-4"><summary className="cursor-pointer font-black">Ver rechazados</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.rejected.length === 0 ? <p>Sin rechazos todavía.</p> : summary.rejected.map((item) => <p key={item.id}>{item.customerName}</p>)}</div></details>
+                <details className="rounded-2xl border border-[#f3d2a5] p-4"><summary className="cursor-pointer font-black">Ver pendientes</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.pending.length === 0 ? <p>No quedan integrantes pendientes.</p> : summary.pending.map((item) => <p key={item.id}>{item.nombre} · {item.whatsapp || "Sin teléfono"}</p>)}</div></details>
+              </div>
+              <details className="mt-3 rounded-2xl bg-[#fff8ed] p-4"><summary className="cursor-pointer text-sm font-black">Generar hoja de reparto</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.accepted.length === 0 ? <p>Cuando haya aceptados, acá queda la hoja simple de reparto.</p> : summary.accepted.map((item, index) => <p key={item.id}>{index + 1}. {item.customerName} — {item.address || "Dirección pendiente"} — {item.quantity} {proposal.format} — Cobrar {formatCurrency(item.total)}</p>)}</div></details>
             </article>;
           })}
         </section>

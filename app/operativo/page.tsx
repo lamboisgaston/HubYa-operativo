@@ -61,11 +61,11 @@ export default async function OperativoPage({ searchParams }: { searchParams?: P
             {ramaActiva.hubs.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {ramaActiva.hubs.map((hub) => (
-                  <Link key={hub.id} href={`/operativo/hubs/${hub.slug}`} className="rounded-[2rem] border border-[#DDE7E2] bg-white p-6 shadow-sm transition hover:border-[#1E8F4D] hover:bg-[#F8FAF7]">
+                  <Link key={hub.id} href={ramaActiva.slug === "ventas" ? `/operativo/hubs/${hub.slug}/ventas` : `/operativo/hubs/${hub.slug}`} className="rounded-[2rem] border border-[#DDE7E2] bg-white p-6 shadow-sm transition hover:border-[#1E8F4D] hover:bg-[#F8FAF7]">
                     <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: ramaActiva.color }}>Hub</p>
                     <h3 className="mt-2 text-2xl font-black">{hub.nombre}</h3>
                     <p className="mt-2 text-sm font-semibold text-[#53685C]">{hub.zona}</p>
-                    <span className="mt-5 inline-flex rounded-2xl bg-[#1E8F4D] px-4 py-3 text-sm font-black text-white">Entrar al Hub →</span>
+                    <span className="mt-5 inline-flex rounded-2xl bg-[#1E8F4D] px-4 py-3 text-sm font-black text-white">{ramaActiva.slug === "ventas" ? "Gestionar propuestas →" : "Entrar al Hub →"}</span>
                   </Link>
                 ))}
               </div>
