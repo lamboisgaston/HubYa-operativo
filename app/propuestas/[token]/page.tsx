@@ -3,8 +3,8 @@ import { formatCurrency, getSalesProposalByToken } from "@/lib/sales/proposals";
 import { respondSalesProposalAction } from "./actions";
 
 function escalaTexto(min: number, max: number | null) {
-  if (max === null) return `+${min - 1} participantes`;
-  return `${min} a ${max} participantes`;
+  if (max === null || max >= 999) return `más de ${min - 1} participantes`;
+  return `de ${min} a ${max} personas`;
 }
 
 export default async function PublicSalesProposalPage({ params }: { params: Promise<{ token: string }> }) {
@@ -19,7 +19,8 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
         <header className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.22em] text-[#B45309]">Propuesta HUBYA</p>
           <h1 className="mt-3 text-3xl font-black">{proposal.title || "Huevos a domicilio — Entrega miércoles"}</h1>
-          <p className="mt-3 text-lg font-black">Tu Hub tiene {hub?.clientesActivos || 0} usuarios.</p>
+          <p className="mt-3 text-lg font-black">Tu Hub tiene actualmente {hub?.clientesActivos || 0} usuarios registrados.</p>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#7c5a34]">{proposal.description || `Esta semana estamos organizando reparto de ${proposal.productName} a domicilio para el día ${proposal.deliveryDay}.`}</p>
         </header>
 
         <section className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
@@ -29,8 +30,8 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
               <dd className="mt-1 text-2xl font-black">{proposal.productName || proposal.format}</dd>
             </div>
             <div>
-              <dt className="text-xs font-black uppercase tracking-[0.16em] text-[#B45309]">Precio inicial de pago</dt>
-              <dd className="mt-1 text-2xl font-black">{formatCurrency(proposal.price)}</dd>
+              <dt className="text-xs font-black uppercase tracking-[0.16em] text-[#B45309]">Link de pago</dt>
+              <dd className="mt-1 break-all text-lg font-black">{proposal.paymentLink ? <a href={proposal.paymentLink} className="text-[#B45309] underline">{proposal.paymentLink}</a> : "Link de pago pendiente"}</dd>
             </div>
             <div>
               <dt className="text-xs font-black uppercase tracking-[0.16em] text-[#B45309]">Entrega</dt>
@@ -38,7 +39,7 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
             </div>
           </dl>
 
-          <a href="#aceptar" className="mt-6 block rounded-2xl bg-[#B45309] px-5 py-3 text-center font-black text-white">Pagar propuesta</a>
+          <div className="mt-6 grid gap-2 sm:grid-cols-3"><a href="#aceptar" className="rounded-2xl border border-[#B45309] px-5 py-3 text-center font-black text-[#B45309]">Acepto participar</a><a href="#no-participo" className="rounded-2xl border border-[#f3d2a5] px-5 py-3 text-center font-black">No participo esta vez</a><a href={proposal.paymentLink || "#aceptar"} className="rounded-2xl bg-[#B45309] px-5 py-3 text-center font-black text-white">Pagar propuesta</a></div>
 
           <div className="mt-6 rounded-3xl bg-[#fff8ed] p-5">
             <h2 className="text-lg font-black">Escala de precio grupal</h2>
@@ -53,7 +54,8 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
           </div>
 
           <p className="mt-5 rounded-2xl border border-[#f3d2a5] p-4 text-sm font-bold leading-6 text-[#7c5a34]">
-            {proposal.notes || "Si el Hub alcanza una escala mejor, la diferencia queda acreditada o se bonifica con mercadería."}
+            {proposal.notes || "Por ahora el link de pago se genera con un precio único. Cuando cierre la propuesta, HUBYA revisará cuántos participantes tuvo el Hub. Si por la cantidad de participantes corresponde un precio menor al pagado, la diferencia quedará acreditada en tu cuenta o podrá bonificarse con mercadería equivalente."}
+            <br /><br /><b>Ejemplo:</b> Si pagaste $45.000 y por participación del Hub el precio final queda en $39.000, la diferencia de $6.000 queda a tu favor.
           </p>
         </section>
 
@@ -70,11 +72,11 @@ export default async function PublicSalesProposalPage({ params }: { params: Prom
               <textarea name="notes" placeholder="Observaciones" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
               <button className="rounded-2xl bg-[#B45309] px-5 py-3 font-black text-white">Acepto participar</button>
             </form>
-            <form action={respondSalesProposalAction} className="rounded-3xl border border-[#f3d2a5] p-5">
+            <form id="no-participo" action={respondSalesProposalAction} className="rounded-3xl border border-[#f3d2a5] p-5">
               <input type="hidden" name="proposalId" value={proposal.id} />
               <input type="hidden" name="responseStatus" value="No aceptó" />
               <input name="customerName" placeholder="Nombre (opcional)" className="mb-3 w-full rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-              <button className="w-full rounded-2xl border border-[#B45309] px-5 py-3 font-black text-[#B45309]">No participo</button>
+              <button className="w-full rounded-2xl border border-[#B45309] px-5 py-3 font-black text-[#B45309]">No participo esta vez</button>
             </form>
           </div>
         </section>

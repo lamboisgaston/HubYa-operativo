@@ -42,7 +42,7 @@ export default async function OperativoPage({ searchParams }: { searchParams?: P
             </div>
             <div className="grid gap-5 md:grid-cols-3">
               {ramas.map((rama) => (
-                <Link key={rama.slug} href={`/operativo?rama=${rama.slug}`} className="group rounded-[2rem] border border-[#DDE7E2] bg-white p-7 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg" style={{ borderColor: `${rama.color}33` }}>
+                <Link key={rama.slug} href={rama.slug === "ventas" ? "/operativo/ventas" : `/operativo?rama=${rama.slug}`} className="group rounded-[2rem] border border-[#DDE7E2] bg-white p-7 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg" style={{ borderColor: `${rama.color}33` }}>
                   <span className="text-4xl" aria-hidden>{rama.icon}</span>
                   <h3 className="mt-5 text-2xl font-black" style={{ color: rama.color }}>{rama.name}</h3>
                   <p className="mt-3 text-sm font-semibold leading-6 text-[#53685C]">{rama.description}</p>
