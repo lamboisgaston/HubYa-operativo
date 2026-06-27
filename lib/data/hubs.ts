@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { HUB_CATEGORY_DEFAULT, type HubCategorySlug } from "@/lib/hubs/hubCategories";
-import { BRANCHES, BRANCH_DEFAULT, getBranchConfig, getDefaultCategoryForBranch, normalizeBranchSlug, type BranchConfig, type BranchSlug } from "@/lib/hubs/branches";
+import { type HubCategorySlug } from "@/lib/hubs/hubCategories";
+import { BRANCHES, getBranchConfig, getDefaultCategoryForBranch, normalizeBranchSlug, type BranchConfig, type BranchSlug } from "@/lib/hubs/branches";
 import { getHubCategoryConfig, normalizeHubCategory } from "@/lib/hubs/getHubCategoryConfig";
 
 export type HubEstado = "activo" | "pausado" | "inactivo";
@@ -30,7 +30,15 @@ export type NuevoHubDemandaInput = { nombre: string; zona: string; branchId?: Br
 type Store = { branches?: BranchConfig[]; hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[]; reportes?: ReporteHub[]; mensajes_operativos?: unknown[]; respuestas_operativas?: unknown[]; parameterResponses?: unknown[] };
 const DATA_FILE = path.join(process.cwd(), "data", "hubya-public.json");
 const now = new Date().toISOString();
-const seedHubs: Hub[] = ["Tipal", "Punto", "Praderas", "Valle Escondido", "Chacras de Santa María", "La Aguada", "Prado", "La Reserva"].map((zona, index) => ({ id: `hub-${index + 1}`, nombre: `Hub ${zona}`, slug: zona.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), zona, estado: "activo", branchId: BRANCH_DEFAULT, categoriaId: HUB_CATEGORY_DEFAULT, tipo: HUB_CATEGORY_DEFAULT, descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente, equipo disponible y trabajos programados sin exponer datos privados de clientes.`, rama: getBranchConfig(BRANCH_DEFAULT).name, equipoOperativo: "JardinerosYa01", moduloOperativo: "jardinerosya", parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, hubOperativo: [], nivelEstabilidad: 8, activo: true, trabajosRealizados: 0, ultimaActividad: now, createdAt: now, updatedAt: now }));
+const seedHubDefinitions: Array<{ zona: string; branchId: BranchSlug; categoriaId: HubCategorySlug; equipoOperativo: string; moduloOperativo: ModuloOperativoHub }> = [
+  ...["El Tipal", "Praderas", "Prado", "Punto"].map((zona) => ({ zona, branchId: "mantenimiento-verde" as const, categoriaId: "mantenimiento-espacios-verdes" as const, equipoOperativo: "JardinerosYa01", moduloOperativo: "jardinerosya" as const })),
+  ...["Consorcios", "Comercios", "Industrias", "Mineras"].map((zona) => ({ zona, branchId: "control-de-plagas" as const, categoriaId: "fumigacion-control-plagas" as const, equipoOperativo: "FumigadoresYa01", moduloOperativo: "fumigadoresya" as const })),
+  ...["Huevos", "Verduras", "Productos recurrentes"].map((zona) => ({ zona, branchId: "ventas" as const, categoriaId: "reparto-recurrente" as const, equipoOperativo: "ComerciarYa01", moduloOperativo: "comerciarya" as const })),
+];
+const seedHubs: Hub[] = seedHubDefinitions.map(({ zona, branchId, categoriaId, equipoOperativo, moduloOperativo }, index) => {
+  const branch = getBranchConfig(branchId);
+  return { id: `hub-${index + 1}`, nombre: `Hub ${zona}`, slug: slugHub(zona), zona, estado: "activo", branchId, categoriaId, tipo: categoriaId, descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente y trabajos programados sin exponer datos privados.`, rama: branch.name, equipoOperativo, moduloOperativo, parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, hubOperativo: [], nivelEstabilidad: 8, activo: true, trabajosRealizados: 0, ultimaActividad: now, createdAt: now, updatedAt: now };
+});
 const seedClientes: Cliente[] = Array.from({ length: 9 }, (_, index) => ({ id: `cliente-tipal-${index + 1}`, nombre: `Cliente ${index + 1}`, email: "", whatsapp: "", referencia: "Alta inicial", tarifaCliente: "sin_tarifa", hubId: "hub-1", tipoDestino: "cliente", estado: "activo", createdAt: now, updatedAt: now }));
 const servicioBasePorHub = [
   { nombre: "Mantenimiento de espacios verdes", descripcion: "Demanda recurrente de corte, limpieza y mantenimiento de jardines." },
