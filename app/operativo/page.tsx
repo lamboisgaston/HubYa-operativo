@@ -2,9 +2,16 @@ import Link from "next/link";
 import { getOperativoPorRamas } from "@/lib/data/hubs";
 import { HubyaLogo } from "@/components/HubyaLogo";
 
-export default async function OperativoPage({ searchParams }: { searchParams: Promise<{ rama?: string }> }) {
-  const [{ rama: ramaSeleccionada }, ramas] = await Promise.all([searchParams, getOperativoPorRamas()]);
-  const ramaActiva = ramas.find((rama) => rama.slug === ramaSeleccionada);
+type OperativoSearchParams = { rama?: string | string[] };
+
+export default async function OperativoPage({ searchParams }: { searchParams?: Promise<OperativoSearchParams> }) {
+  const params = await Promise.resolve(searchParams ?? {});
+  const ramaSeleccionada = typeof params?.rama === "string" ? params.rama : undefined;
+  const ramas = (await getOperativoPorRamas()) ?? [];
+
+  const ramaActiva = ramaSeleccionada
+    ? ramas.find((rama) => rama.slug === ramaSeleccionada)
+    : undefined;
 
   return (
     <main className="min-h-screen bg-[#F8FAF7] px-4 py-6 text-[#0B1726] sm:px-6 lg:px-8">

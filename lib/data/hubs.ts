@@ -181,7 +181,14 @@ export async function deleteContacto(id: string) { const store = await readStore
 export async function updatePublicStore(mutator: (store: Store) => Store | Promise<Store>) { const store = await readStore(); const next = await mutator(store); await saveStore(next); return next; }
 export async function getPublicStore() { return readStore(); }
 export async function getBranches() { return BRANCHES; }
-export async function getOperativoPorRamas() { const hubs = await getHubsOperativos(); return BRANCHES.map((branch) => ({ ...branch, hubs: hubs.filter((hub) => hub.branchId === branch.slug) })); }
+export async function getOperativoPorRamas() {
+  try {
+    const hubs = (await getHubsOperativos()) ?? [];
+    return BRANCHES.map((branch) => ({ ...branch, hubs: hubs.filter((hub) => hub.branchId === branch.slug) }));
+  } catch {
+    return [];
+  }
+}
 export async function getClientesPorHub(hubId: string) { return getClientesByHubId(hubId); }
 export async function getReportesPorHub(hubId: string) { const store = await readStore(); return (store.reportes || []).filter((reporte) => reporte.hubId === hubId || reporte.hub === hubId); }
 export async function getHubsOperativos(): Promise<HubOperativo[]> {
