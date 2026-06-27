@@ -6,7 +6,10 @@ export default async function HubEntradaPage({ params }: { params: Promise<{ hub
   const { hubId } = await params;
   const hub = await getHubOr404(hubId);
 
-  const acciones = [
+  const acciones = hub.branchId === "ventas" ? [
+    { label: "Propuestas comerciales", href: `/operativo/hubs/${hub.slug}/ventas`, helper: "Crear propuesta, compartir link, registrar respuestas y organizar entrega." },
+    { label: "Ver usuarios", href: `/operativo/hubs/${hub.slug}/usuarios`, helper: "Integrantes/clientes del Hub que reciben propuestas." },
+  ] : [
     { label: "Ver usuarios", href: `/operativo/hubs/${hub.slug}/usuarios`, helper: "Personas, clientes o contactos del Hub." },
     { label: "Agregar usuario", href: `/operativo/hubs/${hub.slug}/usuarios#agregar`, helper: "Cargar una persona nueva en este Hub." },
     { label: "Generar reporte", href: `/operativo/hubs/${hub.slug}/reporte`, helper: "Crear un reporte simple de trabajo." },
