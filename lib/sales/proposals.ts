@@ -7,7 +7,7 @@ export type SalesProposalPricingMode = "automatic" | "manual";
 
 export type SalesProposalPriceScale = {
   minParticipants: number;
-  maxParticipants: number;
+  maxParticipants: number | null;
   price: number;
 };
 
@@ -58,6 +58,7 @@ const DEFAULT_PRICE_SCALES: SalesProposalPriceScale[] = [
   { minParticipants: 1, maxParticipants: 5, price: 45000 },
   { minParticipants: 6, maxParticipants: 10, price: 42000 },
   { minParticipants: 11, maxParticipants: 30, price: 39000 },
+  { minParticipants: 31, maxParticipants: null, price: 37000 },
 ];
 
 const token = () => Math.random().toString(36).slice(2, 10);
@@ -74,20 +75,20 @@ function normalizePricingMode(value: FormDataEntryValue | string | null | undefi
 }
 
 function parsePriceScales(formData: FormData, fallbackPrice: number): SalesProposalPriceScale[] {
-  const scales = [0, 1, 2].map((index) => ({
+  const scales = [0, 1, 2, 3].map((index) => ({
     minParticipants: count(formData.get(`scale${index}Min`)),
-    maxParticipants: count(formData.get(`scale${index}Max`)),
+    maxParticipants: text(formData.get(`scale${index}Max`)) ? count(formData.get(`scale${index}Max`)) : null,
     price: money(formData.get(`scale${index}Price`)),
-  })).filter((scale) => scale.minParticipants > 0 && scale.maxParticipants >= scale.minParticipants && scale.price > 0);
+  })).filter((scale) => scale.minParticipants > 0 && (scale.maxParticipants === null || scale.maxParticipants >= scale.minParticipants) && scale.price > 0);
   if (scales.length > 0) return scales.sort((a, b) => a.minParticipants - b.minParticipants);
-  return fallbackPrice > 0 ? [{ minParticipants: 1, maxParticipants: 9999, price: fallbackPrice }] : DEFAULT_PRICE_SCALES;
+  return fallbackPrice > 0 ? [{ minParticipants: 1, maxParticipants: null, price: fallbackPrice }] : DEFAULT_PRICE_SCALES;
 }
 
 function normalizePriceScales(proposal: Partial<SalesProposal>): SalesProposalPriceScale[] {
-  const scales = (proposal.priceScales || []).filter((scale) => scale.minParticipants > 0 && scale.maxParticipants >= scale.minParticipants && scale.price > 0);
+  const scales = (proposal.priceScales || []).map((scale) => ({ ...scale, maxParticipants: scale.maxParticipants ?? null })).filter((scale) => scale.minParticipants > 0 && (scale.maxParticipants === null || scale.maxParticipants >= scale.minParticipants) && scale.price > 0);
   if (scales.length > 0) return scales.sort((a, b) => a.minParticipants - b.minParticipants);
   const fallbackPrice = proposal.price || 0;
-  return fallbackPrice > 0 ? [{ minParticipants: 1, maxParticipants: 9999, price: fallbackPrice }] : DEFAULT_PRICE_SCALES;
+  return fallbackPrice > 0 ? [{ minParticipants: 1, maxParticipants: null, price: fallbackPrice }] : DEFAULT_PRICE_SCALES;
 }
 
 
@@ -96,7 +97,7 @@ export function getFinalPriceForParticipants(scales: SalesProposalPriceScale[], 
   const firstScale = normalized[0];
   if (!firstScale) return 0;
   if (participants < firstScale.minParticipants) return firstScale.price;
-  return normalized.find((scale) => participants >= scale.minParticipants && participants <= scale.maxParticipants)?.price || normalized.at(-1)?.price || 0;
+  return normalized.find((scale) => participants >= scale.minParticipants && (scale.maxParticipants === null || participants <= scale.maxParticipants))?.price || normalized.at(-1)?.price || 0;
 }
 
 function normalizeProposal(proposal: SalesProposal, responses: SalesProposalResponse[] = []): SalesProposal {
@@ -138,7 +139,8 @@ export async function getSalesProposalByToken(publicLink: string) {
   const store = withSales(await readStore());
   const proposal = store.salesProposals!.find((item) => item.publicLink === publicLink || item.id === publicLink) || null;
   if (!proposal) return null;
-  const hub = store.hubs.find((item) => item.id === proposal.hubId) || null;
+  const hubBase = store.hubs.find((item) => item.id === proposal.hubId) || null;
+  const hub = hubBase ? { ...hubBase, clientesActivos: store.clientes.filter((cliente) => cliente.hubId === hubBase.id && cliente.estado === "activo").length } : null;
   const responses = store.salesProposalResponses!.filter((response) => response.proposalId === proposal.id);
   return { proposal: normalizeProposal(proposal, responses), hub, responses };
 }
