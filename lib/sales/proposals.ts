@@ -39,6 +39,8 @@ export type SalesProposal = {
   publicLink: string;
   createdAt: string;
   closedAt?: string;
+  targetCustomerIds?: string[];
+  sentCount?: number;
 };
 
 export type SalesProposalResponse = {
@@ -52,6 +54,7 @@ export type SalesProposalResponse = {
   responseStatus: SalesResponseStatus;
   quantity: number;
   deliveryAvailability: "Sí, voy a estar" | "No voy a estar" | "";
+  preferredDeliveryTime?: "Mañana" | "Mediodía" | "Tarde" | "Otro horario" | "";
   deliveryPreference: "" | "Dejar en portería / guardia" | "Dejar con vecino" | "Coordinar observación" | "Otra indicación";
   deliveryNotes: string;
   respondedAt: string;
@@ -199,14 +202,15 @@ export async function getSalesProposalByToken(publicLink: string) {
 export function summarizeSalesProposal(proposal: SalesProposal, responses: SalesProposalResponse[], clientes: Cliente[] = []) {
   const accepted = responses.filter(responseParticipates);
   const rejected = responses.filter(responseDoesNotParticipate);
-  const pendingCount = Math.max(0, clientes.filter((cliente) => cliente.hubId === proposal.hubId && cliente.estado === "activo").length - responses.length);
+  const destinatarios = proposal.targetCustomerIds?.length ? clientes.filter((cliente) => proposal.targetCustomerIds?.includes(cliente.id)) : clientes.filter((cliente) => cliente.hubId === proposal.hubId && cliente.estado === "activo");
+  const pendingCount = Math.max(0, (proposal.sentCount || destinatarios.length) - responses.length);
   const realAcceptedCount = accepted.length;
   const normalizedProposal = normalizeProposal(proposal, responses);
   const finalPrice = getFinalPriceForParticipants(normalizedProposal.priceScales, normalizedProposal.pricingParticipantsCount);
   const totalQuantity = accepted.reduce((sum, response) => sum + response.quantity, 0);
   const totalToCollect = accepted.reduce((sum, response) => sum + (response.quantity * finalPrice), 0);
   const respondedNames = new Set(responses.map((response) => response.customerName.trim().toLowerCase()).filter(Boolean));
-  const pending = clientes.filter((cliente) => cliente.hubId === proposal.hubId && cliente.estado === "activo" && !respondedNames.has(cliente.nombre.trim().toLowerCase()));
+  const pending = destinatarios.filter((cliente) => !respondedNames.has(cliente.nombre.trim().toLowerCase()));
   return { acceptedCount: realAcceptedCount, rejectedCount: rejected.length, pendingCount, totalQuantity, totalToCollect, acceptedParticipantsCount: realAcceptedCount, pricingParticipantsCount: normalizedProposal.pricingParticipantsCount, pricingMode: normalizedProposal.pricingMode, finalPrice, accepted, rejected, pending };
 }
 
@@ -259,11 +263,16 @@ export async function createSalesProposal(formData: FormData) {
     publicLink: token(),
     proposalGroupId: text(formData.get("proposalGroupId")) || id,
     createdAt: createdAt.toISOString(),
+    targetCustomerIds: formData.getAll("targetCustomerIds").map((value) => text(value)).filter(Boolean),
   };
   store.salesProposals = [proposal, ...store.salesProposals!];
   await saveStore(store);
   const clientesDelHub = store.clientes.filter((cliente) => cliente.hubId === hubId && cliente.estado === "activo");
-  await sendSalesProposalEmail(proposal, clientesDelHub, clientesDelHub.length);
+  const clientesSeleccionados = proposal.targetCustomerIds?.length ? clientesDelHub.filter((cliente) => proposal.targetCustomerIds?.includes(cliente.id)) : clientesDelHub;
+  proposal.sentCount = clientesSeleccionados.length;
+  store.salesProposals = store.salesProposals!.map((item) => item.id === proposal.id ? proposal : item);
+  await saveStore(store);
+  await sendSalesProposalEmail(proposal, clientesSeleccionados, clientesSeleccionados.length);
   revalidatePath(`/operativo/hubs/${hubId}/ventas`);
   revalidatePath(`/operativo?rama=ventas`);
   revalidatePath(`/operativo/ventas`);
@@ -323,6 +332,7 @@ export async function respondSalesProposal(formData: FormData) {
     responseStatus,
     quantity,
     deliveryAvailability: deliveryAvailability === "No voy a estar" ? "No voy a estar" : deliveryAvailability === "Sí, voy a estar" ? "Sí, voy a estar" : "",
+    preferredDeliveryTime: responseStatus === "Participa" ? (text(formData.get("preferredDeliveryTime")) as SalesProposalResponse["preferredDeliveryTime"]) : "",
     deliveryPreference: responseStatus === "Participa" ? (text(formData.get("deliveryPreference")) as SalesProposalResponse["deliveryPreference"]) : "",
     deliveryNotes: text(formData.get("deliveryNotes")),
     respondedAt: new Date().toISOString(),
@@ -336,15 +346,20 @@ export async function respondSalesProposal(formData: FormData) {
 
 
 export async function createGroupedSalesProposal(formData: FormData) {
+  const store = withSales(await readStore());
   const selectedHubIds = formData.getAll("targetHubIds").map((value) => text(value)).filter(Boolean);
   if (selectedHubIds.length === 0) return;
   const groupId = `sales-group-${Date.now()}`;
   for (const hubId of selectedHubIds) {
     const next = new FormData();
     for (const [key, value] of formData.entries()) {
-      if (key !== "targetHubIds") next.append(key, value);
+      if (key !== "targetHubIds" && key !== "targetCustomerIds") next.append(key, value);
     }
     next.set("hubId", hubId);
+    for (const customerId of formData.getAll("targetCustomerIds")) {
+      const cliente = store.clientes.find((item) => item.id === text(customerId));
+      if (cliente?.hubId === hubId) next.append("targetCustomerIds", cliente.id);
+    }
     next.set("proposalGroupId", groupId);
     await createSalesProposal(next);
   }

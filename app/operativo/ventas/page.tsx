@@ -19,14 +19,14 @@ export default async function VentasPage() {
       <header className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-[#B45309]">Rama Ventas / Huevos</p>
         <h1 className="mt-2 text-3xl font-black">Oferta grupal HUBYA</h1>
-        <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-[#7c5a34]">Metodología simple: crear oferta → cargar escala → elegir Hubs → enviar → juntar respuestas → cerrar.</p>
+        <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-[#7c5a34]">Metodología simple: parámetros → destinatarios → vista previa → envío → respuestas → lista de entrega.</p>
       </header>
 
-      <OfertaGrupalHubyaWizard hubs={hubs} action={createGroupedSalesProposalAction} />
+      <OfertaGrupalHubyaWizard hubs={hubs} clientes={clientes} action={createGroupedSalesProposalAction} />
 
       <section className="grid gap-4">
         <div className="rounded-[2rem] border border-[#f3d2a5] bg-white p-6 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#B45309]">Paso 5 — Recolectar respuestas</p>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#B45309]">Paso 4 — Respuestas</p>
           <h2 className="mt-1 text-2xl font-black">Ver respuestas</h2>
           <p className="mt-2 text-sm font-bold text-[#7c5a34]">Solo se muestran participación, no participación, pendientes y tiempo restante.</p>
         </div>
@@ -39,6 +39,7 @@ export default async function VentasPage() {
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#B45309]">{proposal.status}</p>
             <h3 className="mt-2 text-2xl font-black">{proposal.hub?.nombre || "Hub"}</h3>
             <div className="mt-4 grid gap-3 rounded-3xl bg-[#fff8ed] p-5 text-lg font-black">
+              <p>Enviados: {proposal.sentCount || proposal.hub?.clientesActivos || 0}</p>
               <p>Participan: {summary.acceptedCount}</p>
               <p>No participan: {summary.rejectedCount}</p>
               <p>Pendientes: {summary.pendingCount}</p>
@@ -49,15 +50,12 @@ export default async function VentasPage() {
             <form action={updateSalesProposalStatusAction} className="mt-4"><input type="hidden" name="proposalId" value={proposal.id} /><button name="status" value="Cerrada" className="rounded-2xl bg-[#B45309] px-5 py-3 font-black text-white">Cerrar oferta</button></form>
 
             <section className="mt-5 rounded-3xl border border-[#f3d2a5] p-5">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#B45309]">Paso 6 — Cierre</p>
-              <h4 className="mt-1 text-xl font-black">Precio final por escala</h4>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <p className="font-black">Participantes reales:<br /><span className="text-2xl">{summary.acceptedParticipantsCount}</span></p>
-                <p className="font-black">Precio aplicado:<br />{formatCurrency(summary.finalPrice)}</p>
-                <p className="font-black">Importe inicial del link de pago:<br />{formatCurrency(paidLinkPrice)}</p>
-                <p className="font-black">Diferencia a informar si corresponde:<br />{formatCurrency(difference)}</p>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#B45309]">Paso 5 — Lista de entrega</p>
+              <h4 className="mt-1 text-xl font-black">Hoja de ruta — {proposal.deliveryDay}</h4>
+              <div className="mt-4 grid gap-2 text-sm font-bold text-[#7c5a34]">
+                {summary.accepted.length === 0 ? <p>Cuando haya participantes, acá queda la lista clara de reparto.</p> : summary.accepted.map((item, index) => <div key={item.id} className="rounded-2xl bg-[#fff8ed] p-4 text-[#2b1705]"><p className="font-black">{index + 1}. {item.customerName}</p><p>{proposal.hub?.nombre || "Hub"}</p><p>{proposal.format} de {proposal.productName.toLowerCase()} · Cantidad: {item.quantity}</p><p>Dirección: {item.address || "pendiente"}</p><p>Horario: {item.preferredDeliveryTime || "sin definir"}</p><p>Teléfono: {item.phone || "pendiente"}</p><p>Observación: {item.deliveryNotes || item.deliveryPreference || "sin observación"}</p><p>Estado: {item.responseStatus} · Pago: control manual</p></div>)}
               </div>
-              <p className="mt-4 rounded-2xl bg-[#fff8ed] p-4 text-sm font-bold text-[#7c5a34]">La diferencia a favor se informa en ficha física junto con la mercadería. El control real del pago queda en Mercado Pago.</p>
+              <p className="mt-4 rounded-2xl bg-[#fff8ed] p-4 text-sm font-bold text-[#7c5a34]">Filtros operativos previstos: Hub, mañana/mediodía/tarde, participa/no participa/pendiente y pago manual. Precio aplicado: {formatCurrency(summary.finalPrice)}. Diferencia contra link: {formatCurrency(difference)}.</p>
             </section>
           </article>;
         })}
