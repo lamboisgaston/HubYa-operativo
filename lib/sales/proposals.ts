@@ -78,8 +78,7 @@ export function summarizeSalesProposal(proposal: SalesProposal, responses: Sales
   return { acceptedCount: accepted.length, rejectedCount: rejected.length, pendingCount, totalQuantity, totalToCollect, accepted, rejected, pending };
 }
 
-export async function createSalesProposalAction(formData: FormData) {
-  "use server";
+export async function createSalesProposal(formData: FormData) {
   const store = withSales(await readStore());
   const hubId = text(formData.get("hubId"));
   const id = `sales-proposal-${Date.now()}`;
@@ -107,8 +106,7 @@ export async function createSalesProposalAction(formData: FormData) {
   revalidatePath(`/operativo?rama=ventas`);
 }
 
-export async function updateSalesProposalStatusAction(formData: FormData) {
-  "use server";
+export async function updateSalesProposalStatus(formData: FormData) {
   const store = withSales(await readStore());
   const proposalId = text(formData.get("proposalId"));
   const status = text(formData.get("status")) as SalesProposalStatus;
@@ -122,8 +120,7 @@ export async function updateSalesProposalStatusAction(formData: FormData) {
   if (hubId) revalidatePath(`/operativo/hubs/${hubId}/ventas`);
 }
 
-export async function respondSalesProposalAction(formData: FormData) {
-  "use server";
+export async function respondSalesProposal(formData: FormData) {
   const store = withSales(await readStore());
   const proposalId = text(formData.get("proposalId"));
   const proposal = store.salesProposals!.find((item) => item.id === proposalId);
