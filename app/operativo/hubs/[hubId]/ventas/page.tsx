@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getClientesByHubId } from "@/lib/data/hubs";
 import { getHubOr404 } from "../utils";
 import { formatCurrency, getSalesProposalsByHub, summarizeSalesProposal } from "@/lib/sales/proposals";
-import { createSalesProposalAction, updateSalesProposalStatusAction } from "./actions";
+import { createSalesProposalAction, updateSalesProposalPricingAction, updateSalesProposalStatusAction } from "./actions";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -33,10 +33,18 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
             <input name="title" placeholder="Título: Media caja de huevos" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="productName" defaultValue="Huevos" placeholder="Producto" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="format" defaultValue="Media caja" placeholder="Formato" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
-            <input name="price" defaultValue="45000" placeholder="Precio" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <input name="price" defaultValue="45000" placeholder="Precio base / respaldo" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="deliveryDay" defaultValue="Miércoles" placeholder="Día de entrega" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="deliveryMode" defaultValue="Envío a domicilio" placeholder="Modalidad de envío" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
             <input name="responseDeadline" type="date" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold" />
+            <div className="grid gap-2 rounded-2xl border border-[#f3d2a5] bg-[#fff8ed] p-4 md:col-span-2">
+              <p className="text-sm font-black text-[#B45309]">Escala de precios por participantes</p>
+              <div className="grid gap-2 md:grid-cols-3">
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34]">1 a 5<input type="hidden" name="scale0Min" value="1" /><input type="hidden" name="scale0Max" value="5" /><input name="scale0Price" defaultValue="45000" className="rounded-xl border border-[#f3d2a5] px-3 py-2 text-base text-[#2b1705]" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34]">6 a 10<input type="hidden" name="scale1Min" value="6" /><input type="hidden" name="scale1Max" value="10" /><input name="scale1Price" defaultValue="42000" className="rounded-xl border border-[#f3d2a5] px-3 py-2 text-base text-[#2b1705]" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34]">11 a 30<input type="hidden" name="scale2Min" value="11" /><input type="hidden" name="scale2Max" value="30" /><input name="scale2Price" defaultValue="39000" className="rounded-xl border border-[#f3d2a5] px-3 py-2 text-base text-[#2b1705]" /></label>
+              </div>
+            </div>
             <textarea name="notes" placeholder="Observaciones" className="rounded-2xl border border-[#f3d2a5] px-4 py-3 font-bold md:col-span-2" />
             <button className="rounded-2xl bg-[#B45309] px-5 py-3 font-black text-white md:col-span-2">Generar link de propuesta</button>
           </form>
@@ -55,9 +63,20 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
                   <p className="mt-2 break-all rounded-2xl bg-[#fff8ed] p-3 text-sm font-black">Link compartible: {link}</p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {[["Aceptaron", summary.acceptedCount], ["No aceptaron", summary.rejectedCount], ["Pendientes", summary.pendingCount], ["Total vendido", `${summary.totalQuantity} ${proposal.format}`], ["Total a cobrar", formatCurrency(summary.totalToCollect)]].map(([label, value]) => <div key={label} className="rounded-2xl bg-[#fff8ed] p-4"><p className="text-xs font-black uppercase text-[#B45309]">{label}</p><p className="text-xl font-black">{value}</p></div>)}
+                  {[["Aceptaron", summary.acceptedCount], ["No aceptaron", summary.rejectedCount], ["Pendientes", summary.pendingCount], ["Participantes para precio", summary.pricingParticipantsCount], ["Precio final por escala", formatCurrency(summary.finalPrice)], ["Total vendido", `${summary.totalQuantity} ${proposal.format}`], ["Total a cobrar", formatCurrency(summary.totalToCollect)]].map(([label, value]) => <div key={label} className="rounded-2xl bg-[#fff8ed] p-4"><p className="text-xs font-black uppercase text-[#B45309]">{label}</p><p className="text-xl font-black">{value}</p></div>)}
                 </div>
               </div>
+              
+              <form action={updateSalesProposalPricingAction} className="mt-4 grid gap-3 rounded-2xl border border-[#f3d2a5] bg-[#fff8ed] p-4 md:grid-cols-4">
+                <input type="hidden" name="proposalId" value={proposal.id} />
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34] md:col-span-1">Participantes reales<input readOnly value={summary.acceptedParticipantsCount} className="rounded-xl border border-[#f3d2a5] bg-white px-3 py-2 text-base text-[#2b1705]" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34] md:col-span-1">Participantes para calcular precio<input name="pricingParticipantsCount" type="number" min="0" defaultValue={summary.pricingParticipantsCount} className="rounded-xl border border-[#f3d2a5] bg-white px-3 py-2 text-base text-[#2b1705]" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34] md:col-span-1">Modo<select name="pricingMode" defaultValue={summary.pricingMode} className="rounded-xl border border-[#f3d2a5] bg-white px-3 py-2 text-base text-[#2b1705]"><option value="automatic">Automático</option><option value="manual">Manual</option></select></label>
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34] md:col-span-1">Operador<input name="pricingUpdatedBy" defaultValue={proposal.pricingUpdatedBy || "Operador"} className="rounded-xl border border-[#f3d2a5] bg-white px-3 py-2 text-base text-[#2b1705]" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase text-[#7c5a34] md:col-span-3">Motivo del ajuste<input name="pricingOverrideReason" defaultValue={proposal.pricingOverrideReason} placeholder="Simulación, negociación, cierre manual o corrección comercial" className="rounded-xl border border-[#f3d2a5] bg-white px-3 py-2 text-base text-[#2b1705]" /></label>
+                <button className="rounded-xl bg-[#B45309] px-4 py-3 text-sm font-black text-white">Actualizar precio</button>
+                {summary.pricingMode === "manual" && <p className="text-sm font-black text-[#B45309] md:col-span-4">El precio está calculado con una cantidad editada manualmente.</p>}
+              </form>
               <div className="mt-4 flex flex-wrap gap-2 text-sm font-black">
                 <a href={link} className="rounded-xl bg-[#B45309] px-4 py-3 text-white">Abrir / copiar link</a>
                 <form action={updateSalesProposalStatusAction}><input type="hidden" name="proposalId" value={proposal.id} /><button name="status" value="Cerrada" className="rounded-xl border border-[#f3d2a5] px-4 py-3">Cerrar propuesta</button></form>
@@ -65,11 +84,11 @@ export default async function VentasHubPage({ params }: { params: Promise<{ hubI
                 <form action={updateSalesProposalStatusAction}><input type="hidden" name="proposalId" value={proposal.id} /><button name="status" value="Entregada" className="rounded-xl border border-[#f3d2a5] px-4 py-3">Marcar entregado</button></form>
               </div>
               <div className="mt-5 grid gap-3 lg:grid-cols-3">
-                <details className="rounded-2xl border border-[#f3d2a5] p-4" open><summary className="cursor-pointer font-black">Ver aceptados</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.accepted.length === 0 ? <p>Sin aceptaciones todavía.</p> : summary.accepted.map((item) => <p key={item.id}>{item.customerName} · {item.quantity} · {formatCurrency(item.total)} · {item.address || "Sin dirección"}</p>)}</div></details>
+                <details className="rounded-2xl border border-[#f3d2a5] p-4" open><summary className="cursor-pointer font-black">Ver aceptados</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.accepted.length === 0 ? <p>Sin aceptaciones todavía.</p> : summary.accepted.map((item) => <p key={item.id}>{item.customerName} · {item.quantity} · {formatCurrency(item.quantity * summary.finalPrice)} · {item.address || "Sin dirección"}</p>)}</div></details>
                 <details className="rounded-2xl border border-[#f3d2a5] p-4"><summary className="cursor-pointer font-black">Ver rechazados</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.rejected.length === 0 ? <p>Sin rechazos todavía.</p> : summary.rejected.map((item) => <p key={item.id}>{item.customerName}</p>)}</div></details>
                 <details className="rounded-2xl border border-[#f3d2a5] p-4"><summary className="cursor-pointer font-black">Ver pendientes</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.pending.length === 0 ? <p>No quedan integrantes pendientes.</p> : summary.pending.map((item) => <p key={item.id}>{item.nombre} · {item.whatsapp || "Sin teléfono"}</p>)}</div></details>
               </div>
-              <details className="mt-3 rounded-2xl bg-[#fff8ed] p-4"><summary className="cursor-pointer text-sm font-black">Generar hoja de reparto</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.accepted.length === 0 ? <p>Cuando haya aceptados, acá queda la hoja simple de reparto.</p> : summary.accepted.map((item, index) => <p key={item.id}>{index + 1}. {item.customerName} — {item.address || "Dirección pendiente"} — {item.quantity} {proposal.format} — Cobrar {formatCurrency(item.total)}</p>)}</div></details>
+              <details className="mt-3 rounded-2xl bg-[#fff8ed] p-4"><summary className="cursor-pointer text-sm font-black">Generar hoja de reparto</summary><div className="mt-3 grid gap-2 text-sm font-bold text-[#7c5a34]">{summary.accepted.length === 0 ? <p>Cuando haya aceptados, acá queda la hoja simple de reparto.</p> : summary.accepted.map((item, index) => <p key={item.id}>{index + 1}. {item.customerName} — {item.address || "Dirección pendiente"} — {item.quantity} {proposal.format} — Cobrar {formatCurrency(item.quantity * summary.finalPrice)}</p>)}</div></details>
             </article>;
           })}
         </section>
