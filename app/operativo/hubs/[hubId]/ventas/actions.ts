@@ -1,19 +1,38 @@
 "use server";
 
-import { createGroupedSalesProposal, createSalesProposal, updateSalesProposalPricing, updateSalesProposalStatus } from "@/lib/sales/proposals";
+import { revalidatePath } from "next/cache";
+import {
+  createGroupedSalesProposalData,
+  createSalesProposalData,
+  updateSalesProposalPricingData,
+  updateSalesProposalStatusData,
+} from "@/lib/sales/proposals-store";
+
+function revalidateSalesPaths(hubId?: string) {
+  if (hubId) revalidatePath(`/operativo/hubs/${hubId}/ventas`);
+  revalidatePath("/operativo?rama=ventas");
+  revalidatePath("/operativo/ventas");
+}
 
 export async function createSalesProposalAction(formData: FormData) {
-  await createSalesProposal(formData);
+  const result = await createSalesProposalData(formData);
+  revalidateSalesPaths(result.hubId);
 }
 
 export async function createGroupedSalesProposalAction(formData: FormData) {
-  await createGroupedSalesProposal(formData);
+  const result = await createGroupedSalesProposalData(formData);
+  for (const proposal of result?.proposals || []) {
+    revalidateSalesPaths(proposal.hubId);
+  }
+  if (!result?.proposals?.length) revalidateSalesPaths();
 }
 
 export async function updateSalesProposalStatusAction(formData: FormData) {
-  await updateSalesProposalStatus(formData);
+  const result = await updateSalesProposalStatusData(formData);
+  revalidateSalesPaths(result.hubId);
 }
 
 export async function updateSalesProposalPricingAction(formData: FormData) {
-  await updateSalesProposalPricing(formData);
+  const result = await updateSalesProposalPricingData(formData);
+  revalidateSalesPaths(result.hubId);
 }

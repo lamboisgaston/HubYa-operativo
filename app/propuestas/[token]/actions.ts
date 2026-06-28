@@ -1,7 +1,12 @@
 "use server";
 
-import { respondSalesProposal } from "@/lib/sales/proposals";
+import { revalidatePath } from "next/cache";
+import { addSalesProposalResponseData } from "@/lib/sales/proposals-store";
 
 export async function respondSalesProposalAction(formData: FormData) {
-  await respondSalesProposal(formData);
+  const result = await addSalesProposalResponseData(formData);
+  if (!result) return;
+  revalidatePath(`/propuestas/${result.publicLink}`);
+  revalidatePath(`/operativo/hubs/${result.hubId}/ventas`);
+  revalidatePath("/operativo/ventas");
 }
