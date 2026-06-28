@@ -1,5 +1,6 @@
 import { getHubs, readStore, saveStore, type Cliente } from "@/lib/data/hubs";
 import { mensajeErrorResend, obtenerRemitenteResend, obtenerReplyToResend } from "@/lib/email/resend";
+import { formatCurrency } from "@/lib/sales/format";
 
 export type SalesProposalStatus = "Borrador" | "Abierta" | "Cerrada" | "Confirmada" | "Entregada" | "Cancelada";
 export type SalesResponseStatus = "Pendiente" | "Participa" | "No participa";
@@ -166,10 +167,6 @@ function withSales(store: Awaited<ReturnType<typeof readStore>>): SalesStore {
   const responses = (raw.salesProposalResponses || []) as SalesProposalResponse[];
   const proposals = ((raw.salesProposals || []) as SalesProposal[]).map((proposal) => normalizeProposal(proposal, responses.filter((response) => response.proposalId === proposal.id)));
   return { ...store, salesProposals: proposals, salesProposalResponses: responses };
-}
-
-export function formatCurrency(value: number) {
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(value || 0);
 }
 
 export async function getSalesDashboardData() {

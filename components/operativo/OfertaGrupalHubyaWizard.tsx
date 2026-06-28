@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Cliente, HubPublico } from "@/lib/data/hubs";
-import { formatCurrency } from "@/lib/sales/proposals";
+import { formatCurrency } from "@/lib/sales/format";
 
 type Props = { hubs: HubPublico[]; clientes: Cliente[]; action: (formData: FormData) => void | Promise<void> };
 
