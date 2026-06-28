@@ -16,6 +16,8 @@ export type ConsultaHubPersistida = {
   estado: EstadoConsultaHub;
 };
 
+export type RespuestaConsultaRegistrada = { consulta: ConsultaHubPersistida; cliente: ClienteConsultaHub; opcion: string; respondidoEn: string };
+
 const CONSULTAS_FILE = path.join(process.cwd(), "data", "consultas-hub.json");
 const OPCIONES_CANONICAS: Record<string, string> = { si: "Sí", no: "No", "puede-ser": "Puede ser" };
 
@@ -62,11 +64,11 @@ export async function upsertConsultaPersistida(consulta: ConsultaHubPersistida) 
   return consulta;
 }
 
-export async function registrarRespuestaConsulta(token: string, respuesta: string) {
+export async function registrarRespuestaConsulta(token: string, respuesta: string): Promise<RespuestaConsultaRegistrada | null> {
   const consultas = await leerConsultasPersistidas();
   const opcion = normalizarRespuestaConsulta(respuesta);
   const respondidoEn = new Date().toISOString();
-  let resultado: { consulta: ConsultaHubPersistida; cliente: ClienteConsultaHub; opcion: string; respondidoEn: string } | null = null;
+  let resultado: RespuestaConsultaRegistrada | null = null;
 
   const actualizadas = consultas.map((consulta) => {
     const cliente = consulta.clientesDestinatarios.find((destinatario) => destinatario.token === token);

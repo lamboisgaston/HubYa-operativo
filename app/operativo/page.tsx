@@ -2,11 +2,12 @@ import Link from "next/link";
 import { getOperativoPorRamas } from "@/lib/data/hubs";
 import { HubyaLogo } from "@/components/HubyaLogo";
 
-type OperativoSearchParams = { rama?: string | string[] };
+type OperativoSearchParams = Record<string, string | string[] | undefined>;
 
-export default async function OperativoPage({ searchParams }: { searchParams?: Promise<OperativoSearchParams> }) {
-  const params = await Promise.resolve(searchParams ?? {});
-  const ramaSeleccionada = typeof params?.rama === "string" ? params.rama : undefined;
+export default async function OperativoPage({ searchParams }: { searchParams?: Promise<OperativoSearchParams> | OperativoSearchParams }) {
+  const params: OperativoSearchParams = (await Promise.resolve(searchParams)) ?? {};
+  const ramaParam = params.rama;
+  const ramaSeleccionada = typeof ramaParam === "string" ? ramaParam : Array.isArray(ramaParam) ? ramaParam[0] : undefined;
   const ramas = (await getOperativoPorRamas()) ?? [];
 
   const ramaActiva = ramaSeleccionada
