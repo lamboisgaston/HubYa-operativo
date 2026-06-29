@@ -1,5 +1,3 @@
-import OperativoPage from "./operativo/page";
+import WebPublicaPage from "./web-publica/page";
 
-export default function Home() {
-  return <OperativoPage />;
-}
+export default WebPublicaPage;
