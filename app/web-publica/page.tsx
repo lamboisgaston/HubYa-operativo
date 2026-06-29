@@ -79,6 +79,9 @@ export default async function WebPublicaPage() {
               <a href="mailto:contact@hubya.tech" className="hidden rounded-full border border-white/10 px-4 py-2 text-sm font-black text-white/70 hover:bg-white/10 sm:inline-flex">
                 contact@hubya.tech
               </a>
+              <Link href="/membresia" className="rounded-full border border-[#22C7E8]/40 bg-[#22C7E8]/10 px-4 py-2 text-sm font-black text-[#22C7E8]">
+                Membresía
+              </Link>
               <Link href="/operativo" className="rounded-full bg-white px-4 py-2 text-sm font-black text-[#06110D]">
                 Dashboard
               </Link>
@@ -103,6 +106,9 @@ export default async function WebPublicaPage() {
                 <a href="#hubs" className="rounded-2xl bg-[#22C7E8] px-5 py-3 text-sm font-black text-[#06110D]">
                   Ver Hubs operativos
                 </a>
+                <Link href="/membresia" className="rounded-2xl border border-[#22C7E8]/40 bg-[#22C7E8]/10 px-5 py-3 text-sm font-black text-[#22C7E8]">
+                  Comprar membresía
+                </Link>
                 <a href="#paises" className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-black text-white">
                   Cambiar país
                 </a>

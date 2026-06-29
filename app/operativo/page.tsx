@@ -33,6 +33,9 @@ export default async function OperativoPage({ searchParams }: { searchParams?: P
             <Link href="/web-publica" className="rounded-full border border-[#0B1726] bg-[#0B1726] px-4 py-2 text-white shadow-sm transition hover:bg-[#1E8F4D]">
               Ver web principal
             </Link>
+            <Link href="/membresia" className="rounded-full border border-[#22C7E8] bg-[#22C7E8] px-4 py-2 text-[#06110D] shadow-sm transition hover:bg-white">
+              Membresía HUBYA
+            </Link>
             {ramaActiva && <span className="rounded-full bg-white px-4 py-2">→ {ramaActiva.name}</span>}
           </nav>
         </header>
