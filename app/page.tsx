@@ -1,3 +1,1 @@
-import WebPublicaPage from "./web-publica/page";
-
-export default WebPublicaPage;
+export { default } from './web-publica/page'
