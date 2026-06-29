@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getOperativoPorRamas } from "@/lib/data/hubs";
-import { HubyaLogo } from "@/components/HubyaLogo";
+import { HubyaBrandLogo } from "@/components/HubyaBrandLogo";
 
 type OperativoSearchParams = Record<string, string | string[] | undefined>;
 
@@ -15,13 +15,13 @@ export default async function OperativoPage({ searchParams }: { searchParams?: P
     : undefined;
 
   return (
-    <main className="min-h-screen bg-[#F8FAF7] px-4 py-6 text-[#0B1726] sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.10),transparent_34%),#F8FAF7] px-4 py-6 text-[#0B1726] sm:px-6 lg:px-8">
       <section className="mx-auto flex max-w-5xl flex-col gap-6">
-        <header className="rounded-[2rem] border border-[#DDE7E2] bg-white p-6 shadow-sm">
+        <header className="rounded-[2rem] border border-violet-200/70 bg-white/95 p-6 shadow-sm shadow-violet-950/5">
           <div className="flex items-center gap-4">
-            <HubyaLogo className="h-14 w-auto" />
+            <HubyaBrandLogo markOnly className="h-14 w-14" />
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1E8F4D]">HUBYA Operativo</p>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-700">HUBYA Operativo</p>
               <h1 className="text-3xl font-black sm:text-4xl">Un paso por vez</h1>
             </div>
           </div>

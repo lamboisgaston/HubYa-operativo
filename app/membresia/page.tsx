@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { HubyaLogo } from "@/components/HubyaLogo";
+import { HubyaBrandLogo } from "@/components/HubyaBrandLogo";
 
 const beneficios = [
   {
@@ -28,7 +28,7 @@ export default function MembresiaPage() {
       <section className="mx-auto max-w-7xl">
         <header className="flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.05] px-4 py-3 shadow-2xl shadow-black/30 backdrop-blur-xl">
           <Link href="/" className="flex items-center gap-3" aria-label="HUBYA web pública">
-            <HubyaLogo className="h-10 w-auto" />
+            <HubyaBrandLogo markOnly className="h-11 w-11" />
             <div>
               <p className="text-sm font-black tracking-[0.22em] text-violet-200">HUBYA</p>
               <p className="text-xs font-bold text-white/55">HUB = agrupación de potencial</p>
@@ -48,9 +48,12 @@ export default function MembresiaPage() {
 
         <section className="grid items-center gap-8 py-12 lg:grid-cols-[1fr_0.78fr] lg:py-16">
           <div className="rounded-[2rem] border border-white/10 bg-white/[0.055] p-7 shadow-2xl shadow-black/20 sm:p-9">
-            <p className="inline-flex rounded-full border border-violet-300/30 bg-violet-500/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-violet-200">
-              Membresía HUBYA
-            </p>
+            <div className="flex items-center gap-4">
+              <HubyaBrandLogo markOnly className="h-16 w-16" />
+              <p className="inline-flex rounded-full border border-violet-300/30 bg-violet-500/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-violet-200">
+                Membresía HUBYA
+              </p>
+            </div>
 
             <h1 className="mt-6 max-w-4xl text-5xl font-black leading-[0.96] tracking-tight sm:text-7xl">
               Tecnología para que el Hub <span className="bg-gradient-to-r from-violet-200 via-fuchsia-300 to-sky-300 bg-clip-text text-transparent">opere.</span>
