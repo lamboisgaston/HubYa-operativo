@@ -55,74 +55,114 @@ function capacidadMensual(usuarios: number) {
   };
 }
 
+const hubProfiles = [
+  {
+    match: "tipal",
+    rubro: "Espacios verdes / coordinación operativa",
+    usuarios: 24,
+    potencial: "Alto",
+    estado: "Operativo",
+  },
+  {
+    match: "praderas",
+    rubro: "Organización de demanda barrial",
+    usuarios: 18,
+    potencial: "Medio/Alto",
+    estado: "Operativo",
+  },
+  {
+    match: "prado",
+    rubro: "Servicios coordinados",
+    usuarios: 15,
+    potencial: "Alto",
+    estado: "Operativo",
+  },
+  {
+    match: "punto",
+    rubro: "Hub en formación",
+    usuarios: 9,
+    potencial: "Medio",
+    estado: "En crecimiento",
+  },
+] as const;
+
+function perfilHub(nombre: string, usuariosReales: number, rama: string) {
+  const normalizado = nombre.toLowerCase();
+  const perfil = hubProfiles.find((item) => normalizado.includes(item.match));
+
+  return {
+    rubro: perfil?.rubro || tipoDeHub(rama),
+    usuarios: perfil?.usuarios || usuariosReales,
+    potencial: perfil?.potencial || (usuariosReales >= 15 ? "Alto" : usuariosReales >= 8 ? "Medio/Alto" : "Medio"),
+    estado: perfil?.estado || (usuariosReales >= 8 ? "Operativo" : "En formación"),
+  };
+}
+
+function estadoClasses(estado: string) {
+  if (estado === "Operativo") return "border-emerald-300/25 bg-emerald-400/10 text-emerald-100";
+  if (estado === "En crecimiento") return "border-sky-300/25 bg-sky-400/10 text-sky-100";
+  return "border-violet-300/25 bg-violet-400/10 text-violet-100";
+}
+
 function BarrioHubGraphic() {
   const casas = [
-    { x: 70, y: 88, w: 54, h: 42, roof: "62 88 97 58 132 88" },
-    { x: 176, y: 58, w: 60, h: 46, roof: "166 58 206 24 246 58" },
-    { x: 302, y: 92, w: 58, h: 44, roof: "292 92 331 60 370 92" },
-    { x: 92, y: 260, w: 62, h: 48, roof: "82 260 123 224 164 260" },
-    { x: 318, y: 262, w: 64, h: 48, roof: "308 262 350 226 392 262" },
-    { x: 210, y: 330, w: 58, h: 44, roof: "200 330 239 298 278 330" },
+    { id: "a", x: 42, y: 92, w: 46, h: 36, roof: "34 92 65 66 96 92", hub: true, label: "Tipal" },
+    { id: "b", x: 135, y: 52, w: 48, h: 38, roof: "126 52 159 25 192 52", hub: false },
+    { id: "c", x: 245, y: 82, w: 52, h: 40, roof: "236 82 271 53 306 82", hub: true, label: "Prado" },
+    { id: "d", x: 363, y: 70, w: 50, h: 38, roof: "354 70 388 42 422 70", hub: false },
+    { id: "e", x: 78, y: 205, w: 52, h: 40, roof: "69 205 104 176 139 205", hub: true, label: "Praderas" },
+    { id: "f", x: 192, y: 216, w: 48, h: 38, roof: "183 216 216 189 249 216", hub: false },
+    { id: "g", x: 324, y: 211, w: 54, h: 42, roof: "314 211 351 181 388 211", hub: true, label: "Punto" },
+    { id: "h", x: 44, y: 333, w: 50, h: 38, roof: "35 333 69 305 103 333", hub: false },
+    { id: "i", x: 157, y: 324, w: 52, h: 40, roof: "148 324 183 295 218 324", hub: true, label: "Nuevo" },
+    { id: "j", x: 286, y: 334, w: 50, h: 38, roof: "277 334 311 306 345 334", hub: false },
+    { id: "k", x: 383, y: 314, w: 48, h: 38, roof: "374 314 407 287 440 314", hub: true, label: "Oferta" },
   ];
 
+  const hubHouses = casas.filter((casa) => casa.hub);
+  const center = { x: 236, y: 202 };
+
   return (
-    <div className="relative overflow-hidden rounded-[2rem] border border-violet-300/20 bg-[#080914]/80 p-3 shadow-2xl shadow-violet-950/50 sm:p-6">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(168,85,247,0.22),transparent_35%),radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.18),transparent_28%)]" />
-      <svg viewBox="0 0 460 430" role="img" aria-labelledby="barrioHubTitle" className="relative z-10 h-auto w-full">
-        <title id="barrioHubTitle">Barrio de casas conectadas a un núcleo central HUBYA</title>
+    <div className="relative overflow-hidden rounded-[2rem] border border-violet-300/20 bg-[#070817]/90 p-3 shadow-2xl shadow-violet-950/50 sm:p-6">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(168,85,247,0.28),transparent_31%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.16),transparent_28%),radial-gradient(circle_at_84%_84%,rgba(99,102,241,0.18),transparent_28%)]" />
+      <svg viewBox="0 0 480 430" role="img" aria-labelledby="barrioHubTitle barrioHubDesc" className="relative z-10 h-auto w-full">
+        <title id="barrioHubTitle">Barrio con casas conectadas que forman un Hub HUBYA</title>
+        <desc id="barrioHubDesc">Muchas casas componen el barrio, pero solo algunas están iluminadas y conectadas al núcleo HUBYA.</desc>
         <defs>
-          <linearGradient id="hubLine" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stopColor="#a855f7" />
-            <stop offset="100%" stopColor="#38bdf8" />
-          </linearGradient>
-          <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
+          <linearGradient id="hubLine" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#c084fc" /><stop offset="100%" stopColor="#38bdf8" /></linearGradient>
+          <linearGradient id="hubHouse" x1="0" x2="1"><stop offset="0%" stopColor="#f8fafc" /><stop offset="100%" stopColor="#ddd6fe" /></linearGradient>
+          <filter id="hubGlow" x="-45%" y="-45%" width="190%" height="190%"><feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
         </defs>
-
-        <path d="M48 358 C112 324 154 354 214 326 C286 292 336 322 414 284" fill="none" stroke="#1e1b4b" strokeWidth="18" strokeLinecap="round" opacity="0.65" />
-        <path d="M62 104 C120 138 156 118 214 166 C270 212 328 178 394 116" fill="none" stroke="#1e1b4b" strokeWidth="16" strokeLinecap="round" opacity="0.55" />
-
-        <g stroke="url(#hubLine)" strokeWidth="3" strokeLinecap="round" opacity="0.88" filter="url(#glow)">
-          <line x1="97" y1="109" x2="230" y2="206" />
-          <line x1="206" y1="82" x2="230" y2="206" />
-          <line x1="331" y1="114" x2="230" y2="206" />
-          <line x1="123" y1="286" x2="230" y2="206" />
-          <line x1="350" y1="288" x2="230" y2="206" />
-          <line x1="239" y1="354" x2="230" y2="206" />
-          <line x1="97" y1="109" x2="206" y2="82" opacity="0.45" />
-          <line x1="331" y1="114" x2="350" y2="288" opacity="0.45" />
-          <line x1="123" y1="286" x2="239" y2="354" opacity="0.45" />
+        <g fill="none" strokeLinecap="round">
+          <path d="M24 154 C102 126 178 160 246 134 C322 105 390 122 456 92" stroke="#1e1b4b" strokeWidth="17" opacity="0.62" />
+          <path d="M32 286 C105 255 165 283 239 252 C318 218 376 240 452 204" stroke="#1e1b4b" strokeWidth="17" opacity="0.7" />
+          <path d="M26 382 C100 356 171 385 244 356 C318 326 382 341 452 309" stroke="#111827" strokeWidth="14" opacity="0.72" />
+          <path d="M118 34 C127 111 117 210 100 390" stroke="#111827" strokeWidth="12" opacity="0.62" />
+          <path d="M342 38 C329 126 350 226 323 390" stroke="#111827" strokeWidth="12" opacity="0.62" />
         </g>
-
+        <g stroke="url(#hubLine)" strokeWidth="3" strokeLinecap="round" opacity="0.92" filter="url(#hubGlow)">
+          {hubHouses.map((casa) => <line key={casa.id} x1={casa.x + casa.w / 2} y1={casa.y + 20} x2={center.x} y2={center.y} />)}
+          <path d="M65 110 C112 155 170 172 236 202 C280 222 328 225 351 232" fill="none" opacity="0.38" />
+        </g>
         {casas.map((casa) => (
-          <g key={`${casa.x}-${casa.y}`}>
-            <polygon points={casa.roof} fill="#7c3aed" stroke="#c4b5fd" strokeWidth="2" />
-            <rect x={casa.x} y={casa.y} width={casa.w} height={casa.h} rx="8" fill="#f8fafc" opacity="0.95" />
-            <rect x={casa.x + 10} y={casa.y + 16} width="12" height="12" rx="2" fill="#1e1b4b" opacity="0.85" />
-            <rect x={casa.x + casa.w - 24} y={casa.y + 16} width="12" height="12" rx="2" fill="#312e81" opacity="0.85" />
-            <rect x={casa.x + casa.w / 2 - 6} y={casa.y + 22} width="12" height="20" rx="3" fill="#6d28d9" />
+          <g key={casa.id} className={casa.hub ? undefined : "opacity-35"} filter={casa.hub ? "url(#hubGlow)" : undefined}>
+            <polygon points={casa.roof} fill={casa.hub ? "#7c3aed" : "#334155"} stroke={casa.hub ? "#ddd6fe" : "#64748b"} strokeWidth="2" />
+            <rect x={casa.x} y={casa.y} width={casa.w} height={casa.h} rx="8" fill={casa.hub ? "url(#hubHouse)" : "#94a3b8"} />
+            <rect x={casa.x + 8} y={casa.y + 13} width="10" height="10" rx="2" fill={casa.hub ? "#312e81" : "#475569"} />
+            <rect x={casa.x + casa.w - 20} y={casa.y + 13} width="10" height="10" rx="2" fill={casa.hub ? "#1d4ed8" : "#475569"} />
+            <rect x={casa.x + casa.w / 2 - 5} y={casa.y + 20} width="10" height="18" rx="3" fill={casa.hub ? "#6d28d9" : "#475569"} />
+            {casa.hub ? <circle cx={casa.x + casa.w / 2} cy={casa.y + 20} r="5" fill="#c4b5fd" /> : null}
           </g>
         ))}
-
-        <g filter="url(#glow)">
-          <circle cx="230" cy="206" r="72" fill="#111827" stroke="#a855f7" strokeWidth="3" />
-          <circle cx="230" cy="206" r="54" fill="#2e1065" stroke="#38bdf8" strokeWidth="2" opacity="0.95" />
-          <text x="230" y="202" textAnchor="middle" fill="#ffffff" fontSize="42" fontWeight="900" fontFamily="Arial, sans-serif">H</text>
-          <text x="230" y="229" textAnchor="middle" fill="#c4b5fd" fontSize="18" fontWeight="900" letterSpacing="3" fontFamily="Arial, sans-serif">HUBYA</text>
+        <g filter="url(#hubGlow)">
+          <circle cx={center.x} cy={center.y} r="70" fill="#0f1026" stroke="#a855f7" strokeWidth="3" />
+          <circle cx={center.x} cy={center.y} r="50" fill="#2e1065" stroke="#38bdf8" strokeWidth="2" />
+          <text x={center.x} y="199" textAnchor="middle" fill="#ffffff" fontSize="40" fontWeight="900" fontFamily="Arial, sans-serif">H</text>
+          <text x={center.x} y="226" textAnchor="middle" fill="#ddd6fe" fontSize="17" fontWeight="900" letterSpacing="3" fontFamily="Arial, sans-serif">HUBYA</text>
         </g>
-
-        <g fill="#c4b5fd">
-          <circle cx="97" cy="109" r="5" />
-          <circle cx="206" cy="82" r="5" />
-          <circle cx="331" cy="114" r="5" />
-          <circle cx="123" cy="286" r="5" />
-          <circle cx="350" cy="288" r="5" />
-          <circle cx="239" cy="354" r="5" />
+        <g fontFamily="Arial, sans-serif" fontSize="11" fontWeight="800" fill="#e9d5ff">
+          <text x="292" y="34">casas fuera del Hub</text>
+          <text x="38" y="405">casas conectadas = potencial agrupado</text>
         </g>
       </svg>
     </div>
@@ -237,38 +277,44 @@ export default async function WebPublicaPage() {
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {hubs.map((hub) => {
-              const usuarios = hub.clientesActivos;
-              const capacidad = capacidadMensual(usuarios);
+              const perfil = perfilHub(hub.nombre, hub.clientesActivos, hub.rama);
+              const capacidad = capacidadMensual(perfil.usuarios);
 
               return (
-                <Link key={hub.id} href={`/hubs/${hub.slug}`} className="group rounded-[1.6rem] border border-white/10 bg-white/[0.05] p-5 transition hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-white/[0.08]">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-200">Hub público</p>
-                  <h3 className="mt-2 text-2xl font-black">{hub.nombre}</h3>
-
-                  <div className="mt-4 grid gap-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-xs font-black uppercase tracking-[0.16em] text-white/40">Tipo de Hub</p>
-                      <p className="mt-1 text-lg font-black text-white">{tipoDeHub(hub.rama)}</p>
+                <Link key={hub.id} href={`/hubs/${hub.slug}`} className="group relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/[0.055] p-5 shadow-xl shadow-black/15 transition hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-white/[0.08]">
+                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-400 via-fuchsia-300 to-sky-300 opacity-80" />
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-200">Hub público</p>
+                      <h3 className="mt-2 text-2xl font-black">{hub.nombre}</h3>
                     </div>
+                    <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${estadoClasses(perfil.estado)}`}>{perfil.estado}</span>
+                  </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-2xl border border-violet-300/20 bg-violet-500/10 p-3">
-                        <p className="text-2xl font-black text-violet-100">{usuarios}</p>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">personas</p>
-                      </div>
-                      <div className="rounded-2xl border border-sky-300/20 bg-sky-500/10 p-3">
-                        <p className="text-2xl font-black text-sky-100">{capacidad.docenasHuevos}</p>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">docenas/mes</p>
-                      </div>
-                      <div className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-3">
-                        <p className="text-2xl font-black text-fuchsia-100">{capacidad.verduras}</p>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">verduras/mes</p>
-                      </div>
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-white/40">Rubro</p>
+                    <p className="mt-1 text-base font-black text-white">{perfil.rubro}</p>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-violet-300/20 bg-violet-500/10 p-4">
+                      <p className="text-3xl font-black text-violet-100">{perfil.usuarios}</p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">usuarios</p>
                     </div>
+                    <div className="rounded-2xl border border-sky-300/20 bg-sky-500/10 p-4">
+                      <p className="text-xl font-black text-sky-100">{perfil.potencial}</p>
+                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">potencial</p>
+                    </div>
+                  </div>
 
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-4">
+                      <p className="text-2xl font-black text-fuchsia-100">{capacidad.horasMantenimiento} hs</p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">trabajo / mes</p>
+                    </div>
                     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-xs font-black uppercase tracking-[0.16em] text-white/40">Potencia mensual estimada</p>
-                      <p className="mt-1 text-3xl font-black text-violet-100">{capacidad.horasMantenimiento} hs</p>
+                      <p className="text-2xl font-black text-white">P↑</p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">potencia operativa</p>
                     </div>
                   </div>
 
