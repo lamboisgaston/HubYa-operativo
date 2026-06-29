@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Hub {
+  id                       String   @id @default(cuid())
+  nombre                   String
+  slug                     String   @unique
+  tipo                     String
+  pais                     String   @default("Argentina")
+  provincia                String?
+  ciudad                   String?
+  zona                     String?
+  activo                   Boolean  @default(true)
+  usuariosCount            Int      @default(0)
+  docenasHuevosMes         Int      @default(0)
+  verdurasMes              Int      @default(0)
+  horasMantenimientoMes    Int      @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  contactos                Contacto[]
+}
+
+model Contacto {
+  id        String   @id @default(cuid())
+  nombre    String
+  email     String?
+  whatsapp  String?
+  hubId     String?
+  tipo      String   @default("cliente")
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hub       Hub?     @relation(fields: [hubId], references: [id])
+}
+
+model Membership {
+  id                   String   @id @default(cuid())
+  email                String
+  nombre               String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  status               String   @default("pending")
+  plan                 String   @default("hubya_membership")
+  priceId              String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model StripeEvent {
+  id        String   @id
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+}
