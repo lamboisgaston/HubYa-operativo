@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { HubyaLogo } from "@/components/HubyaLogo";
+import { HubyaBrandLogo } from "@/components/HubyaBrandLogo";
 import { getHubs } from "@/lib/data/hubs";
 
 const ideas = [
@@ -182,7 +182,7 @@ export default async function WebPublicaPage() {
         <div className="mx-auto max-w-7xl">
           <header className="flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.05] px-4 py-3 shadow-2xl shadow-black/30 backdrop-blur-xl">
             <Link href="/" className="flex items-center gap-3" aria-label="HUBYA web pública">
-              <HubyaLogo className="h-10 w-auto" />
+              <HubyaBrandLogo markOnly className="h-11 w-11" />
               <div>
                 <p className="text-sm font-black tracking-[0.22em] text-violet-200">HUBYA</p>
                 <p className="text-xs font-bold text-white/55">HUB = agrupación de potencial</p>
@@ -203,6 +203,13 @@ export default async function WebPublicaPage() {
 
           <section className="grid items-center gap-10 py-14 lg:grid-cols-[0.95fr_1.05fr] lg:py-20">
             <div>
+              <div className="mb-7 flex items-center gap-4 rounded-[1.75rem] border border-violet-300/20 bg-white/[0.045] p-4 shadow-2xl shadow-violet-950/20 backdrop-blur-xl sm:max-w-xl">
+                <HubyaBrandLogo markOnly className="h-16 w-16 shrink-0" />
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.24em] text-violet-200">Núcleo HUBYA</p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-white/62">Una red tecnológica que conecta Hubs, demanda, oferta y operación.</p>
+                </div>
+              </div>
               <p className="inline-flex rounded-full border border-violet-300/30 bg-violet-500/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-violet-200">
                 HUB = agrupación de potencial
               </p>
@@ -283,7 +290,10 @@ export default async function WebPublicaPage() {
               return (
                 <Link key={hub.id} href={`/hubs/${hub.slug}`} className="group relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/[0.055] p-5 shadow-xl shadow-black/15 transition hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-white/[0.08]">
                   <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-400 via-fuchsia-300 to-sky-300 opacity-80" />
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="absolute -right-8 -top-8 opacity-[0.09] transition group-hover:opacity-[0.16]">
+                    <HubyaBrandLogo markOnly className="h-32 w-32" />
+                  </div>
+                  <div className="relative flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-200">Hub público</p>
                       <h3 className="mt-2 text-2xl font-black">{hub.nombre}</h3>
@@ -291,7 +301,7 @@ export default async function WebPublicaPage() {
                     <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${estadoClasses(perfil.estado)}`}>{perfil.estado}</span>
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4">
+                  <div className="relative mt-5 rounded-2xl border border-white/10 bg-black/15 p-4">
                     <p className="text-xs font-black uppercase tracking-[0.16em] text-white/40">Rubro</p>
                     <p className="mt-1 text-base font-black text-white">{perfil.rubro}</p>
                   </div>
