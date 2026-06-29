@@ -104,65 +104,95 @@ function estadoClasses(estado: string) {
   return "border-violet-300/25 bg-violet-400/10 text-violet-100";
 }
 
-function BarrioHubGraphic() {
-  const casas = [
-    { id: "a", x: 42, y: 92, w: 46, h: 36, roof: "34 92 65 66 96 92", hub: true, label: "Tipal" },
-    { id: "b", x: 135, y: 52, w: 48, h: 38, roof: "126 52 159 25 192 52", hub: false },
-    { id: "c", x: 245, y: 82, w: 52, h: 40, roof: "236 82 271 53 306 82", hub: true, label: "Prado" },
-    { id: "d", x: 363, y: 70, w: 50, h: 38, roof: "354 70 388 42 422 70", hub: false },
-    { id: "e", x: 78, y: 205, w: 52, h: 40, roof: "69 205 104 176 139 205", hub: true, label: "Praderas" },
-    { id: "f", x: 192, y: 216, w: 48, h: 38, roof: "183 216 216 189 249 216", hub: false },
-    { id: "g", x: 324, y: 211, w: 54, h: 42, roof: "314 211 351 181 388 211", hub: true, label: "Punto" },
-    { id: "h", x: 44, y: 333, w: 50, h: 38, roof: "35 333 69 305 103 333", hub: false },
-    { id: "i", x: 157, y: 324, w: 52, h: 40, roof: "148 324 183 295 218 324", hub: true, label: "Nuevo" },
-    { id: "j", x: 286, y: 334, w: 50, h: 38, roof: "277 334 311 306 345 334", hub: false },
-    { id: "k", x: 383, y: 314, w: 48, h: 38, roof: "374 314 407 287 440 314", hub: true, label: "Oferta" },
+function HubNeighborhoodIllustration() {
+  const homes = [
+    { id: "northwest", x: 86, y: 104, accent: "#8b5cf6", hub: true, size: 1, label: "demanda" },
+    { id: "north", x: 196, y: 70, accent: "#64748b", hub: false, size: 0.88 },
+    { id: "northeast", x: 312, y: 100, accent: "#a78bfa", hub: true, size: 0.94, label: "oferta" },
+    { id: "east", x: 390, y: 190, accent: "#475569", hub: false, size: 0.9 },
+    { id: "southeast", x: 318, y: 310, accent: "#c084fc", hub: true, size: 1.04, label: "operación" },
+    { id: "south", x: 204, y: 352, accent: "#64748b", hub: false, size: 0.92 },
+    { id: "southwest", x: 94, y: 296, accent: "#7c3aed", hub: true, size: 0.96, label: "capacidad" },
+    { id: "west", x: 46, y: 198, accent: "#475569", hub: false, size: 0.84 },
+    { id: "inner-west", x: 148, y: 216, accent: "#ddd6fe", hub: true, size: 0.82, label: "hub" },
+    { id: "inner-east", x: 300, y: 216, accent: "#334155", hub: false, size: 0.8 },
   ];
 
-  const hubHouses = casas.filter((casa) => casa.hub);
-  const center = { x: 236, y: 202 };
+  const hubHomes = homes.filter((home) => home.hub);
+  const center = { x: 240, y: 218 };
 
   return (
-    <div className="relative overflow-hidden rounded-[2rem] border border-violet-300/20 bg-[#070817]/90 p-3 shadow-2xl shadow-violet-950/50 sm:p-6">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(168,85,247,0.28),transparent_31%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.16),transparent_28%),radial-gradient(circle_at_84%_84%,rgba(99,102,241,0.18),transparent_28%)]" />
-      <svg viewBox="0 0 480 430" role="img" aria-labelledby="barrioHubTitle barrioHubDesc" className="relative z-10 h-auto w-full">
-        <title id="barrioHubTitle">Barrio con casas conectadas que forman un Hub HUBYA</title>
-        <desc id="barrioHubDesc">Muchas casas componen el barrio, pero solo algunas están iluminadas y conectadas al núcleo HUBYA.</desc>
+    <div className="group relative overflow-hidden rounded-[2.25rem] border border-violet-200/15 bg-[#050816] p-3 shadow-2xl shadow-violet-950/45 sm:p-5">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_48%_48%,rgba(124,58,237,0.34),transparent_30%),radial-gradient(circle_at_20%_18%,rgba(56,189,248,0.16),transparent_26%),radial-gradient(circle_at_84%_78%,rgba(217,70,239,0.14),transparent_28%),linear-gradient(145deg,rgba(15,23,42,0.8),rgba(3,7,18,0.96))]" />
+      <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(rgba(167,139,250,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(167,139,250,0.2)_1px,transparent_1px)] [background-size:36px_36px]" />
+
+      <svg viewBox="0 0 480 430" role="img" aria-labelledby="hubNeighborhoodTitle hubNeighborhoodDesc" className="relative z-10 h-auto w-full drop-shadow-2xl">
+        <title id="hubNeighborhoodTitle">Barrio tecnológico conectado por HUBYA</title>
+        <desc id="hubNeighborhoodDesc">Un barrio visto en perspectiva isométrica donde algunas casas violetas se conectan con un nodo central HUBYA y otras permanecen apagadas.</desc>
         <defs>
-          <linearGradient id="hubLine" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#c084fc" /><stop offset="100%" stopColor="#38bdf8" /></linearGradient>
-          <linearGradient id="hubHouse" x1="0" x2="1"><stop offset="0%" stopColor="#f8fafc" /><stop offset="100%" stopColor="#ddd6fe" /></linearGradient>
-          <filter id="hubGlow" x="-45%" y="-45%" width="190%" height="190%"><feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          <linearGradient id="districtBase" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#111827" /><stop offset="55%" stopColor="#0f172a" /><stop offset="100%" stopColor="#020617" /></linearGradient>
+          <linearGradient id="activeLine" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f0abfc" /><stop offset="55%" stopColor="#a78bfa" /><stop offset="100%" stopColor="#38bdf8" /></linearGradient>
+          <linearGradient id="activeRoof" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f5d0fe" /><stop offset="45%" stopColor="#a855f7" /><stop offset="100%" stopColor="#4c1d95" /></linearGradient>
+          <linearGradient id="activeWall" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f8fafc" /><stop offset="100%" stopColor="#c4b5fd" /></linearGradient>
+          <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          <filter id="violetAura" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="10" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
         </defs>
-        <g fill="none" strokeLinecap="round">
-          <path d="M24 154 C102 126 178 160 246 134 C322 105 390 122 456 92" stroke="#1e1b4b" strokeWidth="17" opacity="0.62" />
-          <path d="M32 286 C105 255 165 283 239 252 C318 218 376 240 452 204" stroke="#1e1b4b" strokeWidth="17" opacity="0.7" />
-          <path d="M26 382 C100 356 171 385 244 356 C318 326 382 341 452 309" stroke="#111827" strokeWidth="14" opacity="0.72" />
-          <path d="M118 34 C127 111 117 210 100 390" stroke="#111827" strokeWidth="12" opacity="0.62" />
-          <path d="M342 38 C329 126 350 226 323 390" stroke="#111827" strokeWidth="12" opacity="0.62" />
+
+        <g opacity="0.88">
+          <path d="M36 226 L240 42 L444 226 L240 408 Z" fill="url(#districtBase)" stroke="#312e81" strokeWidth="1.5" />
+          <path d="M70 226 L240 74 L410 226 L240 378 Z" fill="none" stroke="#334155" strokeWidth="1" opacity="0.55" />
+          <path d="M36 226 H444 M240 42 V408 M96 172 L306 360 M174 102 L384 290 M96 280 L306 92 M174 352 L384 164" fill="none" stroke="#1e293b" strokeWidth="8" strokeLinecap="round" opacity="0.55" />
+          <path d="M36 226 H444 M240 42 V408 M96 172 L306 360 M174 102 L384 290 M96 280 L306 92 M174 352 L384 164" fill="none" stroke="#475569" strokeWidth="1" strokeLinecap="round" strokeDasharray="5 10" opacity="0.42" />
         </g>
-        <g stroke="url(#hubLine)" strokeWidth="3" strokeLinecap="round" opacity="0.92" filter="url(#hubGlow)">
-          {hubHouses.map((casa) => <line key={casa.id} x1={casa.x + casa.w / 2} y1={casa.y + 20} x2={center.x} y2={center.y} />)}
-          <path d="M65 110 C112 155 170 172 236 202 C280 222 328 225 351 232" fill="none" opacity="0.38" />
+
+        <g stroke="url(#activeLine)" strokeLinecap="round" filter="url(#softGlow)">
+          {hubHomes.map((home) => (
+            <line key={home.id} x1={home.x} y1={home.y + 14} x2={center.x} y2={center.y} strokeWidth="2.5" opacity="0.86" />
+          ))}
+          <path d="M88 118 C134 160 171 183 240 218 C284 240 315 267 318 324" fill="none" strokeWidth="1.6" strokeDasharray="8 9" opacity="0.55" />
         </g>
-        {casas.map((casa) => (
-          <g key={casa.id} className={casa.hub ? undefined : "opacity-35"} filter={casa.hub ? "url(#hubGlow)" : undefined}>
-            <polygon points={casa.roof} fill={casa.hub ? "#7c3aed" : "#334155"} stroke={casa.hub ? "#ddd6fe" : "#64748b"} strokeWidth="2" />
-            <rect x={casa.x} y={casa.y} width={casa.w} height={casa.h} rx="8" fill={casa.hub ? "url(#hubHouse)" : "#94a3b8"} />
-            <rect x={casa.x + 8} y={casa.y + 13} width="10" height="10" rx="2" fill={casa.hub ? "#312e81" : "#475569"} />
-            <rect x={casa.x + casa.w - 20} y={casa.y + 13} width="10" height="10" rx="2" fill={casa.hub ? "#1d4ed8" : "#475569"} />
-            <rect x={casa.x + casa.w / 2 - 5} y={casa.y + 20} width="10" height="18" rx="3" fill={casa.hub ? "#6d28d9" : "#475569"} />
-            {casa.hub ? <circle cx={casa.x + casa.w / 2} cy={casa.y + 20} r="5" fill="#c4b5fd" /> : null}
+
+        <g>
+          {homes.map((home) => {
+            const width = 56 * home.size;
+            const height = 34 * home.size;
+            const roofHeight = 24 * home.size;
+            const x = home.x - width / 2;
+            const y = home.y - height / 2;
+            const active = home.hub;
+
+            return (
+              <g key={home.id} opacity={active ? 1 : 0.36} filter={active ? "url(#softGlow)" : undefined}>
+                <ellipse cx={home.x} cy={y + height + 11} rx={width * 0.58} ry="9" fill="#020617" opacity="0.52" />
+                <path d={`M${home.x} ${y - roofHeight} L${x + width} ${y} L${home.x} ${y + roofHeight * 0.72} L${x} ${y} Z`} fill={active ? "url(#activeRoof)" : "#334155"} stroke={active ? "#e9d5ff" : "#64748b"} strokeWidth="1.4" />
+                <path d={`M${x} ${y} L${home.x} ${y + roofHeight * 0.72} L${home.x} ${y + height} L${x} ${y + height - roofHeight * 0.72} Z`} fill={active ? "#ede9fe" : "#94a3b8"} />
+                <path d={`M${x + width} ${y} L${home.x} ${y + roofHeight * 0.72} L${home.x} ${y + height} L${x + width} ${y + height - roofHeight * 0.72} Z`} fill={active ? "url(#activeWall)" : "#64748b"} />
+                <path d={`M${home.x} ${y + roofHeight * 0.72} L${home.x} ${y + height}`} stroke={active ? "#7c3aed" : "#475569"} strokeWidth="1" opacity="0.65" />
+                <rect x={home.x - 5 * home.size} y={y + height - 19 * home.size} width={10 * home.size} height={16 * home.size} rx="2" fill={active ? "#6d28d9" : "#334155"} />
+                <circle cx={home.x} cy={home.y + 14} r={active ? 4.4 : 2.8} fill={active ? home.accent : "#64748b"} />
+                {active ? <circle cx={home.x} cy={home.y + 14} r="12" fill={home.accent} opacity="0.14" /> : null}
+                {home.label ? <text x={home.x} y={y + height + 29} textAnchor="middle" fill="#e9d5ff" fontSize="9" fontWeight="800" letterSpacing="1.4" opacity="0.78">{home.label.toUpperCase()}</text> : null}
+              </g>
+            );
+          })}
+        </g>
+
+        <g filter="url(#violetAura)">
+          <circle cx={center.x} cy={center.y} r="64" fill="#140a2e" stroke="#8b5cf6" strokeWidth="2" />
+          <circle cx={center.x} cy={center.y} r="48" fill="#24104f" stroke="#38bdf8" strokeWidth="1.5" opacity="0.9" />
+          <circle cx={center.x} cy={center.y} r="29" fill="#6d28d9" opacity="0.86" />
+          <text x={center.x} y={center.y + 12} textAnchor="middle" fill="#ffffff" fontSize="42" fontWeight="900" fontFamily="Arial, sans-serif">H</text>
+          <text x={center.x} y={center.y + 49} textAnchor="middle" fill="#ddd6fe" fontSize="12" fontWeight="900" letterSpacing="3.2" fontFamily="Arial, sans-serif">HUBYA</text>
+        </g>
+
+        <g fontFamily="Arial, sans-serif">
+          <text x="32" y="37" fill="#c4b5fd" fontSize="12" fontWeight="900" letterSpacing="2.6">AGRUPACIÓN DE POTENCIAL</text>
+          <text x="32" y="58" fill="#94a3b8" fontSize="11" fontWeight="700">casas apagadas + casas conectadas → potencia operativa</text>
+          <g transform="translate(324 32)">
+            <rect width="120" height="38" rx="14" fill="#020617" opacity="0.56" stroke="#7c3aed" />
+            <circle cx="18" cy="19" r="5" fill="#a78bfa" />
+            <text x="32" y="23" fill="#e9d5ff" fontSize="10" fontWeight="900" letterSpacing="1.7">HUB ACTIVO</text>
           </g>
-        ))}
-        <g filter="url(#hubGlow)">
-          <circle cx={center.x} cy={center.y} r="70" fill="#0f1026" stroke="#a855f7" strokeWidth="3" />
-          <circle cx={center.x} cy={center.y} r="50" fill="#2e1065" stroke="#38bdf8" strokeWidth="2" />
-          <text x={center.x} y="199" textAnchor="middle" fill="#ffffff" fontSize="40" fontWeight="900" fontFamily="Arial, sans-serif">H</text>
-          <text x={center.x} y="226" textAnchor="middle" fill="#ddd6fe" fontSize="17" fontWeight="900" letterSpacing="3" fontFamily="Arial, sans-serif">HUBYA</text>
-        </g>
-        <g fontFamily="Arial, sans-serif" fontSize="11" fontWeight="800" fill="#e9d5ff">
-          <text x="292" y="34">casas fuera del Hub</text>
-          <text x="38" y="405">casas conectadas = potencial agrupado</text>
         </g>
       </svg>
     </div>
@@ -245,7 +275,7 @@ export default async function WebPublicaPage() {
               </div>
             </div>
 
-            <BarrioHubGraphic />
+            <HubNeighborhoodIllustration />
           </section>
         </div>
       </section>
