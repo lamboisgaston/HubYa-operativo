@@ -426,7 +426,7 @@ export default async function WebPublicaPage() {
         </div>
       </section>
 
-      <section id="contacto" className="px-5 pb-12 sm:px-8">
+      <section id="contacto" className="px-5 pb-8 sm:px-8">
         <div className="mx-auto max-w-7xl rounded-[1.7rem] border border-white/10 bg-white/[0.05] p-7 text-center shadow-2xl shadow-black/20">
           <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Contacto</p>
           <h2 className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-tight sm:text-5xl">Hablemos de tu próximo Hub.</h2>
@@ -434,6 +434,17 @@ export default async function WebPublicaPage() {
           <a href="mailto:contact@hubya.tech" className="mt-6 inline-flex rounded-2xl bg-violet-200 px-5 py-3 text-sm font-black text-[#12071f] transition hover:bg-white">contact@hubya.tech</a>
         </div>
       </section>
+
+      <footer className="px-5 pb-10 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 border-t border-white/10 pt-6 text-xs font-bold text-white/45 sm:flex-row sm:items-center sm:justify-between">
+          <p>© HUBYA LLC</p>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Enlaces legales">
+            <Link href="/politica-privacidad" className="transition hover:text-violet-200">Política de privacidad</Link>
+            <Link href="/terminos" className="transition hover:text-violet-200">Términos</Link>
+            <Link href="/eliminacion-datos" className="transition hover:text-violet-200">Eliminación de datos</Link>
+          </nav>
+        </div>
+      </footer>
     </main>
   );
 }
