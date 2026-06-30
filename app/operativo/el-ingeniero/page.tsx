@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ElIngenieroPanel } from "@/components/ElIngenieroPanel";
+import { WhatsappDebugPanel } from "@/components/WhatsappDebugPanel";
 
 export default function ElIngenieroPage() {
   return (
@@ -19,6 +20,7 @@ export default function ElIngenieroPage() {
         </header>
 
         <ElIngenieroPanel />
+        <WhatsappDebugPanel />
       </section>
     </main>
   );
