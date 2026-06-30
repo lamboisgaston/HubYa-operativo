@@ -105,102 +105,114 @@ function estadoClasses(estado: string) {
 }
 
 function HubNeighborhoodIllustration() {
-  const homes = [
-    { id: "northwest", x: 86, y: 108, accent: "#a78bfa", hub: true, size: 1.02, label: "demanda", rotation: -7 },
-    { id: "north", x: 198, y: 70, accent: "#64748b", hub: false, size: 0.86, rotation: 5 },
-    { id: "northeast", x: 318, y: 105, accent: "#c084fc", hub: true, size: 0.96, label: "oferta", rotation: 8 },
-    { id: "east", x: 395, y: 190, accent: "#475569", hub: false, size: 0.9, rotation: -5 },
-    { id: "southeast", x: 322, y: 314, accent: "#f0abfc", hub: true, size: 1.06, label: "operación", rotation: -2 },
-    { id: "south", x: 204, y: 356, accent: "#64748b", hub: false, size: 0.92, rotation: 7 },
-    { id: "southwest", x: 92, y: 300, accent: "#8b5cf6", hub: true, size: 0.98, label: "capacidad", rotation: 4 },
-    { id: "west", x: 48, y: 198, accent: "#475569", hub: false, size: 0.84, rotation: -7 },
-    { id: "inner-west", x: 150, y: 220, accent: "#ddd6fe", hub: true, size: 0.86, label: "hub", rotation: -3 },
-    { id: "inner-east", x: 304, y: 220, accent: "#334155", hub: false, size: 0.82, rotation: 3 },
-    { id: "far-northwest", x: 132, y: 52, accent: "#334155", hub: false, size: 0.68, rotation: -5 },
-    { id: "far-southeast", x: 382, y: 278, accent: "#475569", hub: false, size: 0.72, rotation: 5 },
+  const center = { x: 420, y: 268 };
+  const activeUnits = [
+    { id: "a01", x: 172, y: 126, label: "Demanda", scale: 1.05, tone: "violet" },
+    { id: "a02", x: 546, y: 126, label: "Oferta", scale: 0.98, tone: "sky" },
+    { id: "a03", x: 154, y: 354, label: "Capacidad", scale: 0.95, tone: "fuchsia" },
+    { id: "a04", x: 578, y: 386, label: "Operación", scale: 1.08, tone: "violet" },
+    { id: "a05", x: 330, y: 430, label: "Personas", scale: 0.9, tone: "sky" },
   ];
 
-  const hubHomes = homes.filter((home) => home.hub);
-  const center = { x: 240, y: 218 };
+  const dormantUnits = [
+    { id: "d01", x: 290, y: 104, scale: 0.82 },
+    { id: "d02", x: 424, y: 102, scale: 0.78 },
+    { id: "d03", x: 674, y: 218, scale: 0.84 },
+    { id: "d04", x: 636, y: 306, scale: 0.74 },
+    { id: "d05", x: 470, y: 466, scale: 0.8 },
+    { id: "d06", x: 238, y: 472, scale: 0.74 },
+    { id: "d07", x: 86, y: 268, scale: 0.78 },
+    { id: "d08", x: 106, y: 186, scale: 0.7 },
+  ];
+
+  const blocks = [
+    "M92 244 L210 166 L330 236 L210 318 Z",
+    "M310 156 L430 84 L552 154 L430 230 Z",
+    "M496 244 L620 166 L716 224 L594 304 Z",
+    "M124 366 L260 286 L374 358 L238 446 Z",
+    "M414 374 L562 288 L690 364 L540 460 Z",
+  ];
+
+  function Unit({ x, y, active = false, scale = 1, label, tone = "violet" }: { x: number; y: number; active?: boolean; scale?: number; label?: string; tone?: "violet" | "sky" | "fuchsia" }) {
+    const accent = tone === "sky" ? "#38bdf8" : tone === "fuchsia" ? "#f0abfc" : "#a78bfa";
+    const glow = tone === "sky" ? "#0ea5e9" : tone === "fuchsia" ? "#d946ef" : "#8b5cf6";
+
+    return (
+      <g transform={`translate(${x} ${y}) scale(${scale})`} opacity={active ? 1 : 0.34}>
+        <ellipse cx="0" cy="35" rx="52" ry="18" fill="#020617" opacity={active ? 0.72 : 0.48} />
+        {active ? <ellipse cx="0" cy="22" rx="62" ry="34" fill={glow} opacity="0.14" filter="url(#hubHeroBlur)" /> : null}
+        <path d="M-46 4 L0 -25 L47 4 L0 32 Z" fill={active ? "url(#hubHeroActiveRoof)" : "#273449"} stroke={active ? accent : "#516073"} strokeWidth="1.4" />
+        <path d="M-46 4 L0 32 L0 72 L-46 44 Z" fill={active ? "url(#hubHeroActiveWallLeft)" : "#64748b"} />
+        <path d="M47 4 L0 32 L0 72 L47 44 Z" fill={active ? "url(#hubHeroActiveWallRight)" : "#334155"} />
+        <path d="M0 32 L0 72" stroke={active ? "#c4b5fd" : "#475569"} strokeWidth="1" opacity="0.7" />
+        <rect x="-8" y="45" width="16" height="24" rx="3" fill={active ? "#16062c" : "#1e293b"} />
+        <rect x="-32" y="33" width="11" height="11" rx="2" fill={active ? accent : "#0f172a"} opacity={active ? 0.95 : 0.9} />
+        <rect x="21" y="33" width="11" height="11" rx="2" fill={active ? "#ffffff" : "#0f172a"} opacity={active ? 0.9 : 0.9} />
+        <circle cx="0" cy="78" r={active ? 5 : 3} fill={active ? accent : "#64748b"} />
+        {label ? (
+          <g transform="translate(0 104)">
+            <rect x="-48" y="-13" width="96" height="26" rx="13" fill="#030712" opacity="0.74" stroke={accent} strokeOpacity="0.42" />
+            <text textAnchor="middle" y="4" fill="#f8fafc" fontSize="10" fontWeight="900" letterSpacing="1.4">{label.toUpperCase()}</text>
+          </g>
+        ) : null}
+      </g>
+    );
+  }
 
   return (
-    <div className="group relative overflow-hidden rounded-[2.5rem] border border-violet-200/15 bg-[#050816]/95 p-3 shadow-2xl shadow-violet-950/45 ring-1 ring-white/5 sm:p-5">
-      <div className="absolute -inset-10 bg-[radial-gradient(circle_at_46%_48%,rgba(124,58,237,0.34),transparent_29%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.18),transparent_25%),radial-gradient(circle_at_84%_78%,rgba(217,70,239,0.16),transparent_28%),linear-gradient(145deg,rgba(15,23,42,0.72),rgba(3,7,18,0.98))]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_38%,rgba(5,3,11,0.72)_82%)]" />
-      <div className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(167,139,250,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(167,139,250,0.18)_1px,transparent_1px)] [background-size:34px_34px]" />
+    <div className="relative overflow-hidden rounded-[2.75rem] border border-violet-200/15 bg-[#030611] p-3 shadow-2xl shadow-violet-950/50 ring-1 ring-white/10 sm:p-5">
+      <div className="absolute -inset-16 bg-[radial-gradient(circle_at_50%_42%,rgba(124,58,237,0.35),transparent_26%),radial-gradient(circle_at_18%_20%,rgba(56,189,248,0.20),transparent_22%),radial-gradient(circle_at_84%_72%,rgba(217,70,239,0.18),transparent_24%),linear-gradient(145deg,#08111f,#05030b_58%,#020617)]" />
+      <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(148,163,184,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.18)_1px,transparent_1px)] [background-size:42px_42px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_42%,rgba(2,6,23,0.86)_88%)]" />
 
-      <svg viewBox="0 0 480 430" role="img" aria-labelledby="hubNeighborhoodTitle hubNeighborhoodDesc" className="relative z-10 h-auto w-full drop-shadow-2xl">
-        <title id="hubNeighborhoodTitle">Barrio tecnológico conectado por HUBYA</title>
-        <desc id="hubNeighborhoodDesc">Un barrio en perspectiva isométrica donde algunas casas iluminadas se conectan con el núcleo operativo HUBYA y otras permanecen apagadas.</desc>
+      <svg viewBox="0 0 760 560" role="img" aria-labelledby="hubHeroTitle hubHeroDesc" className="relative z-10 h-auto w-full">
+        <title id="hubHeroTitle">Red barrial premium operada por HUBYA</title>
+        <desc id="hubHeroDesc">Visualización tecnológica de un barrio donde solo algunas unidades están iluminadas y conectadas a un núcleo central HUBYA.</desc>
         <defs>
-          <linearGradient id="districtBase" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#18203a" /><stop offset="48%" stopColor="#0f172a" /><stop offset="100%" stopColor="#020617" /></linearGradient>
-          <linearGradient id="activeLine" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f5d0fe" /><stop offset="48%" stopColor="#a78bfa" /><stop offset="100%" stopColor="#38bdf8" /></linearGradient>
-          <linearGradient id="activeRoof" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f5d0fe" /><stop offset="45%" stopColor="#a855f7" /><stop offset="100%" stopColor="#4c1d95" /></linearGradient>
-          <linearGradient id="activeWallLeft" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#ffffff" /><stop offset="100%" stopColor="#c4b5fd" /></linearGradient>
-          <linearGradient id="activeWallRight" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#ddd6fe" /><stop offset="100%" stopColor="#7c3aed" /></linearGradient>
-          <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-          <filter id="violetAura" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="10" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          <linearGradient id="hubHeroPlate" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#17203a" /><stop offset="52%" stopColor="#0f172a" /><stop offset="100%" stopColor="#020617" /></linearGradient>
+          <linearGradient id="hubHeroRoad" x1="0" x2="1"><stop offset="0%" stopColor="#111827" /><stop offset="100%" stopColor="#020617" /></linearGradient>
+          <linearGradient id="hubHeroLine" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f5d0fe" /><stop offset="45%" stopColor="#a78bfa" /><stop offset="100%" stopColor="#38bdf8" /></linearGradient>
+          <linearGradient id="hubHeroActiveRoof" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f5d0fe" /><stop offset="42%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#312e81" /></linearGradient>
+          <linearGradient id="hubHeroActiveWallLeft" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#ffffff" /><stop offset="100%" stopColor="#c4b5fd" /></linearGradient>
+          <linearGradient id="hubHeroActiveWallRight" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#ddd6fe" /><stop offset="100%" stopColor="#6d28d9" /></linearGradient>
+          <filter id="hubHeroGlow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          <filter id="hubHeroBlur" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="12" /></filter>
         </defs>
 
-        <g opacity="0.96">
-          <path d="M36 226 L240 42 L444 226 L240 408 Z" fill="url(#districtBase)" stroke="#4c1d95" strokeWidth="1.4" />
-          <path d="M62 226 L240 66 L418 226 L240 386 Z" fill="none" stroke="#6366f1" strokeWidth="1" opacity="0.28" />
-          <path d="M36 226 H444 M240 42 V408 M96 172 L306 360 M174 102 L384 290 M96 280 L306 92 M174 352 L384 164" fill="none" stroke="#050816" strokeWidth="15" strokeLinecap="round" opacity="0.78" />
-          <path d="M36 226 H444 M240 42 V408 M96 172 L306 360 M174 102 L384 290 M96 280 L306 92 M174 352 L384 164" fill="none" stroke="#334155" strokeWidth="2" strokeLinecap="round" strokeDasharray="10 14" opacity="0.48" />
-          <path d="M72 228 C118 197 160 184 206 190 C282 200 312 176 392 140" fill="none" stroke="#7c3aed" strokeWidth="1.1" opacity="0.24" />
-          <path d="M86 306 C144 276 193 272 242 288 C288 304 330 302 394 270" fill="none" stroke="#38bdf8" strokeWidth="1" opacity="0.18" />
+        <path d="M56 280 L380 66 L704 280 L380 514 Z" fill="url(#hubHeroPlate)" stroke="#7c3aed" strokeOpacity="0.45" strokeWidth="1.5" />
+        <path d="M92 280 L380 91 L668 280 L380 488 Z" fill="none" stroke="#38bdf8" strokeOpacity="0.16" strokeWidth="1.2" />
+        {blocks.map((block) => <path key={block} d={block} fill="#111827" opacity="0.54" stroke="#334155" strokeOpacity="0.55" />)}
+        <g fill="none" strokeLinecap="round">
+          <path d="M60 280 H700 M380 70 V512 M122 196 L588 438 M212 124 L680 366 M116 376 L552 124 M220 456 L652 202" stroke="url(#hubHeroRoad)" strokeWidth="25" opacity="0.92" />
+          <path d="M60 280 H700 M380 70 V512 M122 196 L588 438 M212 124 L680 366 M116 376 L552 124 M220 456 L652 202" stroke="#64748b" strokeWidth="1.4" strokeDasharray="12 18" opacity="0.44" />
         </g>
 
-        <g stroke="url(#activeLine)" strokeLinecap="round" filter="url(#softGlow)">
-          {hubHomes.map((home) => (
-            <path key={home.id} d={`M${home.x} ${home.y + 14} C${(home.x + center.x) / 2} ${home.y}, ${(home.x + center.x) / 2} ${center.y + 26}, ${center.x} ${center.y}`} fill="none" strokeWidth="2.5" opacity="0.86" />
-          ))}
-          <circle cx={center.x} cy={center.y} r="92" fill="none" strokeWidth="1" strokeDasharray="3 10" opacity="0.34" />
+        <g stroke="url(#hubHeroLine)" strokeLinecap="round" filter="url(#hubHeroGlow)">
+          {activeUnits.map((unit) => <path key={unit.id} d={`M${unit.x} ${unit.y + 78} C${(unit.x + center.x) / 2} ${unit.y + 56}, ${(unit.x + center.x) / 2} ${center.y + 38}, ${center.x} ${center.y}`} fill="none" strokeWidth="3" opacity="0.9" />)}
+          <circle cx={center.x} cy={center.y} r="114" fill="none" strokeWidth="1.3" strokeDasharray="4 12" opacity="0.4" />
         </g>
 
-        <g>
-          {homes.map((home) => {
-            const width = 58 * home.size;
-            const height = 36 * home.size;
-            const roofHeight = 25 * home.size;
-            const x = home.x - width / 2;
-            const y = home.y - height / 2;
-            const active = home.hub;
+        {dormantUnits.map((unit) => <Unit key={unit.id} x={unit.x} y={unit.y} scale={unit.scale} />)}
+        {activeUnits.map((unit) => <Unit key={unit.id} x={unit.x} y={unit.y} scale={unit.scale} active label={unit.label} tone={unit.tone as "violet" | "sky" | "fuchsia"} />)}
 
-            return (
-              <g key={home.id} opacity={active ? 1 : 0.3} filter={active ? "url(#softGlow)" : undefined} transform={`rotate(${home.rotation} ${home.x} ${home.y})`}>
-                <ellipse cx={home.x} cy={y + height + 13} rx={width * 0.72} ry="11" fill="#020617" opacity={active ? 0.58 : 0.44} />
-                {active ? <ellipse cx={home.x} cy={home.y + 13} rx={width * 0.86} ry="21" fill={home.accent} opacity="0.12" /> : null}
-                <path d={`M${home.x} ${y - roofHeight} L${x + width} ${y} L${home.x} ${y + roofHeight * 0.74} L${x} ${y} Z`} fill={active ? "url(#activeRoof)" : "#334155"} stroke={active ? "#f5d0fe" : "#64748b"} strokeWidth="1.35" />
-                <path d={`M${x} ${y} L${home.x} ${y + roofHeight * 0.74} L${home.x} ${y + height} L${x} ${y + height - roofHeight * 0.74} Z`} fill={active ? "url(#activeWallLeft)" : "#94a3b8"} />
-                <path d={`M${x + width} ${y} L${home.x} ${y + roofHeight * 0.74} L${home.x} ${y + height} L${x + width} ${y + height - roofHeight * 0.74} Z`} fill={active ? "url(#activeWallRight)" : "#64748b"} />
-                <path d={`M${home.x} ${y + roofHeight * 0.74} L${home.x} ${y + height}`} stroke={active ? "#7c3aed" : "#475569"} strokeWidth="1" opacity="0.65" />
-                <rect x={home.x - 6 * home.size} y={y + height - 20 * home.size} width={12 * home.size} height={17 * home.size} rx="2" fill={active ? "#4c1d95" : "#334155"} />
-                <rect x={x + width * 0.18} y={y + height - 25 * home.size} width={8 * home.size} height={8 * home.size} rx="1.5" fill={active ? "#38bdf8" : "#1e293b"} opacity={active ? 0.95 : 0.65} />
-                <rect x={x + width * 0.68} y={y + height - 25 * home.size} width={8 * home.size} height={8 * home.size} rx="1.5" fill={active ? "#f0abfc" : "#1e293b"} opacity={active ? 0.92 : 0.65} />
-                <circle cx={home.x} cy={home.y + 14} r={active ? 4.8 : 2.8} fill={active ? home.accent : "#64748b"} />
-                {home.label ? <text x={home.x} y={y + height + 31} textAnchor="middle" fill="#f5d0fe" fontSize="9" fontWeight="900" letterSpacing="1.3" opacity="0.84">{home.label.toUpperCase()}</text> : null}
-              </g>
-            );
-          })}
-        </g>
-
-        <g filter="url(#violetAura)">
-          <circle cx={center.x} cy={center.y} r="70" fill="#140a2e" stroke="#8b5cf6" strokeWidth="1.8" opacity="0.9" />
-          <circle cx={center.x} cy={center.y} r="54" fill="#24104f" stroke="#38bdf8" strokeWidth="1.3" opacity="0.92" />
-          <path d="M240 170 L282 194 L282 242 L240 266 L198 242 L198 194 Z" fill="#6d28d9" opacity="0.9" stroke="#f5d0fe" strokeWidth="1.2" />
-          <text x={center.x} y={center.y + 9} textAnchor="middle" fill="#ffffff" fontSize="36" fontWeight="900" fontFamily="Arial, sans-serif">H</text>
-          <text x={center.x} y={center.y + 48} textAnchor="middle" fill="#ddd6fe" fontSize="12" fontWeight="900" letterSpacing="3.2" fontFamily="Arial, sans-serif">HUBYA</text>
+        <g filter="url(#hubHeroGlow)">
+          <circle cx={center.x} cy={center.y} r="84" fill="#080415" stroke="#a78bfa" strokeWidth="1.6" />
+          <circle cx={center.x} cy={center.y} r="62" fill="#1f0b46" stroke="#38bdf8" strokeOpacity="0.72" strokeWidth="1.4" />
+          <path d="M420 202 L476 235 L476 300 L420 334 L364 300 L364 235 Z" fill="#6d28d9" stroke="#f5d0fe" strokeWidth="1.4" />
+          <text x={center.x} y={center.y + 12} textAnchor="middle" fill="#ffffff" fontSize="48" fontWeight="900" fontFamily="Arial, sans-serif">H</text>
+          <text x={center.x} y={center.y + 58} textAnchor="middle" fill="#ddd6fe" fontSize="13" fontWeight="900" letterSpacing="4" fontFamily="Arial, sans-serif">HUBYA</text>
         </g>
 
         <g fontFamily="Arial, sans-serif">
-          <text x="32" y="37" fill="#e9d5ff" fontSize="12" fontWeight="900" letterSpacing="2.6">AGRUPAMOS POTENCIAL</text>
-          <text x="32" y="58" fill="#94a3b8" fontSize="11" fontWeight="700">casas apagadas + casas iluminadas → núcleo operativo</text>
-          <g transform="translate(314 30)">
-            <rect width="132" height="42" rx="16" fill="#020617" opacity="0.68" stroke="#8b5cf6" />
-            <circle cx="19" cy="21" r="5" fill="#a78bfa" />
-            <circle cx="19" cy="21" r="12" fill="#a78bfa" opacity="0.13" />
-            <text x="34" y="25" fill="#f5d0fe" fontSize="10" fontWeight="900" letterSpacing="1.7">HUB ACTIVO</text>
+          <g transform="translate(38 36)">
+            <rect width="258" height="64" rx="22" fill="#020617" opacity="0.72" stroke="#8b5cf6" strokeOpacity="0.35" />
+            <text x="20" y="27" fill="#f5d0fe" fontSize="12" fontWeight="900" letterSpacing="2.3">AGRUPAMOS POTENCIAL</text>
+            <text x="20" y="48" fill="#94a3b8" fontSize="11" fontWeight="700">casas activas conectadas · barrio ordenado</text>
+          </g>
+          <g transform="translate(548 40)">
+            <rect width="154" height="52" rx="20" fill="#020617" opacity="0.7" stroke="#38bdf8" strokeOpacity="0.28" />
+            <text x="22" y="24" fill="#e0f2fe" fontSize="11" fontWeight="900" letterSpacing="1.7">P = W / t</text>
+            <text x="22" y="40" fill="#c4b5fd" fontSize="9" fontWeight="800" letterSpacing="1.2">POTENCIA OPERATIVA</text>
           </g>
         </g>
       </svg>
