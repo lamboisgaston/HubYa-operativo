@@ -43,20 +43,23 @@ model Contacto {
 
 model Membership {
   id                   String   @id @default(cuid())
-  email                String
+  email                String   @unique
   nombre               String?
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
   status               String   @default("pending")
   plan                 String   @default("hubya_membership")
   priceId              String?
+  currentPeriodEnd     DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 }
 
 model StripeEvent {
-  id        String   @id
-  type      String
-  payload   Json
-  createdAt DateTime @default(now())
+  id            String   @id
+  stripeEventId String?  @unique
+  type          String
+  processed     Boolean  @default(false)
+  payload       Json
+  createdAt     DateTime @default(now())
 }

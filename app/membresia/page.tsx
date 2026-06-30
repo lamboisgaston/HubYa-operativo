@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HubyaBrandLogo } from "@/components/HubyaBrandLogo";
+import { MembershipCheckoutButton } from "@/components/MembershipCheckoutButton";
 
 const beneficios = [
   {
@@ -87,10 +88,7 @@ export default function MembresiaPage() {
                 En HUBYA, agrupamos potencial y lo transformamos en potencia operativa: más trabajo coordinado en menos tiempo.
               </p>
 
-              <div className="mt-6 rounded-2xl bg-violet-200 px-5 py-4 text-center text-sm font-black text-[#12071f] shadow-lg shadow-violet-950/30 opacity-80">
-                Suscribirme
-                <span className="block text-xs font-bold opacity-60">Checkout Stripe · próximo paso</span>
-              </div>
+              <MembershipCheckoutButton />
 
               <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-white/40">Producto Stripe</p>
