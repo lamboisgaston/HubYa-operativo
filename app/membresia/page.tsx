@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HubyaBrandLogo } from "@/components/HubyaBrandLogo";
 import { MembershipCheckoutButton } from "@/components/MembershipCheckoutButton";
+import { IngenieroWhatsappCard } from "@/components/IngenieroWhatsappCard";
 
 const beneficios = [
   {
@@ -89,6 +90,10 @@ export default function MembresiaPage() {
               </p>
 
               <MembershipCheckoutButton />
+
+              <div className="mt-6">
+                <IngenieroWhatsappCard compact />
+              </div>
 
               <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-white/40">Producto Stripe</p>
