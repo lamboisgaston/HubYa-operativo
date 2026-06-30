@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+const stripePaymentLinkUrl = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL;
+
 export function MembershipCheckoutButton() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -11,6 +13,11 @@ export function MembershipCheckoutButton() {
     setLoading(true);
 
     try {
+      if (stripePaymentLinkUrl) {
+        window.location.href = stripePaymentLinkUrl;
+        return;
+      }
+
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: {
