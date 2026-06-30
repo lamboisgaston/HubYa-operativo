@@ -6,6 +6,17 @@ export type NormalizedWhatsappIncomingMessage = {
   source: "whatsapp";
 };
 
+export type WhatsappPayloadDiagnostics = {
+  object?: string;
+  entryCount: number;
+  hasChanges: boolean;
+  hasMessages: boolean;
+  hasContacts: boolean;
+  phoneNumberId?: string;
+  messagesCount: number;
+  contactsCount: number;
+};
+
 function textField(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -54,4 +65,47 @@ export function normalizeIncomingMessages(payload: unknown): NormalizedWhatsappI
         .filter((message): message is NormalizedWhatsappIncomingMessage => message !== null);
     });
   });
+}
+
+export function getWhatsappPayloadDiagnostics(payload: unknown): WhatsappPayloadDiagnostics {
+  const root = asRecord(payload);
+  const entries = Array.isArray(root?.entry) ? root.entry : [];
+  let hasChanges = false;
+  let hasMessages = false;
+  let hasContacts = false;
+  let phoneNumberId: string | undefined;
+  let messagesCount = 0;
+  let contactsCount = 0;
+
+  for (const entry of entries) {
+    const entryRecord = asRecord(entry);
+    const changes = Array.isArray(entryRecord?.changes) ? entryRecord.changes : [];
+    if (changes.length > 0) hasChanges = true;
+
+    for (const change of changes) {
+      const changeRecord = asRecord(change);
+      const value = asRecord(changeRecord?.value);
+      const metadata = asRecord(value?.metadata);
+      const currentPhoneNumberId = textField(metadata?.phone_number_id);
+      if (currentPhoneNumberId && !phoneNumberId) phoneNumberId = currentPhoneNumberId;
+
+      const messages = Array.isArray(value?.messages) ? value.messages : [];
+      const contacts = Array.isArray(value?.contacts) ? value.contacts : [];
+      messagesCount += messages.length;
+      contactsCount += contacts.length;
+      if (messages.length > 0) hasMessages = true;
+      if (contacts.length > 0) hasContacts = true;
+    }
+  }
+
+  return {
+    object: textField(root?.object) || undefined,
+    entryCount: entries.length,
+    hasChanges,
+    hasMessages,
+    hasContacts,
+    phoneNumberId,
+    messagesCount,
+    contactsCount,
+  };
 }

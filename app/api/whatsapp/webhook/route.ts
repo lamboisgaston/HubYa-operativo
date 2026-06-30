@@ -1,5 +1,5 @@
 import { generateElIngenieroReply } from "@/lib/ai/elIngeniero";
-import { normalizeIncomingMessages } from "@/lib/whatsapp/normalizeIncomingMessage";
+import { getWhatsappPayloadDiagnostics, normalizeIncomingMessages } from "@/lib/whatsapp/normalizeIncomingMessage";
 import { sendWhatsappMessage } from "@/lib/whatsapp/sendWhatsappMessage";
 
 export async function GET(request: Request) {
@@ -16,14 +16,44 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const receivedAt = new Date().toISOString();
   const payload = await request.json().catch(() => null);
+  const diagnostics = getWhatsappPayloadDiagnostics(payload);
   const messages = normalizeIncomingMessages(payload);
 
+  console.info("[WHATSAPP_WEBHOOK] POST recibido", {
+    timestamp: receivedAt,
+    object: diagnostics.object,
+    entryCount: diagnostics.entryCount,
+    hasChanges: diagnostics.hasChanges,
+    hasMessages: diagnostics.hasMessages,
+    hasContacts: diagnostics.hasContacts,
+    messagesCount: diagnostics.messagesCount,
+    contactsCount: diagnostics.contactsCount,
+    phoneNumberId: diagnostics.phoneNumberId,
+    normalizedMessagesCount: messages.length,
+    firstFromPhone: messages[0]?.fromPhone,
+    firstMessageText: messages[0]?.messageText,
+    firstMessageId: messages[0]?.messageId,
+  });
+
+  if (messages.length === 0) {
+    console.info("[WHATSAPP_WEBHOOK] Mensaje ignorado", {
+      reason: diagnostics.hasMessages ? "No hay texto válido para responder." : "El payload no incluye messages.",
+      timestamp: receivedAt,
+      object: diagnostics.object,
+      phoneNumberId: diagnostics.phoneNumberId,
+    });
+  }
+
   for (const message of messages) {
-    console.info("Mensaje WhatsApp recibido", {
+    console.info("[WHATSAPP_WEBHOOK] Mensaje WhatsApp recibido", {
       fromPhone: message.fromPhone,
+      messageText: message.messageText,
       messageId: message.messageId,
       timestamp: message.timestamp,
+      source: message.source,
+      phoneNumberId: diagnostics.phoneNumberId,
     });
 
     const reply = await generateElIngenieroReply({
@@ -32,20 +62,26 @@ export async function POST(request: Request) {
       source: message.source,
     });
 
-    console.info("Respuesta generada por El Ingeniero", {
+    console.info("[WHATSAPP_WEBHOOK] Respuesta generada por El Ingeniero", {
       fromPhone: message.fromPhone,
       messageId: message.messageId,
       needsHuman: reply.needsHuman,
     });
 
+    console.info("[WHATSAPP_WEBHOOK] Intentando enviar respuesta por WhatsApp", {
+      fromPhone: message.fromPhone,
+      messageId: message.messageId,
+    });
+
     const sendResult = await sendWhatsappMessage({ to: message.fromPhone, message: reply.reply });
 
-    console.info("Respuesta enviada por WhatsApp", {
+    console.info("[WHATSAPP_WEBHOOK] Resultado envío WhatsApp", {
       fromPhone: message.fromPhone,
       messageId: message.messageId,
       ok: sendResult.ok,
       skipped: sendResult.skipped,
       status: sendResult.status,
+      error: sendResult.error,
     });
   }
 
