@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { HubyaBrandLogo } from "@/components/HubyaBrandLogo";
+import { IngenieroWhatsappCard } from "@/components/IngenieroWhatsappCard";
 import { getHubs } from "@/lib/data/hubs";
 
 const ideas = [
@@ -293,6 +294,9 @@ export default async function WebPublicaPage() {
                 <a href="#concepto" className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-black text-white transition hover:bg-white/10">
                   Entender el concepto
                 </a>
+                <a href="#ingeniero" className="rounded-2xl border border-emerald-300/35 bg-emerald-400/10 px-5 py-3 text-sm font-black text-emerald-100 transition hover:bg-emerald-400/20">
+                  Hablar con El Ingeniero
+                </a>
               </div>
             </div>
 
@@ -416,7 +420,13 @@ export default async function WebPublicaPage() {
         </div>
       </section>
 
-      <section id="contacto" className="px-5 py-12 sm:px-8">
+      <section id="ingeniero" className="px-5 py-12 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <IngenieroWhatsappCard />
+        </div>
+      </section>
+
+      <section id="contacto" className="px-5 pb-12 sm:px-8">
         <div className="mx-auto max-w-7xl rounded-[1.7rem] border border-white/10 bg-white/[0.05] p-7 text-center shadow-2xl shadow-black/20">
           <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Contacto</p>
           <h2 className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-tight sm:text-5xl">Hablemos de tu próximo Hub.</h2>
