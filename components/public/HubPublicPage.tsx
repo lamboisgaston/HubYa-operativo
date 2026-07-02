@@ -49,7 +49,30 @@ function IntegranteItem({ integrante }: { integrante: IntegranteEquipoOperativoP
 
 export function HubPublicPage({ hub }: { hub: HubPublico }) {
   const categoria = getHubCategoryConfig(hub.categoriaId);
-  const parametrosJardinerosYa = categoria.slug === "mantenimiento-espacios-verdes" && hub.moduloOperativo === "jardinerosya" && hub.parametrosOperativos?.jardinerosYa?.mostrarEnWebPublica ? hub.parametrosOperativos.jardinerosYa : null;
+  const parametrosJardinerosYa =
+    categoria.slug === "mantenimiento-espacios-verdes" && hub.moduloOperativo === "jardinerosya"
+      ? (hub.parametrosOperativos?.jardinerosYa ?? {
+          valorHoraTrabajo: 0,
+          comisionResponsableCuadrillaPorcentaje: 0,
+          traslado: 0,
+          aceite: 0,
+          nafta: 0,
+          valorHoraCortadoraCesped: 0,
+          valorHoraBordeadora: 0,
+          valorHoraMaquinaEmpuje: 0,
+          escalasComisionManejoPersonal: [
+            { desde: 1, hasta: 1, porcentaje: 0 },
+            { desde: 2, hasta: 2, porcentaje: 0 },
+            { desde: 3, hasta: 5, porcentaje: 0 },
+          ],
+          escalasTrasladoBonoFinalizacion: [
+            { desde: 1, hasta: 1, valor: 0 },
+            { desde: 2, hasta: 3, valor: 0 },
+            { desde: 4, hasta: 6, valor: 0 },
+          ],
+          mostrarEnWebPublica: false,
+        })
+      : null;
   const equipo = obtenerEquipo(hub);
   const responsable = hub.responsableHub;
   const tieneResponsable = Boolean(responsable?.nombre);
