@@ -31,6 +31,7 @@ const TARIFAS_CLIENTE: Array<{ value: TarifaCliente; label: string }> = [
 ];
 
 type FilaGasto = { id: number; concepto: string; importe: CampoNumerico };
+type ComponentesHub = { maquinariaTrasladoResponsable: string };
 type FilaActor = { id: number; nombre: string; activo: boolean; participacion: CampoNumerico; ajusteManual: CampoNumerico; email?: string; whatsapp?: string; rol?: string; recibeReportes?: boolean; participaDistribucion?: boolean; observacion?: string };
 
 type ResumenHubManual = {
@@ -46,6 +47,7 @@ type DatosHub = {
   actores: FilaActor[];
   resumen: ResumenHubManual;
   clienteActivoId: number;
+  componentes: ComponentesHub;
 };
 type DatosPorHub = Record<HubDisponible, DatosHub>;
 
@@ -246,6 +248,7 @@ function formatoPlano(valor: CampoNumerico | undefined) {
 }
 
 const MENSAJE_SIN_GASTOS_REALES = "No se registraron gastos adicionales en este reporte.";
+const CONCEPTO_MAQUINARIA_TRASLADO = "Maquinaria y traslado";
 const conceptosReferenciaHub = ["referencia", "parametro", "parámetro", "jornal", "comision", "comisión", "valor hora", "hora cortadora", "hora bordeadora", "maquina de empuje", "máquina de empuje", "jardinerosya"];
 
 function esGastoRealDelDia(gasto: FilaGasto) {
@@ -275,6 +278,10 @@ function resumenInicial(): ResumenHubManual {
     estadoOperativo: "Operativo",
     observacionGeneral: observacionGeneralInicial,
   };
+}
+
+function componentesHubInicial(): ComponentesHub {
+  return { maquinariaTrasladoResponsable: "" };
 }
 
 function clienteIngresoInicial(nombre: string, index = 0, baseId = 1000): FilaClienteIngreso {
@@ -327,7 +334,7 @@ function datosHubInicial(hub: HubDisponible): DatosHub {
   const clientesIngresos = clientesDelHub.map((nombre, index) => clienteIngresoInicial(nombre, index, hubIndex * 1000));
   return {
     clientesIngresos,
-    gastos: ["Nafta", "Maquinaria", "Servicios de administración del Hub", "Tanza"].map((concepto, index) => ({ id: hubIndex * 10000 + index, concepto, importe: 0 })),
+    gastos: ["Nafta", CONCEPTO_MAQUINARIA_TRASLADO, "Servicios de administración del Hub", "Tanza"].map((concepto, index) => ({ id: hubIndex * 10000 + index, concepto, importe: 0 })),
     actores: [
       { nombre: "", rol: "Capataz", participacion: 1.5 },
       { nombre: "", rol: "Segundo jardinero", participacion: 1.2 },
@@ -335,6 +342,7 @@ function datosHubInicial(hub: HubDisponible): DatosHub {
     ].map((actor, index) => ({ id: hubIndex * 100000 + index, nombre: actor.nombre, rol: actor.rol, activo: true, participacion: actor.participacion, ajusteManual: 0 })),
     resumen: resumenInicial(),
     clienteActivoId: clientesIngresos[0]?.id || 0,
+    componentes: componentesHubInicial(),
   };
 }
 
@@ -446,9 +454,10 @@ function normalizarDatosHub(datos: (Partial<DatosHub> & { distribucion?: (Partia
   const clientesIngresos = clientesFuente.map(normalizarCliente);
   return {
     clientesIngresos,
-    gastos: gastosFuente.map((gasto) => ({ id: gasto.id || crearId(), concepto: gasto.concepto || "", importe: gasto.importe ?? 0 })),
+    gastos: gastosFuente.map((gasto) => ({ id: gasto.id || crearId(), concepto: /^maquinaria$/i.test((gasto.concepto || "").trim()) ? CONCEPTO_MAQUINARIA_TRASLADO : gasto.concepto || "", importe: gasto.importe ?? 0 })),
     actores: actoresFuente.map((actor, index) => normalizarActor(actor, index)),
     resumen: { ...resumenInicial(), ...datos?.resumen },
+    componentes: { ...componentesHubInicial(), ...datos?.componentes },
     clienteActivoId: clientesIngresos.some((cliente) => cliente.id === datos?.clienteActivoId) ? Number(datos?.clienteActivoId) : clientesIngresos[0]?.id || 0,
   };
 }
@@ -1075,6 +1084,10 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     actualizarDatosHub({ resumen: { ...datosHub.resumen, ...cambios } });
   }
 
+  function actualizarComponentes(cambios: Partial<ComponentesHub>) {
+    actualizarDatosHub({ componentes: { ...datosHub.componentes, ...cambios } });
+  }
+
   function actualizarCliente(id: number, cambios: Partial<FilaClienteIngreso>) {
     const clienteActual = datosHub.clientesIngresos.find((cliente) => cliente.id === id);
     actualizarDatosHub({ clientesIngresos: datosHub.clientesIngresos.map((cliente) => cliente.id === id ? { ...cliente, ...cambios } : cliente) });
@@ -1264,6 +1277,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
   const horasMaquinariaReporte = precioHoraMaquinariaReferencia > 0 && totalGastosMaquinaria > 0 ? totalGastosMaquinaria / precioHoraMaquinariaReferencia : 0;
   const formatoHorasMaquinaria = horasMaquinariaReporte > 0 ? horasMaquinariaReporte.toLocaleString("es-AR", { maximumFractionDigits: 2 }) : "—";
   const formatoPrecioHoraMaquinaria = precioHoraMaquinariaReferencia > 0 ? formatoMoneda(precioHoraMaquinariaReferencia) : "—";
+  const responsableMaquinariaTraslado = datosHub.componentes.maquinariaTrasladoResponsable.trim();
+  const responsableMaquinariaTrasladoResumen = responsableMaquinariaTraslado || "Sin asignar";
 
 
   function aportesHubParaCliente(clienteObjetivo: FilaClienteIngreso | undefined) {
@@ -1298,10 +1313,11 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
       "",
       "Gastos del Hub:",
       "",
-      "1. Servicios de maquinaria al Hub",
-      `Horas de maquinaria: ${formatoHorasMaquinaria} h`,
+      "1. Maquinaria y traslado del Hub",
+      `A cargo de: ${responsableMaquinariaTrasladoResumen}`,
+      `Horas de maquinaria y traslado: ${formatoHorasMaquinaria} h`,
       `Precio por hora: ${formatoPrecioHoraMaquinaria}`,
-      `Subtotal maquinaria: ${formatoMoneda(totalGastosMaquinaria)}`,
+      `Subtotal maquinaria y traslado: ${formatoMoneda(totalGastosMaquinaria)}`,
       "",
       "2. Servicios de administración del Hub",
       `Subtotal administración: ${formatoMoneda(totalGastosAdministracion)}`,
@@ -1323,7 +1339,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     ].filter(Boolean).join("\n");
   }
 
-  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
+  const reporteTexto = useMemo(() => textoReportePrevioParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.componentes.maquinariaTrasladoResponsable, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalADistribuir, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
 
   function reporteTextoParaCliente(clienteObjetivo: FilaClienteIngreso) {
     return textoReportePrevioParaCliente(clienteObjetivo);
@@ -1381,7 +1397,8 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
           </div>
           <div style="margin-top:10px;background:#fff;border:1px solid #e1e6dc;border-radius:16px;padding:12px;">
             <h2 style="margin:0 0 8px;font-size:15px;font-weight:900;">Gastos del Hub</h2>
-            <p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de maquinaria al Hub</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoHorasMaquinaria)} h x ${escaparHtml(formatoPrecioHoraMaquinaria)} = ${escaparHtml(formatoMoneda(totalGastosMaquinaria))}</strong></p>
+            <p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Maquinaria y traslado del Hub</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoHorasMaquinaria)} h x ${escaparHtml(formatoPrecioHoraMaquinaria)} = ${escaparHtml(formatoMoneda(totalGastosMaquinaria))}</strong></p>
+            <p style="margin:0 0 5px;color:#66745c;font-weight:700;"><span>A cargo de: ${escaparHtml(responsableMaquinariaTrasladoResumen)}</span></p>
             <p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Servicios de administración del Hub</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(totalGastosAdministracion))}</strong></p>
             <p style="margin:0 0 5px;display:flex;justify-content:space-between;gap:12px;"><span>Otros insumos</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoMoneda(totalGastosOtrosInsumos))}</strong></p>
             <p style="margin:8px 0 0;border-top:1px solid #e1e6dc;padding-top:8px;display:flex;justify-content:space-between;gap:12px;"><span>Total de gastos</span><strong style="font-size:13px;font-weight:800;">${escaparHtml(formatoPlano(totalGastos) || formatoMoneda(0))}</strong></p>
@@ -1400,7 +1417,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
     </article>`;
   }
 
-  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
+  const reporteHtml = useMemo(() => armarReporteHtmlParaCliente(clienteActivoReporte), [clienteActivoReporte, clientesDelHub, datosHub.componentes.maquinariaTrasladoResponsable, datosHub.resumen.observacionGeneral, distribucionCalculada, fechaFormateada, formatoHorasMaquinaria, formatoPrecioHoraMaquinaria, integrantesParticipantesReporte, integrantesSalteanVisitaReporte, jornada.hub, servicioRealizadoReporte, totalDistribuido, totalFacturadoHub, totalGastos, totalGastosAdministracion, totalGastosMaquinaria, totalGastosOtrosInsumos, totalPagarEquipoOperativo, totalParticipacion]);
 
 
 
@@ -2223,7 +2240,7 @@ export default function OperativoLegacy({ initialSection = "reporte", initialHub
 
             <section className="grid gap-3 lg:grid-cols-2">
               <div className="space-y-3">
-                <div id="paso-gastos" className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 3 — Gastos reales del día</h3><p className="mb-2 text-xs font-bold text-[#66745c]">Los gastos son valores reales del día. No cargues acá parámetros del Hub.</p>{datosHub.gastos.length === 0 && <p className="mb-2 rounded-lg bg-[#f8faf5] p-2 text-xs font-black text-[#66745c]">No se registraron gastos adicionales en este reporte.</p>}<table className="w-full border-collapse text-xs"><tbody>{datosHub.gastos.map((gasto, index) => <tr key={`gasto-${gasto.id}-${index}`}><td className="border p-1">{inputTexto(gasto.concepto, (valor) => actualizarGasto(gasto.id, { concepto: valor }), "min-w-28")}</td><td className="border p-1">{inputNumero(gasto.importe, (valor) => actualizarGasto(gasto.id, { importe: valor }))}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ gastos: datosHub.gastos.filter((fila) => fila.id !== gasto.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table><button onClick={() => actualizarDatosHub({ gastos: [...datosHub.gastos, { id: crearId(), concepto: "", importe: 0 }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar gasto</button></div>
+                <div id="paso-gastos" className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 3 — Gastos reales del día</h3><p className="mb-2 text-xs font-bold text-[#66745c]">Los gastos son valores reales del día. No cargues acá parámetros del Hub.</p><label className="mb-2 grid gap-1 rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2 text-[11px] font-bold uppercase text-[#66745c]">Maquinaria y traslado · A cargo de<input value={datosHub.componentes.maquinariaTrasladoResponsable} onChange={(e) => actualizarComponentes({ maquinariaTrasladoResponsable: e.target.value })} placeholder="Gastón Lambois, Exequiel Garzón..." className="h-8 rounded-lg border border-[#cfd8c6] bg-white px-2 text-sm font-semibold normal-case outline-none focus:border-[#5d7032]" /></label>{datosHub.gastos.length === 0 && <p className="mb-2 rounded-lg bg-[#f8faf5] p-2 text-xs font-black text-[#66745c]">No se registraron gastos adicionales en este reporte.</p>}<table className="w-full border-collapse text-xs"><tbody>{datosHub.gastos.map((gasto, index) => <tr key={`gasto-${gasto.id}-${index}`}><td className="border p-1">{inputTexto(gasto.concepto, (valor) => actualizarGasto(gasto.id, { concepto: valor }), "min-w-28")}</td><td className="border p-1">{inputNumero(gasto.importe, (valor) => actualizarGasto(gasto.id, { importe: valor }))}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ gastos: datosHub.gastos.filter((fila) => fila.id !== gasto.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table><button onClick={() => actualizarDatosHub({ gastos: [...datosHub.gastos, { id: crearId(), concepto: "", importe: 0 }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar gasto</button></div>
               </div>
               <div className="rounded-xl border border-[#d8dfd1] bg-white p-3 shadow-sm"><h3 className="mb-1 text-xs font-black uppercase text-[#66745c]">Paso 4 — Estimado de distribución</h3><p className="mb-2 text-xs font-bold text-[#66745c]">Calculadora interna editable para simular cómo se puede distribuir el saldo. No es una liquidación definitiva.</p><div className="mb-2 grid gap-2 text-xs sm:grid-cols-3"><div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><p className="font-black text-[#66745c]">Saldo distribuible</p><p className="font-black">{formatoMoneda(totalADistribuir)}</p></div><div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><p className="font-black text-[#66745c]">Total de puntos</p><p className="font-black">{totalParticipacion.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</p></div><div className="rounded-lg border border-[#cfd8c6] bg-[#f8faf5] p-2"><p className="font-black text-[#66745c]">Total estimado distribuido</p><p className="font-black">{formatoMoneda(totalDistribuido)}</p></div></div><div className="overflow-x-auto"><table className="w-full border-collapse text-xs"><thead className="bg-[#f1f4ec] text-left text-[10px] uppercase text-[#66745c]"><tr><th className="border p-1">Nombre</th><th className="border p-1">Rol</th><th className="border p-1">Participación</th><th className="border p-1">Estimado</th><th className="border p-1"></th></tr></thead><tbody>{distribucionCalculada.map((actor, index) => <tr key={`actor-${actor.id}-${index}`}><td className="border p-1">{inputTexto(actor.nombre, (valor) => actualizarActor(actor.id, { nombre: valor }), "min-w-32")}</td><td className="border p-1">{inputTexto(actor.rol || "", (valor) => actualizarActor(actor.id, { rol: valor }), "min-w-32")}</td><td className="border p-1">{inputNumero(actor.participacion, (valor) => actualizarActor(actor.id, { participacion: valor }))}</td><td className="border p-1 text-right font-black">{formatoMoneda(actor.importeDistribuido)}</td><td className="border p-1 text-center"><button onClick={() => actualizarDatosHub({ actores: datosHub.actores.filter((item) => item.id !== actor.id) })} className="font-black text-[#743c3c]">×</button></td></tr>)}</tbody></table></div><button onClick={() => actualizarDatosHub({ actores: [...datosHub.actores, { id: crearId(), nombre: "", rol: "Integrante", activo: true, participacion: 1, ajusteManual: 0, participaDistribucion: true, recibeReportes: true }] })} className="mt-2 h-7 rounded-md border px-3 text-xs font-black">Agregar integrante</button></div>
             </section>
