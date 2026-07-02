@@ -30,6 +30,13 @@ const membresia = [
   "Comunicación operativa para convertir intención en acción concreta.",
 ];
 
+const parametrosJardinerosYa = [
+  "Hora de trabajo",
+  "Manejo de personal",
+  "Traslado del equipo",
+  "Uso de maquinaria",
+];
+
 function vecinosAgrupadosHub(hub: HubPublico) {
   return hub.vecinosAgrupados ?? hub.clientesActivos;
 }
@@ -263,6 +270,37 @@ export default async function HomePage() {
                 <p className="mt-3 text-sm font-semibold leading-7 text-white/60">{idea.texto}</p>
               </article>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="parametros" className="px-5 py-14 sm:px-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2.2rem] border border-violet-200/15 bg-white/[0.045] p-6 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8">
+          <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-sky-200">JardinerosYa</p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Parámetros para ordenar el servicio</h2>
+              <p className="mt-5 text-base font-semibold leading-8 text-white/68">
+                JardinerosYa ayuda a que el servicio no se cobre a ojo. HUBYA no solo agrupa vecinos para contratar servicios: también ofrece referencias operativas para ordenar el valor del trabajo.
+              </p>
+              <p className="mt-5 rounded-[1.35rem] border border-sky-300/20 bg-sky-400/10 px-5 py-4 text-lg font-black leading-7 text-sky-100">
+                “Trabajar sin parámetros es como construir una casa sin metro.”
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold leading-7 text-white/62">
+                La plataforma permite orientar cuánto debería pagarse por hora de trabajo, cuánto corresponde por manejo o coordinación de personal, cuánto corresponde por traslado del equipo hasta la casa y cuánto corresponde por tiempo de uso de maquinaria.
+              </p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {parametrosJardinerosYa.map((parametro, index) => (
+                  <article key={parametro} className="rounded-[1.45rem] border border-white/10 bg-[#070A18]/70 p-5 shadow-xl shadow-black/10">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-200">Referencia 0{index + 1}</p>
+                    <h3 className="mt-3 text-xl font-black text-white">{parametro}</h3>
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
