@@ -7,20 +7,20 @@ import { getHubs, type HubPublico } from "@/lib/data/hubs";
 
 const ideas = [
   {
-    titulo: "Buscamos demanda",
-    texto: "Encontramos necesidades reales que aparecen dispersas en barrios, personas, instituciones y empresas.",
+    titulo: "Agrupamos demanda",
+    texto: "HUBYA reúne vecinos, clientes o unidades de una misma zona para que la necesidad deje de estar aislada.",
   },
   {
-    titulo: "Buscamos oferta",
-    texto: "Mapeamos capacidades, prestadores, proveedores y equipos que pueden resolver esas necesidades.",
+    titulo: "Coordinamos oferta",
+    texto: "El hub permite contratar servicios con una demanda más clara y equipos mejor organizados.",
   },
   {
-    titulo: "Agrupamos personas",
-    texto: "Una casa sola tiene una necesidad. Varias casas conectadas tienen potencial agrupado.",
+    titulo: "Ordenamos tareas",
+    texto: "El vecino no queda solo: el hub coordina personas, equipos, comunicación y seguimiento operativo.",
   },
   {
-    titulo: "Generamos tecnología",
-    texto: "Ordenamos comunicación, membresías, capacidad y operación para que cada Hub pueda funcionar.",
+    titulo: "Mejoramos operación",
+    texto: "La demanda agrupada mejora la oferta y convierte necesidades dispersas en servicios más previsibles.",
   },
 ];
 
@@ -42,11 +42,11 @@ function estadoAtencionHub(hub: HubPublico) {
 function HubNeighborhoodIllustration() {
   const center = { x: 420, y: 268 };
   const activeUnits = [
-    { id: "a01", x: 172, y: 126, label: "Demanda", scale: 1.05, tone: "violet" },
-    { id: "a02", x: 546, y: 126, label: "Oferta", scale: 0.98, tone: "sky" },
-    { id: "a03", x: 154, y: 354, label: "Capacidad", scale: 0.95, tone: "fuchsia" },
-    { id: "a04", x: 578, y: 386, label: "Operación", scale: 1.08, tone: "violet" },
-    { id: "a05", x: 330, y: 430, label: "Personas", scale: 0.9, tone: "sky" },
+    { id: "a01", x: 172, y: 126, label: "Vecinos", scale: 1.05, tone: "violet" },
+    { id: "a02", x: 546, y: 126, label: "Casas", scale: 0.98, tone: "sky" },
+    { id: "a03", x: 154, y: 354, label: "Unidades", scale: 0.95, tone: "fuchsia" },
+    { id: "a04", x: 578, y: 386, label: "Vecinos", scale: 1.08, tone: "violet" },
+    { id: "a05", x: 330, y: 430, label: "Casas", scale: 0.9, tone: "sky" },
   ];
 
   const dormantUnits = [
@@ -138,11 +138,20 @@ function HubNeighborhoodIllustration() {
           <text x={center.x} y={center.y + 58} textAnchor="middle" fill="#ddd6fe" fontSize="13" fontWeight="900" letterSpacing="4" fontFamily="Arial, sans-serif">HUBYA</text>
         </g>
 
+        <g filter="url(#hubHeroGlow)">
+          <path d="M606 252 h78 a18 18 0 0 1 18 18 v38 h-114 v-38 a18 18 0 0 1 18-18Z" fill="#020617" stroke="#38bdf8" strokeOpacity="0.58" />
+          <path d="M610 244 h50 l20 18 h-70Z" fill="#0f172a" stroke="#a78bfa" strokeOpacity="0.55" />
+          <circle cx="618" cy="316" r="10" fill="#111827" stroke="#f8fafc" strokeOpacity="0.72" />
+          <circle cx="674" cy="316" r="10" fill="#111827" stroke="#f8fafc" strokeOpacity="0.72" />
+          <text x="645" y="287" textAnchor="middle" fill="#e0f2fe" fontSize="13" fontWeight="900" fontFamily="Arial, sans-serif">SERVICIO</text>
+          <path d="M588 306 C546 308, 506 298, 476 282" fill="none" stroke="#38bdf8" strokeWidth="3" strokeDasharray="8 10" opacity="0.78" />
+        </g>
+
         <g fontFamily="Arial, sans-serif">
           <g transform="translate(38 36)">
             <rect width="258" height="64" rx="22" fill="#020617" opacity="0.72" stroke="#8b5cf6" strokeOpacity="0.35" />
-            <text x="20" y="27" fill="#f5d0fe" fontSize="12" fontWeight="900" letterSpacing="2.3">AGRUPAMOS POTENCIAL</text>
-            <text x="20" y="48" fill="#94a3b8" fontSize="11" fontWeight="700">vecinos agrupados · servicios coordinados</text>
+            <text x="20" y="27" fill="#f5d0fe" fontSize="12" fontWeight="900" letterSpacing="2.3">VECINOS AGRUPADOS</text>
+            <text x="20" y="48" fill="#94a3b8" fontSize="11" fontWeight="700">casas conectadas · hub central · servicios</text>
           </g>
           <g transform="translate(548 40)">
             <rect width="154" height="52" rx="20" fill="#020617" opacity="0.7" stroke="#38bdf8" strokeOpacity="0.28" />
@@ -202,7 +211,7 @@ export default async function HomePage() {
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg font-semibold leading-8 text-white/70">
-                Buscamos demanda, buscamos oferta, agrupamos personas y generamos tecnología para que los Hubs se comuniquen, se ordenen y puedan operar.
+                HUBYA agrupa vecinos, clientes o unidades de demanda para contratar servicios de forma organizada. Un hub permite que varias personas de una misma zona coordinen equipos, tareas y operación sin quedar solas frente al servicio.
               </p>
 
               <div className="mt-8 grid max-w-xl gap-3 rounded-[1.5rem] border border-violet-300/20 bg-white/[0.05] p-5 shadow-xl shadow-violet-950/20 sm:grid-cols-[0.55fr_1fr] sm:items-center">
@@ -211,7 +220,7 @@ export default async function HomePage() {
                   <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-sky-200">Potencia = trabajo / tiempo</p>
                 </div>
                 <p className="text-sm font-semibold leading-7 text-white/65">
-                  En HUBYA, agrupamos potencial y lo transformamos en potencia operativa.
+                  La demanda agrupada mejora la oferta: más claridad para contratar, más coordinación para ejecutar y mejor seguimiento para cada vecino.
                 </p>
               </div>
 
@@ -240,9 +249,9 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
             <p className="text-xs font-black uppercase tracking-[0.24em] text-violet-200">Concepto</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Lo ordenamos en Hubs. Lo convertimos en potencia operativa.</h2>
+            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Qué es un hub: vecinos conectados para contratar mejor.</h2>
             <p className="mt-5 text-base font-semibold leading-8 text-white/65">
-              Una casa sola tiene una necesidad. Varias casas conectadas tienen potencial agrupado. Cuando HUBYA las organiza con tecnología, comunicación y operación, ese potencial se vuelve potencia operativa.
+              Un hub permite que varias personas de una misma zona se agrupen para contratar servicios, coordinar equipos y mejorar la organización operativa. Una casa sola tiene una necesidad; varias casas conectadas tienen una demanda clara y más capacidad de respuesta.
             </p>
           </div>
 
