@@ -12,7 +12,9 @@ export type Cliente = { id: string; nombre: string; email: string; whatsapp: str
 export type ContactoInput = Partial<Pick<Cliente, "nombre" | "email" | "whatsapp" | "referencia" | "direccion" | "servicioInteres" | "observaciones" | "tarifaCliente" | "hubId" | "tipoDestino" | "estado">>;
 export type HubInformacionImportante = { titulo: string; texto: string; mostrarEnWebPublica: boolean; mostrarEnReporte: boolean };
 export type ModuloOperativoHub = "jardinerosya" | "fumigadoresya" | "comerciarya" | "pileterosya" | "otro";
-export type ParametrosJardinerosYaHub = { valorHoraTrabajo: number; comisionResponsableCuadrillaPorcentaje: number; traslado: number; aceite: number; nafta: number; valorHoraCortadoraCesped: number; valorHoraBordeadora: number; valorHoraMaquinaEmpuje: number; mostrarEnWebPublica: boolean };
+export type RangoComisionManejoPersonal = { desde: number; hasta: number; porcentaje: number };
+export type RangoTrasladoBonoFinalizacion = { desde: number; hasta: number; valor: number };
+export type ParametrosJardinerosYaHub = { valorHoraTrabajo: number; comisionResponsableCuadrillaPorcentaje: number; comisionManejoPersonal: RangoComisionManejoPersonal[]; traslado: number; trasladoBonoFinalizacion: RangoTrasladoBonoFinalizacion[]; aceite: number; nafta: number; valorHoraCortadoraCesped: number; valorHoraBordeadora: number; valorHoraMaquinaEmpuje: number; mostrarEnWebPublica: boolean };
 export type ParametrosOperativosHub = { jardinerosYa?: ParametrosJardinerosYaHub };
 export type ResponsableHub = { nombre: string; iniciales: string; rol: string; descripcion: string };
 export type IntegranteEquipoOperativoPublico = { nombre: string; rol?: string; activo?: boolean };
@@ -30,6 +32,17 @@ export type ReporteHub = { id: string; hubId?: string; hub?: string; estado: Est
 export type HubOperativo = HubPublico & { cantidadClientes: number; cantidadReportesBorrador: number; cantidadReportesGuardados: number; estabilidadOperativa: string; serviciosActivos: HubServicioPublico[] };
 export type HubDetalleOperativo = HubOperativo & { ficha: HubPublico; clientes: Cliente[]; reportesBorrador: ReporteHub[]; reportesGuardados: ReporteHub[]; reportesEnviados: ReporteHub[]; vinculos: HubServicioVinculo[]; postulantes: HubServicioVinculo[] };
 export type NuevoHubDemandaInput = { nombre: string; zona: string; branchId?: BranchSlug; categoriaId?: HubCategorySlug; descripcionPublica?: string; rama?: string; equipoOperativo?: string };
+
+const comisionManejoPersonalInicial: RangoComisionManejoPersonal[] = [
+  { desde: 1, hasta: 1, porcentaje: 15 },
+  { desde: 2, hasta: 2, porcentaje: 20 },
+  { desde: 3, hasta: 5, porcentaje: 25 },
+];
+const trasladoBonoFinalizacionInicial: RangoTrasladoBonoFinalizacion[] = [
+  { desde: 1, hasta: 1, valor: 0 },
+  { desde: 2, hasta: 3, valor: 0 },
+  { desde: 4, hasta: 6, valor: 0 },
+];
 
 type Store = { branches?: BranchConfig[]; hubs: Hub[]; clientes: Cliente[]; solicitudes: unknown[]; hub_servicios: HubServicio[]; hub_servicio_vinculos: HubServicioVinculo[]; reportes?: ReporteHub[]; mensajes_operativos?: unknown[]; respuestas_operativas?: unknown[]; parameterResponses?: unknown[]; salesProposals?: unknown[]; salesProposalResponses?: unknown[] };
 const DATA_FILE = path.join(process.cwd(), "data", "hubya-public.json");
@@ -149,9 +162,33 @@ function deduplicarHubs(hubsEntrada: Hub[]) {
   return { hubs, idCanonico };
 }
 
-export function parametrosJardinerosYaVacios(): ParametrosJardinerosYaHub { return { valorHoraTrabajo: 0, comisionResponsableCuadrillaPorcentaje: 0, traslado: 0, aceite: 0, nafta: 0, valorHoraCortadoraCesped: 0, valorHoraBordeadora: 0, valorHoraMaquinaEmpuje: 0, mostrarEnWebPublica: false }; }
+export function parametrosJardinerosYaVacios(): ParametrosJardinerosYaHub { return { valorHoraTrabajo: 0, comisionResponsableCuadrillaPorcentaje: 0, comisionManejoPersonal: comisionManejoPersonalInicial, traslado: 0, trasladoBonoFinalizacion: trasladoBonoFinalizacionInicial, aceite: 0, nafta: 0, valorHoraCortadoraCesped: 0, valorHoraBordeadora: 0, valorHoraMaquinaEmpuje: 0, mostrarEnWebPublica: false }; }
 
-export function normalizarParametrosJardinerosYa(input: Partial<ParametrosJardinerosYaHub> | undefined): ParametrosJardinerosYaHub { const base = parametrosJardinerosYaVacios(); return Object.fromEntries(Object.entries(base).map(([clave, valor]) => [clave, clave === "mostrarEnWebPublica" ? Boolean(input?.mostrarEnWebPublica) : Number((input?.[clave as keyof ParametrosJardinerosYaHub] ?? valor) || 0)])) as ParametrosJardinerosYaHub; }
+function normalizarRangos<T extends { desde: number; hasta: number }>(input: unknown, iniciales: T[], extra: (rango: Record<string, unknown>, base: T) => Partial<T>): T[] {
+  const rangos = Array.isArray(input) && input.length > 0 ? input : iniciales;
+  return rangos.map((rango, index) => {
+    const base = iniciales[index] || iniciales[iniciales.length - 1];
+    const actual = (rango && typeof rango === "object" ? rango : {}) as Record<string, unknown>;
+    return { ...base, desde: Math.max(0, Math.round(Number(actual.desde ?? base.desde) || 0)), hasta: Math.max(0, Math.round(Number(actual.hasta ?? base.hasta) || 0)), ...extra(actual, base) };
+  });
+}
+
+export function normalizarParametrosJardinerosYa(input: Partial<ParametrosJardinerosYaHub> | undefined): ParametrosJardinerosYaHub {
+  const base = parametrosJardinerosYaVacios();
+  return {
+    valorHoraTrabajo: Number(input?.valorHoraTrabajo ?? base.valorHoraTrabajo) || 0,
+    comisionResponsableCuadrillaPorcentaje: Number(input?.comisionResponsableCuadrillaPorcentaje ?? base.comisionResponsableCuadrillaPorcentaje) || 0,
+    comisionManejoPersonal: normalizarRangos(input?.comisionManejoPersonal, comisionManejoPersonalInicial, (rango, base) => ({ porcentaje: Number(rango.porcentaje ?? base.porcentaje) || 0 })),
+    traslado: Number(input?.traslado ?? base.traslado) || 0,
+    trasladoBonoFinalizacion: normalizarRangos(input?.trasladoBonoFinalizacion, trasladoBonoFinalizacionInicial, (rango, base) => ({ valor: Number(rango.valor ?? base.valor) || 0 })),
+    aceite: Number(input?.aceite ?? base.aceite) || 0,
+    nafta: Number(input?.nafta ?? base.nafta) || 0,
+    valorHoraCortadoraCesped: Number(input?.valorHoraCortadoraCesped ?? base.valorHoraCortadoraCesped) || 0,
+    valorHoraBordeadora: Number(input?.valorHoraBordeadora ?? base.valorHoraBordeadora) || 0,
+    valorHoraMaquinaEmpuje: Number(input?.valorHoraMaquinaEmpuje ?? base.valorHoraMaquinaEmpuje) || 0,
+    mostrarEnWebPublica: Boolean(input?.mostrarEnWebPublica),
+  };
+}
 
 function normalizarNivelEstabilidad(valor: unknown): number { const numero = Number(valor); if (!Number.isFinite(numero)) return 8; return Math.min(10, Math.max(1, Math.round(numero))); }
 
