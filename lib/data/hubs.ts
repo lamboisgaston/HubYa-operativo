@@ -14,9 +14,13 @@ export type HubInformacionImportante = { titulo: string; texto: string; mostrarE
 export type ModuloOperativoHub = "jardinerosya" | "fumigadoresya" | "comerciarya" | "pileterosya" | "otro";
 export type ParametrosJardinerosYaHub = { valorHoraTrabajo: number; comisionResponsableCuadrillaPorcentaje: number; traslado: number; aceite: number; nafta: number; valorHoraCortadoraCesped: number; valorHoraBordeadora: number; valorHoraMaquinaEmpuje: number; mostrarEnWebPublica: boolean };
 export type ParametrosOperativosHub = { jardinerosYa?: ParametrosJardinerosYaHub };
+export type ResponsableHub = { nombre: string; iniciales: string; rol: string; descripcion: string };
+export type IntegranteEquipoOperativoPublico = { nombre: string; rol?: string; activo?: boolean };
+export type EquipoOperativoPublico = { cantidad: number; integrantes: IntegranteEquipoOperativoPublico[] };
+export type MetricasOperativasHub = { trabajosTerminados: number; clientesActivos: number; ultimaActividad?: string };
 export type RolHubOperativo = "Capataz" | "Responsable de cuadrilla" | "Jardinero" | "Ayudante" | "Técnico" | "Paisajista" | "Coordinador" | "Otro";
 export type IntegranteHubOperativo = { id: string; nombre: string; email: string; whatsapp: string; rol: RolHubOperativo; tipoParticipacion: string; activo: boolean; recibeReportes: boolean; participaDistribucion: boolean; porcentajeOCriterio: string; notaInterna: string; createdAt: string; updatedAt: string };
-export type Hub = { id: string; branchId: BranchSlug; nombre: string; slug: string; zona: string; estado: HubEstado; categoriaId: HubCategorySlug; tipo: HubCategorySlug; descripcionPublica: string; rama: string; equipoOperativo: string; moduloOperativo?: ModuloOperativoHub; parametrosOperativos?: ParametrosOperativosHub; hubOperativo?: IntegranteHubOperativo[]; nivelEstabilidad?: number; activo: boolean; informacionImportante?: HubInformacionImportante; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
+export type Hub = { id: string; branchId: BranchSlug; nombre: string; slug: string; zona: string; estado: HubEstado; categoriaId: HubCategorySlug; tipo: HubCategorySlug; descripcionPublica: string; rama: string; equipoOperativo: string | EquipoOperativoPublico; responsableHub?: ResponsableHub; metricasOperativas?: MetricasOperativasHub; moduloOperativo?: ModuloOperativoHub; parametrosOperativos?: ParametrosOperativosHub; hubOperativo?: IntegranteHubOperativo[]; nivelEstabilidad?: number; activo: boolean; informacionImportante?: HubInformacionImportante; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
 export type HubServicio = { id: string; hub_id: string; nombre_servicio: string; descripcion: string; activo: boolean };
 export type HubServicioVinculo = { id: string; hub_servicio_id: string; oferta_nombre: string; estado: EstadoHubServicioVinculo; responsable: string; observaciones: string; created_at: string; updated_at: string };
 export type HubServicioPublico = HubServicio & { vinculoActivo: HubServicioVinculo | null; postulantes: HubServicioVinculo[] };
@@ -31,13 +35,42 @@ type Store = { branches?: BranchConfig[]; hubs: Hub[]; clientes: Cliente[]; soli
 const DATA_FILE = path.join(process.cwd(), "data", "hubya-public.json");
 const now = new Date().toISOString();
 const seedHubDefinitions: Array<{ zona: string; branchId: BranchSlug; categoriaId: HubCategorySlug; equipoOperativo: string; moduloOperativo: ModuloOperativoHub }> = [
-  ...["El Tipal", "Praderas", "Prado", "Punto"].map((zona) => ({ zona, branchId: "mantenimiento-verde" as const, categoriaId: "mantenimiento-espacios-verdes" as const, equipoOperativo: "JardinerosYa01", moduloOperativo: "jardinerosya" as const })),
+  ...["El Tipal", "Praderas", "Prado", "Punto", "Chacras", "La Guada", "Valle Escondido", "Reserva"].map((zona) => ({ zona, branchId: "mantenimiento-verde" as const, categoriaId: "mantenimiento-espacios-verdes" as const, equipoOperativo: "JardinerosYa01", moduloOperativo: "jardinerosya" as const })),
   ...["Consorcios", "Comercios", "Industrias", "Mineras"].map((zona) => ({ zona, branchId: "control-de-plagas" as const, categoriaId: "fumigacion-control-plagas" as const, equipoOperativo: "FumigadoresYa01", moduloOperativo: "fumigadoresya" as const })),
   ...["Huevos", "Verduras", "Productos recurrentes"].map((zona) => ({ zona, branchId: "ventas" as const, categoriaId: "reparto-recurrente" as const, equipoOperativo: "ComerciarYa01", moduloOperativo: "comerciarya" as const })),
 ];
 const seedHubs: Hub[] = seedHubDefinitions.map(({ zona, branchId, categoriaId, equipoOperativo, moduloOperativo }, index) => {
   const branch = getBranchConfig(branchId);
-  return { id: `hub-${index + 1}`, nombre: `Hub ${zona}`, slug: slugHub(zona), zona, estado: "activo", branchId, categoriaId, tipo: categoriaId, descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente y trabajos programados sin exponer datos privados.`, rama: branch.name, equipoOperativo, moduloOperativo, parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, hubOperativo: [], nivelEstabilidad: 8, activo: true, trabajosRealizados: 0, ultimaActividad: now, createdAt: now, updatedAt: now };
+  const esElTipal = zona === "El Tipal";
+  return {
+    id: `hub-${index + 1}`,
+    nombre: `Hub ${zona}`,
+    slug: slugHub(zona),
+    zona,
+    estado: "activo",
+    branchId,
+    categoriaId,
+    tipo: categoriaId,
+    descripcionPublica: `Hub operativo de ${zona} para coordinar demanda recurrente y trabajos programados sin exponer datos privados.`,
+    rama: branch.name,
+    equipoOperativo: esElTipal ? { cantidad: 4, integrantes: [
+      { nombre: "Hernán Llanes", rol: "Responsable del hub", activo: true },
+      { nombre: "Equipo operativo", rol: "Integrante operativo", activo: true },
+      { nombre: "Equipo operativo", rol: "Integrante operativo", activo: true },
+      { nombre: "Equipo operativo", rol: "Integrante operativo", activo: true },
+    ] } : equipoOperativo,
+    responsableHub: esElTipal ? { nombre: "Hernán Llanes", iniciales: "HL", rol: "Responsable del hub / Coordinador operativo", descripcion: "Responsable de coordinar la atención operativa de las casas vinculadas al hub." } : undefined,
+    metricasOperativas: esElTipal ? { trabajosTerminados: 1245, clientesActivos: 9, ultimaActividad: "30/6/2026" } : undefined,
+    moduloOperativo,
+    parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() },
+    hubOperativo: [],
+    nivelEstabilidad: 8,
+    activo: true,
+    trabajosRealizados: esElTipal ? 1245 : 0,
+    ultimaActividad: esElTipal ? "2026-06-30T00:00:00.000Z" : now,
+    createdAt: now,
+    updatedAt: now,
+  };
 });
 const seedClientes: Cliente[] = Array.from({ length: 9 }, (_, index) => ({ id: `cliente-tipal-${index + 1}`, nombre: `Cliente ${index + 1}`, email: "", whatsapp: "", referencia: "Alta inicial", tarifaCliente: "sin_tarifa", hubId: "hub-1", tipoDestino: "cliente", estado: "activo", createdAt: now, updatedAt: now }));
 const servicioBasePorHub = [
@@ -105,7 +138,7 @@ function deduplicarHubs(hubsEntrada: Hub[]) {
     }
     const slug = slugHub(hub.nombre.replace(/^Hub\s+/i, "") || hub.zona || hub.slug);
     const branchId = normalizeBranchSlug(hub.branchId || hub.rama, hub.categoriaId || hub.tipo);
-    const canonico = { ...hub, branchId, nivelEstabilidad: normalizarNivelEstabilidad(hub.nivelEstabilidad), nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim(), informacionImportante: normalizarInformacionImportante(hub.informacionImportante), categoriaId: normalizeHubCategory(hub.categoriaId || hub.tipo || hub.moduloOperativo || hub.rama || branchId), rama: getBranchConfig(branchId).name, tipo: normalizeHubCategory(hub.tipo || hub.categoriaId || hub.moduloOperativo || hub.rama), moduloOperativo: normalizarModuloOperativo(hub.moduloOperativo || hub.rama), parametrosOperativos: { ...hub.parametrosOperativos, jardinerosYa: normalizarParametrosJardinerosYa(hub.parametrosOperativos?.jardinerosYa) }, hubOperativo: normalizarHubOperativo(hub.hubOperativo) };
+    const canonico = { ...hub, branchId, nivelEstabilidad: normalizarNivelEstabilidad(hub.nivelEstabilidad), nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim(), informacionImportante: normalizarInformacionImportante(hub.informacionImportante), categoriaId: normalizeHubCategory(hub.categoriaId || hub.tipo || hub.moduloOperativo || hub.rama || branchId), rama: getBranchConfig(branchId).name, tipo: normalizeHubCategory(hub.tipo || hub.categoriaId || hub.moduloOperativo || hub.rama), moduloOperativo: normalizarModuloOperativo(hub.moduloOperativo || hub.rama), parametrosOperativos: { ...hub.parametrosOperativos, jardinerosYa: normalizarParametrosJardinerosYa(hub.parametrosOperativos?.jardinerosYa) }, hubOperativo: normalizarHubOperativo(hub.hubOperativo), responsableHub: normalizarResponsableHub(hub.responsableHub), equipoOperativo: normalizarEquipoOperativoPublico(hub.equipoOperativo), metricasOperativas: normalizarMetricasOperativas(hub.metricasOperativas, hub) };
     idCanonico.set(clave, canonico.id);
     idCanonico.set(canonico.id, canonico.id);
     idCanonico.set(canonico.slug, canonico.id);
@@ -129,6 +162,21 @@ function normalizarInformacionImportante(info: Partial<HubInformacionImportante>
 function normalizarRolHubOperativo(valor: unknown): RolHubOperativo {
   const rol = String(valor || "Otro").trim();
   return (["Capataz", "Responsable de cuadrilla", "Jardinero", "Ayudante", "Técnico", "Paisajista", "Coordinador", "Otro"] as RolHubOperativo[]).includes(rol as RolHubOperativo) ? rol as RolHubOperativo : "Otro";
+}
+
+function normalizarResponsableHub(responsable: Partial<ResponsableHub> | undefined): ResponsableHub | undefined {
+  if (!responsable?.nombre && !responsable?.iniciales && !responsable?.rol && !responsable?.descripcion) return undefined;
+  return { nombre: String(responsable.nombre || "").trim(), iniciales: String(responsable.iniciales || "").trim(), rol: String(responsable.rol || "").trim(), descripcion: String(responsable.descripcion || "").trim() };
+}
+
+function normalizarEquipoOperativoPublico(equipo: string | Partial<EquipoOperativoPublico> | undefined): string | EquipoOperativoPublico {
+  if (!equipo || typeof equipo === "string") return String(equipo || "Equipo a asignar");
+  const integrantes = Array.isArray(equipo.integrantes) ? equipo.integrantes.map((integrante) => ({ nombre: String(integrante.nombre || "").trim(), rol: String(integrante.rol || "").trim(), activo: integrante.activo !== false })).filter((integrante) => integrante.nombre) : [];
+  return { cantidad: Math.max(0, Number(equipo.cantidad || integrantes.length || 0)), integrantes };
+}
+
+function normalizarMetricasOperativas(metricas: Partial<MetricasOperativasHub> | undefined, hub?: Partial<Hub>): MetricasOperativasHub {
+  return { trabajosTerminados: Math.max(0, Number(metricas?.trabajosTerminados ?? hub?.trabajosRealizados ?? 0) || 0), clientesActivos: Math.max(0, Number(metricas?.clientesActivos ?? 0) || 0), ultimaActividad: metricas?.ultimaActividad ? String(metricas.ultimaActividad) : hub?.ultimaActividad ? String(hub.ultimaActividad) : undefined };
 }
 
 function normalizarHubOperativo(integrantes: Partial<IntegranteHubOperativo>[] | undefined): IntegranteHubOperativo[] {
@@ -171,7 +219,9 @@ export async function getHubs(): Promise<HubPublico[]> { const store = await rea
 export async function getHubBySlug(slug: string): Promise<HubPublico | null> { return (await getHubs()).find((hub) => hub.slug === slug) || null; }
 export async function getClientesByHubId(hubId: string): Promise<Cliente[]> { const store = await readStore(); return store.clientes.filter((cliente) => cliente.hubId === hubId && cliente.estado === "activo"); }
 export function slugHub(valor: string) { return valor.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `hub-${Date.now()}`; }
-export async function createHubDemanda(input: NuevoHubDemandaInput) { const store = await readStore(); const branchId = normalizeBranchSlug(input.branchId || input.rama, input.categoriaId); const categoriaId = input.categoriaId ? normalizeHubCategory(input.categoriaId) : getDefaultCategoryForBranch(branchId); const categoria = getHubCategoryConfig(categoriaId); const branch = getBranchConfig(branchId); const timestamp = new Date().toISOString(); const nombre = nombreHubCanonico(input.nombre.trim() || input.zona.trim() || "nuevo"); const zona = input.zona.trim() || nombre.replace(/^Hub\s+/i, ""); const claveNueva = normalizarClaveHub(nombre); const existente = store.hubs.find((hub) => normalizarClaveHub(hub.nombre) === claveNueva || normalizarClaveHub(hub.zona) === claveNueva); if (existente) return { ...existente, branch: getBranchConfig(existente.branchId), clientesActivos: store.clientes.filter((cliente) => cliente.hubId === existente.id && cliente.estado === "activo").length, servicios: serviciosPublicos(store, existente.id) }; const baseSlug = slugHub(nombre.replace(/^Hub\s+/i, "")); let slug = baseSlug; let suffix = 2; while (store.hubs.some((hub) => hub.slug === slug)) { slug = `${baseSlug}-${suffix}`; suffix += 1; } const nuevo: Hub = { id: `hub-${Date.now()}`, nombre, slug, zona, estado: "activo", branchId, categoriaId, tipo: categoriaId, descripcionPublica: input.descripcionPublica?.trim() || `Hub de demanda de ${zona} para agrupar clientes y coordinar oferta operativa disponible.`, rama: branch.name, equipoOperativo: input.equipoOperativo?.trim() || "Equipo a asignar", moduloOperativo: categoria.moduloOperativoSugerido, parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, hubOperativo: [], nivelEstabilidad: 8, activo: true, trabajosRealizados: 0, ultimaActividad: timestamp, createdAt: timestamp, updatedAt: timestamp }; store.hubs = [nuevo, ...store.hubs]; await saveStore(store); return { ...nuevo, branch, clientesActivos: 0, servicios: [] }; }
+export async function createHubDemanda(input: NuevoHubDemandaInput) { const store = await readStore(); const branchId = normalizeBranchSlug(input.branchId || input.rama, input.categoriaId); const categoriaId = input.categoriaId ? normalizeHubCategory(input.categoriaId) : getDefaultCategoryForBranch(branchId); const categoria = getHubCategoryConfig(categoriaId); const branch = getBranchConfig(branchId); const timestamp = new Date().toISOString(); const nombre = nombreHubCanonico(input.nombre.trim() || input.zona.trim() || "nuevo"); const zona = input.zona.trim() || nombre.replace(/^Hub\s+/i, ""); const claveNueva = normalizarClaveHub(nombre); const existente = store.hubs.find((hub) => normalizarClaveHub(hub.nombre) === claveNueva || normalizarClaveHub(hub.zona) === claveNueva); if (existente) return { ...existente, branch: getBranchConfig(existente.branchId), clientesActivos: store.clientes.filter((cliente) => cliente.hubId === existente.id && cliente.estado === "activo").length, servicios: serviciosPublicos(store, existente.id) }; const baseSlug = slugHub(nombre.replace(/^Hub\s+/i, "")); let slug = baseSlug; let suffix = 2; while (store.hubs.some((hub) => hub.slug === slug)) { slug = `${baseSlug}-${suffix}`; suffix += 1; } const nuevo: Hub = { id: `hub-${Date.now()}`, nombre, slug, zona, estado: "activo", branchId, categoriaId, tipo: categoriaId, descripcionPublica: input.descripcionPublica?.trim() || `Hub de demanda de ${zona} para agrupar clientes y coordinar oferta operativa disponible.`, rama: branch.name, equipoOperativo: input.equipoOperativo?.trim() || "Equipo a asignar",
+    responsableHub: undefined,
+    metricasOperativas: { trabajosTerminados: 0, clientesActivos: 0, ultimaActividad: timestamp }, moduloOperativo: categoria.moduloOperativoSugerido, parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() }, hubOperativo: [], nivelEstabilidad: 8, activo: true, trabajosRealizados: 0, ultimaActividad: timestamp, createdAt: timestamp, updatedAt: timestamp }; store.hubs = [nuevo, ...store.hubs]; await saveStore(store); return { ...nuevo, branch, clientesActivos: 0, servicios: [] }; }
 export async function addClienteToHub(hubId: string, cliente: Omit<Cliente, "id" | "hubId" | "tipoDestino" | "tarifaCliente" | "estado" | "createdAt" | "updatedAt"> & { tipoDestino?: TipoDestinoContacto; tarifaCliente?: TarifaClienteHub }) { return createContacto({ ...cliente, hubId }); }
 
 export async function getContactos(): Promise<Cliente[]> { const store = await readStore(); return store.clientes.filter((cliente) => cliente.estado !== "inactivo"); }
@@ -293,6 +343,30 @@ export async function updateHubOperativo(hubIdOrSlug: string, integrantes: Parti
   store.hubs = store.hubs.map((hub) => {
     if (hub.id !== hubIdOrSlug && hub.slug !== hubIdOrSlug) return hub;
     actualizado = { ...hub, hubOperativo: normalizarHubOperativo(integrantes).map((integrante) => ({ ...integrante, updatedAt: timestamp })), updatedAt: timestamp };
+    return actualizado;
+  });
+  if (!actualizado) return null;
+  await saveStore(store);
+  return actualizado;
+}
+
+
+export async function updateHubPerfilPublico(hubIdOrSlug: string, input: { responsableHub?: Partial<ResponsableHub>; equipoOperativo?: string | Partial<EquipoOperativoPublico>; metricasOperativas?: Partial<MetricasOperativasHub> }) {
+  const store = await readStore();
+  const timestamp = new Date().toISOString();
+  let actualizado: Hub | null = null;
+  store.hubs = store.hubs.map((hub) => {
+    if (hub.id !== hubIdOrSlug && hub.slug !== hubIdOrSlug) return hub;
+    const metricasOperativas = input.metricasOperativas ? normalizarMetricasOperativas(input.metricasOperativas, hub) : normalizarMetricasOperativas(hub.metricasOperativas, hub);
+    actualizado = {
+      ...hub,
+      responsableHub: input.responsableHub ? normalizarResponsableHub(input.responsableHub) : normalizarResponsableHub(hub.responsableHub),
+      equipoOperativo: input.equipoOperativo !== undefined ? normalizarEquipoOperativoPublico(input.equipoOperativo) : normalizarEquipoOperativoPublico(hub.equipoOperativo),
+      metricasOperativas,
+      trabajosRealizados: metricasOperativas.trabajosTerminados,
+      ultimaActividad: metricasOperativas.ultimaActividad || hub.ultimaActividad,
+      updatedAt: timestamp,
+    };
     return actualizado;
   });
   if (!actualizado) return null;
