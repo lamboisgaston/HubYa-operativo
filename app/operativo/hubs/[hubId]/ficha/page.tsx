@@ -41,7 +41,7 @@ export default async function FichaHubPage({ params }: { params: Promise<{ hubId
           <p className="mt-2 text-sm font-semibold text-[#66745c]">Clientes / vecinos / usuarios que reciben o pagan el servicio.</p>
           <div className="mt-4 grid gap-2 md:grid-cols-2">{clientesHub.map((cliente) => <div key={cliente.id} className="rounded-2xl bg-[#f8faf5] p-3 text-sm"><p className="font-black">{cliente.nombre}</p><p className="font-semibold text-[#66745c]">{cliente.email || "Sin email cargado"} · {cliente.whatsapp || "Sin WhatsApp"}</p></div>)}</div>
         </section>
-        <HubOperativoEditor hubSlug={hub.slug} integrantes={hub.hubOperativo || []} />
+        <HubOperativoEditor hubSlug={hub.slug} integrantes={hub.hubOperativo || []} responsableHub={hub.responsableHub} equipoOperativoPublico={hub.equipoOperativo} metricasOperativas={hub.metricasOperativas} clientesActivos={hub.clientesActivos} trabajosRealizados={hub.trabajosRealizados} ultimaActividad={hub.ultimaActividad} />
         <HubParametrosOperativosEditor hub={hub} />
         <HubInformacionImportanteEditor hubSlug={hub.slug} informacion={hub.informacionImportante} />
 
