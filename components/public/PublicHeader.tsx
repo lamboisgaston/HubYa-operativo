@@ -12,7 +12,6 @@ export function PublicHeader() {
           <a className="transition hover:text-[#1E8F4D]" href="#servicios-coordinados">¿Cómo funciona?</a>
           <a className="transition hover:text-[#1E8F4D]" href="#modulos">Módulos</a>
           <a className="transition hover:text-[#1E8F4D]" href="#hubs">Hubs</a>
-          <Link className="transition hover:text-[#1E8F4D]" href="/operativo">Operativo</Link>
         </div>
       </nav>
     </header>
