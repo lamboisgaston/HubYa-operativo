@@ -20,7 +20,7 @@ export type EquipoOperativoPublico = { cantidad: number; integrantes: Integrante
 export type MetricasOperativasHub = { trabajosTerminados: number; clientesActivos: number; ultimaActividad?: string };
 export type RolHubOperativo = "Capataz" | "Responsable de cuadrilla" | "Jardinero" | "Ayudante" | "Técnico" | "Paisajista" | "Coordinador" | "Otro";
 export type IntegranteHubOperativo = { id: string; nombre: string; email: string; whatsapp: string; rol: RolHubOperativo; tipoParticipacion: string; activo: boolean; recibeReportes: boolean; participaDistribucion: boolean; porcentajeOCriterio: string; notaInterna: string; createdAt: string; updatedAt: string };
-export type Hub = { id: string; branchId: BranchSlug; nombre: string; slug: string; zona: string; estado: HubEstado; categoriaId: HubCategorySlug; tipo: HubCategorySlug; descripcionPublica: string; rama: string; equipoOperativo: string | EquipoOperativoPublico; responsableHub?: ResponsableHub; metricasOperativas?: MetricasOperativasHub; moduloOperativo?: ModuloOperativoHub; parametrosOperativos?: ParametrosOperativosHub; hubOperativo?: IntegranteHubOperativo[]; nivelEstabilidad?: number; activo: boolean; informacionImportante?: HubInformacionImportante; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
+export type Hub = { id: string; branchId: BranchSlug; nombre: string; slug: string; zona: string; estado: HubEstado; categoriaId: HubCategorySlug; tipo: HubCategorySlug; descripcionPublica: string; rama: string; equipoOperativo: string | EquipoOperativoPublico; responsableHub?: ResponsableHub; metricasOperativas?: MetricasOperativasHub; vecinosAgrupados?: number; moduloOperativo?: ModuloOperativoHub; parametrosOperativos?: ParametrosOperativosHub; hubOperativo?: IntegranteHubOperativo[]; nivelEstabilidad?: number; activo: boolean; informacionImportante?: HubInformacionImportante; trabajosRealizados?: number; ultimaActividad?: string; createdAt: string; updatedAt: string };
 export type HubServicio = { id: string; hub_id: string; nombre_servicio: string; descripcion: string; activo: boolean };
 export type HubServicioVinculo = { id: string; hub_servicio_id: string; oferta_nombre: string; estado: EstadoHubServicioVinculo; responsable: string; observaciones: string; created_at: string; updated_at: string };
 export type HubServicioPublico = HubServicio & { vinculoActivo: HubServicioVinculo | null; postulantes: HubServicioVinculo[] };
@@ -39,6 +39,7 @@ const seedHubDefinitions: Array<{ zona: string; branchId: BranchSlug; categoriaI
   ...["Consorcios", "Comercios", "Industrias", "Mineras"].map((zona) => ({ zona, branchId: "control-de-plagas" as const, categoriaId: "fumigacion-control-plagas" as const, equipoOperativo: "FumigadoresYa01", moduloOperativo: "fumigadoresya" as const })),
   ...["Huevos", "Verduras", "Productos recurrentes"].map((zona) => ({ zona, branchId: "ventas" as const, categoriaId: "reparto-recurrente" as const, equipoOperativo: "ComerciarYa01", moduloOperativo: "comerciarya" as const })),
 ];
+const vecinosAgrupadosSeed: Record<string, number> = { "El Tipal": 9, Prado: 5, Praderas: 7 };
 const seedHubs: Hub[] = seedHubDefinitions.map(({ zona, branchId, categoriaId, equipoOperativo, moduloOperativo }, index) => {
   const branch = getBranchConfig(branchId);
   const esElTipal = zona === "El Tipal";
@@ -61,6 +62,7 @@ const seedHubs: Hub[] = seedHubDefinitions.map(({ zona, branchId, categoriaId, e
     ] } : equipoOperativo,
     responsableHub: esElTipal ? { nombre: "Hernán Llanes", iniciales: "HL", rol: "Responsable del hub / Coordinador operativo", descripcion: "Responsable de coordinar la atención operativa de las casas vinculadas al hub." } : undefined,
     metricasOperativas: esElTipal ? { trabajosTerminados: 1245, clientesActivos: 9, ultimaActividad: "30/6/2026" } : undefined,
+    vecinosAgrupados: vecinosAgrupadosSeed[zona] ?? 0,
     moduloOperativo,
     parametrosOperativos: { jardinerosYa: parametrosJardinerosYaVacios() },
     hubOperativo: [],
@@ -138,7 +140,7 @@ function deduplicarHubs(hubsEntrada: Hub[]) {
     }
     const slug = slugHub(hub.nombre.replace(/^Hub\s+/i, "") || hub.zona || hub.slug);
     const branchId = normalizeBranchSlug(hub.branchId || hub.rama, hub.categoriaId || hub.tipo);
-    const canonico = { ...hub, branchId, nivelEstabilidad: normalizarNivelEstabilidad(hub.nivelEstabilidad), nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim(), informacionImportante: normalizarInformacionImportante(hub.informacionImportante), categoriaId: normalizeHubCategory(hub.categoriaId || hub.tipo || hub.moduloOperativo || hub.rama || branchId), rama: getBranchConfig(branchId).name, tipo: normalizeHubCategory(hub.tipo || hub.categoriaId || hub.moduloOperativo || hub.rama), moduloOperativo: normalizarModuloOperativo(hub.moduloOperativo || hub.rama), parametrosOperativos: { ...hub.parametrosOperativos, jardinerosYa: normalizarParametrosJardinerosYa(hub.parametrosOperativos?.jardinerosYa) }, hubOperativo: normalizarHubOperativo(hub.hubOperativo), responsableHub: normalizarResponsableHub(hub.responsableHub), equipoOperativo: normalizarEquipoOperativoPublico(hub.equipoOperativo), metricasOperativas: normalizarMetricasOperativas(hub.metricasOperativas, hub) };
+    const canonico = { ...hub, branchId, nivelEstabilidad: normalizarNivelEstabilidad(hub.nivelEstabilidad), nombre: nombreHubCanonico(hub.nombre || hub.zona), slug, zona: hub.zona?.trim() || hub.nombre.replace(/^Hub\s+/i, "").trim(), informacionImportante: normalizarInformacionImportante(hub.informacionImportante), categoriaId: normalizeHubCategory(hub.categoriaId || hub.tipo || hub.moduloOperativo || hub.rama || branchId), rama: getBranchConfig(branchId).name, tipo: normalizeHubCategory(hub.tipo || hub.categoriaId || hub.moduloOperativo || hub.rama), moduloOperativo: normalizarModuloOperativo(hub.moduloOperativo || hub.rama), parametrosOperativos: { ...hub.parametrosOperativos, jardinerosYa: normalizarParametrosJardinerosYa(hub.parametrosOperativos?.jardinerosYa) }, hubOperativo: normalizarHubOperativo(hub.hubOperativo), responsableHub: normalizarResponsableHub(hub.responsableHub), equipoOperativo: normalizarEquipoOperativoPublico(hub.equipoOperativo), metricasOperativas: normalizarMetricasOperativas(hub.metricasOperativas, hub), vecinosAgrupados: normalizarVecinosAgrupados(hub.vecinosAgrupados, hub) };
     idCanonico.set(clave, canonico.id);
     idCanonico.set(canonico.id, canonico.id);
     idCanonico.set(canonico.slug, canonico.id);
@@ -177,6 +179,11 @@ function normalizarEquipoOperativoPublico(equipo: string | Partial<EquipoOperati
 
 function normalizarMetricasOperativas(metricas: Partial<MetricasOperativasHub> | undefined, hub?: Partial<Hub>): MetricasOperativasHub {
   return { trabajosTerminados: Math.max(0, Number(metricas?.trabajosTerminados ?? hub?.trabajosRealizados ?? 0) || 0), clientesActivos: Math.max(0, Number(metricas?.clientesActivos ?? 0) || 0), ultimaActividad: metricas?.ultimaActividad ? String(metricas.ultimaActividad) : hub?.ultimaActividad ? String(hub.ultimaActividad) : undefined };
+}
+
+function normalizarVecinosAgrupados(valor: unknown, hub?: Partial<Hub>): number {
+  const numero = Number(valor ?? hub?.metricasOperativas?.clientesActivos ?? 0);
+  return Number.isFinite(numero) ? Math.max(0, Math.round(numero)) : 0;
 }
 
 function normalizarHubOperativo(integrantes: Partial<IntegranteHubOperativo>[] | undefined): IntegranteHubOperativo[] {

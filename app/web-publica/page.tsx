@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { HubyaBrandLogo } from "@/components/HubyaBrandLogo";
 import { IngenieroWhatsappCard } from "@/components/IngenieroWhatsappCard";
-import { getHubs } from "@/lib/data/hubs";
+import { getHubs, type HubPublico } from "@/lib/data/hubs";
 
 const ideas = [
   {
@@ -30,22 +30,12 @@ const membresia = [
   "Comunicación operativa para convertir intención en acción concreta.",
 ];
 
-function tipoDeHub(rama: string) {
-  const normalizada = rama.toLowerCase();
+function vecinosAgrupadosHub(hub: HubPublico) {
+  return hub.vecinosAgrupados ?? hub.clientesActivos;
+}
 
-  if (normalizada.includes("mantenimiento") || normalizada.includes("verde")) {
-    return "Mantenimiento verde";
-  }
-
-  if (normalizada.includes("plaga") || normalizada.includes("fumig")) {
-    return "Control de plagas";
-  }
-
-  if (normalizada.includes("venta") || normalizada.includes("comercial")) {
-    return "Ventas agrupadas";
-  }
-
-  return rama || "Hub público";
+function estadoAtencionHub(hub: HubPublico) {
+  return hub.responsableHub?.nombre ? `Atendido por ${hub.responsableHub.nombre}` : "Postulate para este hub";
 }
 
 function capacidadMensual(usuarios: number) {
@@ -54,55 +44,6 @@ function capacidadMensual(usuarios: number) {
     verduras: usuarios * 2,
     horasMantenimiento: usuarios * 2,
   };
-}
-
-const hubProfiles = [
-  {
-    match: "tipal",
-    rubro: "Espacios verdes / coordinación operativa",
-    usuarios: 24,
-    potencial: "Alto",
-    estado: "Operativo",
-  },
-  {
-    match: "praderas",
-    rubro: "Organización de demanda barrial",
-    usuarios: 18,
-    potencial: "Medio/Alto",
-    estado: "Operativo",
-  },
-  {
-    match: "prado",
-    rubro: "Servicios coordinados",
-    usuarios: 15,
-    potencial: "Alto",
-    estado: "Operativo",
-  },
-  {
-    match: "punto",
-    rubro: "Hub en formación",
-    usuarios: 9,
-    potencial: "Medio",
-    estado: "En crecimiento",
-  },
-] as const;
-
-function perfilHub(nombre: string, usuariosReales: number, rama: string) {
-  const normalizado = nombre.toLowerCase();
-  const perfil = hubProfiles.find((item) => normalizado.includes(item.match));
-
-  return {
-    rubro: perfil?.rubro || tipoDeHub(rama),
-    usuarios: perfil?.usuarios || usuariosReales,
-    potencial: perfil?.potencial || (usuariosReales >= 15 ? "Alto" : usuariosReales >= 8 ? "Medio/Alto" : "Medio"),
-    estado: perfil?.estado || (usuariosReales >= 8 ? "Operativo" : "En formación"),
-  };
-}
-
-function estadoClasses(estado: string) {
-  if (estado === "Operativo") return "border-emerald-300/25 bg-emerald-400/10 text-emerald-100";
-  if (estado === "En crecimiento") return "border-sky-300/25 bg-sky-400/10 text-sky-100";
-  return "border-violet-300/25 bg-violet-400/10 text-violet-100";
 }
 
 function HubNeighborhoodIllustration() {
@@ -167,8 +108,8 @@ function HubNeighborhoodIllustration() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_42%,rgba(2,6,23,0.86)_88%)]" />
 
       <svg viewBox="0 0 760 560" role="img" aria-labelledby="hubHeroTitle hubHeroDesc" className="relative z-10 h-auto w-full">
-        <title id="hubHeroTitle">Red barrial premium operada por HUBYA</title>
-        <desc id="hubHeroDesc">Visualización tecnológica de un barrio donde solo algunas unidades están iluminadas y conectadas a un núcleo central HUBYA.</desc>
+        <title id="hubHeroTitle">Vecinos agrupados para contratar servicios con HUBYA</title>
+        <desc id="hubHeroDesc">Visualización tecnológica de vecinos conectados a un hub central que coordina contratación de servicios y operación.</desc>
         <defs>
           <linearGradient id="hubHeroPlate" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#17203a" /><stop offset="52%" stopColor="#0f172a" /><stop offset="100%" stopColor="#020617" /></linearGradient>
           <linearGradient id="hubHeroRoad" x1="0" x2="1"><stop offset="0%" stopColor="#111827" /><stop offset="100%" stopColor="#020617" /></linearGradient>
@@ -208,12 +149,12 @@ function HubNeighborhoodIllustration() {
           <g transform="translate(38 36)">
             <rect width="258" height="64" rx="22" fill="#020617" opacity="0.72" stroke="#8b5cf6" strokeOpacity="0.35" />
             <text x="20" y="27" fill="#f5d0fe" fontSize="12" fontWeight="900" letterSpacing="2.3">AGRUPAMOS POTENCIAL</text>
-            <text x="20" y="48" fill="#94a3b8" fontSize="11" fontWeight="700">casas activas conectadas · barrio ordenado</text>
+            <text x="20" y="48" fill="#94a3b8" fontSize="11" fontWeight="700">vecinos agrupados · servicios coordinados</text>
           </g>
           <g transform="translate(548 40)">
             <rect width="154" height="52" rx="20" fill="#020617" opacity="0.7" stroke="#38bdf8" strokeOpacity="0.28" />
-            <text x="22" y="24" fill="#e0f2fe" fontSize="11" fontWeight="900" letterSpacing="1.7">P = W / t</text>
-            <text x="22" y="40" fill="#c4b5fd" fontSize="9" fontWeight="800" letterSpacing="1.2">POTENCIA OPERATIVA</text>
+            <text x="22" y="24" fill="#e0f2fe" fontSize="11" fontWeight="900" letterSpacing="1.7">SERVICIOS</text>
+            <text x="22" y="40" fill="#c4b5fd" fontSize="9" fontWeight="800" letterSpacing="1.2">COORDINADOS</text>
           </g>
         </g>
       </svg>
@@ -223,7 +164,7 @@ function HubNeighborhoodIllustration() {
 
 export default async function WebPublicaPage() {
   const hubs = (await getHubs()).filter((hub) => hub.activo !== false);
-  const totalUsuarios = hubs.reduce((acc, hub) => acc + hub.clientesActivos, 0);
+  const totalUsuarios = hubs.reduce((acc, hub) => acc + vecinosAgrupadosHub(hub), 0);
   const capacidadTotal = capacidadMensual(totalUsuarios);
 
   return (
@@ -332,59 +273,32 @@ export default async function WebPublicaPage() {
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-violet-200">Hubs</p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">{hubs.length} Hubs activos · {totalUsuarios} personas agrupadas.</h2>
+              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Vecinos agrupados para contratar servicios.</h2>
             </div>
-            <p className="max-w-xl text-sm font-semibold leading-7 text-white/58">La web muestra capacidad mensual agrupada. Los datos privados de cada persona quedan protegidos.</p>
+            <p className="max-w-xl text-sm font-semibold leading-7 text-white/58">Cada Hub reúne vecinos de una zona para ordenar la demanda, postular responsables y coordinar la operación sin exponer datos privados.</p>
           </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {hubs.map((hub) => {
-              const perfil = perfilHub(hub.nombre, hub.clientesActivos, hub.rama);
-              const capacidad = capacidadMensual(perfil.usuarios);
+              const vecinosAgrupados = vecinosAgrupadosHub(hub);
+              const estadoAtencion = estadoAtencionHub(hub);
 
               return (
-                <Link key={hub.id} href={`/hubs/${hub.slug}`} className="group relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/[0.055] p-5 shadow-xl shadow-black/15 transition hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-white/[0.08]">
+                <article key={hub.id} className="group relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/[0.055] p-5 shadow-xl shadow-black/15 transition hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-white/[0.08]">
                   <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-400 via-fuchsia-300 to-sky-300 opacity-80" />
                   <div className="absolute -right-8 -top-8 opacity-[0.09] transition group-hover:opacity-[0.16]">
                     <HubyaBrandLogo markOnly className="h-32 w-32" />
                   </div>
-                  <div className="relative flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-200">Hub público</p>
-                      <h3 className="mt-2 text-2xl font-black">{hub.nombre}</h3>
-                    </div>
-                    <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${estadoClasses(perfil.estado)}`}>{perfil.estado}</span>
+
+                  <div className="relative">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-200">Hub público</p>
+                    <h3 className="mt-2 text-2xl font-black">{hub.nombre}</h3>
+                    <p className="mt-5 text-lg font-black leading-7 text-white">{vecinosAgrupados} vecinos agrupados para contratar servicios</p>
+                    <p className={`mt-4 inline-flex rounded-full border px-3 py-2 text-xs font-black ${hub.responsableHub?.nombre ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100" : "border-sky-300/25 bg-sky-400/10 text-sky-100"}`}>{estadoAtencion}</p>
                   </div>
 
-                  <div className="relative mt-5 rounded-2xl border border-white/10 bg-black/15 p-4">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-white/40">Rubro</p>
-                    <p className="mt-1 text-base font-black text-white">{perfil.rubro}</p>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-violet-300/20 bg-violet-500/10 p-4">
-                      <p className="text-3xl font-black text-violet-100">{perfil.usuarios}</p>
-                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">usuarios</p>
-                    </div>
-                    <div className="rounded-2xl border border-sky-300/20 bg-sky-500/10 p-4">
-                      <p className="text-xl font-black text-sky-100">{perfil.potencial}</p>
-                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">potencial</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-4">
-                      <p className="text-2xl font-black text-fuchsia-100">{capacidad.horasMantenimiento} hs</p>
-                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">trabajo / mes</p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-2xl font-black text-white">P↑</p>
-                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">potencia operativa</p>
-                    </div>
-                  </div>
-
-                  <span className="mt-5 inline-flex rounded-xl bg-violet-200 px-3 py-2 text-xs font-black text-[#12071f] transition group-hover:bg-white">Ver Hub →</span>
-                </Link>
+                  <Link href={`/hubs/${hub.slug}`} className="relative mt-6 inline-flex rounded-xl bg-violet-200 px-4 py-3 text-sm font-black text-[#12071f] transition group-hover:bg-white">Ver hub</Link>
+                </article>
               );
             })}
           </div>
