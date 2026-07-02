@@ -12,7 +12,21 @@ export type Cliente = { id: string; nombre: string; email: string; whatsapp: str
 export type ContactoInput = Partial<Pick<Cliente, "nombre" | "email" | "whatsapp" | "referencia" | "direccion" | "servicioInteres" | "observaciones" | "tarifaCliente" | "hubId" | "tipoDestino" | "estado">>;
 export type HubInformacionImportante = { titulo: string; texto: string; mostrarEnWebPublica: boolean; mostrarEnReporte: boolean };
 export type ModuloOperativoHub = "jardinerosya" | "fumigadoresya" | "comerciarya" | "pileterosya" | "otro";
-export type ParametrosJardinerosYaHub = { valorHoraTrabajo: number; comisionResponsableCuadrillaPorcentaje: number; traslado: number; aceite: number; nafta: number; valorHoraCortadoraCesped: number; valorHoraBordeadora: number; valorHoraMaquinaEmpuje: number; mostrarEnWebPublica: boolean };
+export type EscalaComisionManejoPersonal = { desde: number; hasta: number; porcentaje: number };
+export type EscalaTrasladoBonoFinalizacion = { desde: number; hasta: number; valor: number };
+export type ParametrosJardinerosYaHub = {
+  valorHoraTrabajo: number;
+  comisionResponsableCuadrillaPorcentaje: number;
+  traslado: number;
+  aceite: number;
+  nafta: number;
+  valorHoraCortadoraCesped: number;
+  valorHoraBordeadora: number;
+  valorHoraMaquinaEmpuje: number;
+  escalasComisionManejoPersonal: EscalaComisionManejoPersonal[];
+  escalasTrasladoBonoFinalizacion: EscalaTrasladoBonoFinalizacion[];
+  mostrarEnWebPublica: boolean;
+};
 export type ParametrosOperativosHub = { jardinerosYa?: ParametrosJardinerosYaHub };
 export type ResponsableHub = { nombre: string; iniciales: string; rol: string; descripcion: string };
 export type IntegranteEquipoOperativoPublico = { nombre: string; rol?: string; activo?: boolean };
@@ -149,9 +163,60 @@ function deduplicarHubs(hubsEntrada: Hub[]) {
   return { hubs, idCanonico };
 }
 
-export function parametrosJardinerosYaVacios(): ParametrosJardinerosYaHub { return { valorHoraTrabajo: 0, comisionResponsableCuadrillaPorcentaje: 0, traslado: 0, aceite: 0, nafta: 0, valorHoraCortadoraCesped: 0, valorHoraBordeadora: 0, valorHoraMaquinaEmpuje: 0, mostrarEnWebPublica: false }; }
+export function parametrosJardinerosYaVacios(): ParametrosJardinerosYaHub {
+  return {
+    valorHoraTrabajo: 0,
+    comisionResponsableCuadrillaPorcentaje: 0,
+    traslado: 0,
+    aceite: 0,
+    nafta: 0,
+    valorHoraCortadoraCesped: 0,
+    valorHoraBordeadora: 0,
+    valorHoraMaquinaEmpuje: 0,
+    escalasComisionManejoPersonal: [
+      { desde: 1, hasta: 1, porcentaje: 15 },
+      { desde: 2, hasta: 2, porcentaje: 20 },
+      { desde: 3, hasta: 5, porcentaje: 25 },
+    ],
+    escalasTrasladoBonoFinalizacion: [
+      { desde: 1, hasta: 1, valor: 0 },
+      { desde: 2, hasta: 3, valor: 0 },
+      { desde: 4, hasta: 6, valor: 0 },
+    ],
+    mostrarEnWebPublica: false,
+  };
+}
 
-export function normalizarParametrosJardinerosYa(input: Partial<ParametrosJardinerosYaHub> | undefined): ParametrosJardinerosYaHub { const base = parametrosJardinerosYaVacios(); return Object.fromEntries(Object.entries(base).map(([clave, valor]) => [clave, clave === "mostrarEnWebPublica" ? Boolean(input?.mostrarEnWebPublica) : Number((input?.[clave as keyof ParametrosJardinerosYaHub] ?? valor) || 0)])) as ParametrosJardinerosYaHub; }
+export function normalizarParametrosJardinerosYa(input: Partial<ParametrosJardinerosYaHub> | undefined): ParametrosJardinerosYaHub {
+  const base = parametrosJardinerosYaVacios();
+  const normalizarNumero = (valor: unknown) => Number(valor || 0);
+  const normalizarEscalasComision = (escalas: unknown) => Array.isArray(escalas) && escalas.length > 0
+    ? escalas.map((escala) => {
+      const item = escala as Partial<EscalaComisionManejoPersonal>;
+      return { desde: normalizarNumero(item.desde), hasta: normalizarNumero(item.hasta), porcentaje: normalizarNumero(item.porcentaje) };
+    })
+    : base.escalasComisionManejoPersonal;
+  const normalizarEscalasTraslado = (escalas: unknown) => Array.isArray(escalas) && escalas.length > 0
+    ? escalas.map((escala) => {
+      const item = escala as Partial<EscalaTrasladoBonoFinalizacion>;
+      return { desde: normalizarNumero(item.desde), hasta: normalizarNumero(item.hasta), valor: normalizarNumero(item.valor) };
+    })
+    : base.escalasTrasladoBonoFinalizacion;
+
+  return {
+    valorHoraTrabajo: normalizarNumero(input?.valorHoraTrabajo),
+    comisionResponsableCuadrillaPorcentaje: normalizarNumero(input?.comisionResponsableCuadrillaPorcentaje),
+    traslado: normalizarNumero(input?.traslado),
+    aceite: normalizarNumero(input?.aceite),
+    nafta: normalizarNumero(input?.nafta),
+    valorHoraCortadoraCesped: normalizarNumero(input?.valorHoraCortadoraCesped),
+    valorHoraBordeadora: normalizarNumero(input?.valorHoraBordeadora),
+    valorHoraMaquinaEmpuje: normalizarNumero(input?.valorHoraMaquinaEmpuje),
+    escalasComisionManejoPersonal: normalizarEscalasComision(input?.escalasComisionManejoPersonal),
+    escalasTrasladoBonoFinalizacion: normalizarEscalasTraslado(input?.escalasTrasladoBonoFinalizacion),
+    mostrarEnWebPublica: Boolean(input?.mostrarEnWebPublica),
+  };
+}
 
 function normalizarNivelEstabilidad(valor: unknown): number { const numero = Number(valor); if (!Number.isFinite(numero)) return 8; return Math.min(10, Math.max(1, Math.round(numero))); }
 

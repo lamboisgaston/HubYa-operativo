@@ -83,7 +83,56 @@ export function HubPublicPage({ hub }: { hub: HubPublico }) {
       </section>
 
       {hub.informacionImportante?.mostrarEnWebPublica && hub.informacionImportante.texto && <section className="mt-8 rounded-3xl border border-[#BFE8CF] bg-[#EAF7EF] p-6 text-[#0B1726] shadow-2xl shadow-emerald-950/10"><p className="text-xs font-black uppercase tracking-[0.22em] text-[#1E8F4D]">Información importante</p><h2 className="mt-2 text-2xl font-black">{hub.informacionImportante.titulo || "Información importante del Hub"}</h2><p className="mt-3 whitespace-pre-wrap text-base leading-7 text-[#375243]">{hub.informacionImportante.texto}</p></section>}
-      {parametrosJardinerosYa && <section className="mt-8 rounded-3xl border border-[#DDE7E2] bg-[#FFF4CC] p-6 text-[#0B1726] shadow-2xl shadow-lime-950/10"><p className="text-xs font-black uppercase tracking-[0.22em] text-[#1E8F4D]">Parámetros de trabajo del Hub</p><h2 className="mt-2 text-2xl font-black">{categoria.textos.parametrosTitulo}</h2><p className="mt-3 text-base leading-7 text-[#375243]">{categoria.textos.parametrosDescripcion}</p><dl className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">{[["Valor hora de trabajo", formatoMoneda(parametrosJardinerosYa.valorHoraTrabajo)], ["Comisión responsable de cuadrilla", `${parametrosJardinerosYa.comisionResponsableCuadrillaPorcentaje}%`], ["Traslado", formatoMoneda(parametrosJardinerosYa.traslado)], ["Nafta", formatoMoneda(parametrosJardinerosYa.nafta)], ["Aceite", formatoMoneda(parametrosJardinerosYa.aceite)], ["Hora cortadora de césped", formatoMoneda(parametrosJardinerosYa.valorHoraCortadoraCesped)], ["Hora bordeadora", formatoMoneda(parametrosJardinerosYa.valorHoraBordeadora)], ["Hora máquina de empuje", formatoMoneda(parametrosJardinerosYa.valorHoraMaquinaEmpuje)]].map(([k, v]) => <div key={k} className="rounded-2xl border border-[#DDE7E2] bg-white p-4"><dt className="text-xs font-black uppercase text-[#53685C]">{k}</dt><dd className="mt-1 text-lg font-black text-[#0B1726]">{v}</dd></div>)}</dl></section>}
+      {parametrosJardinerosYa && <section className="mt-8 rounded-3xl border border-[#DDE7E2] bg-[#FFF4CC] p-6 text-[#0B1726] shadow-2xl shadow-lime-950/10">
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1E8F4D]">Parámetros JardinerosYa del Hub</p>
+        <h2 className="mt-2 text-2xl font-black">Parámetros de referencia para el servicio</h2>
+        <p className="mt-3 text-base leading-7 text-[#375243]">
+          Estos valores sirven como referencia para ordenar el cobro del servicio: hora de trabajo, manejo de personal, maquinaria y traslado/bono de finalización.
+        </p>
+
+        <dl className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-[#DDE7E2] bg-white p-4">
+            <dt className="text-xs font-black uppercase text-[#53685C]">Precio de la hora de trabajo</dt>
+            <dd className="mt-1 text-lg font-black text-[#0B1726]">{formatoMoneda(parametrosJardinerosYa.valorHoraTrabajo)}</dd>
+          </div>
+          <div className="rounded-2xl border border-[#DDE7E2] bg-white p-4">
+            <dt className="text-xs font-black uppercase text-[#53685C]">Precio de la hora máquina bordeadora</dt>
+            <dd className="mt-1 text-lg font-black text-[#0B1726]">{formatoMoneda(parametrosJardinerosYa.valorHoraBordeadora)}</dd>
+          </div>
+          <div className="rounded-2xl border border-[#DDE7E2] bg-white p-4">
+            <dt className="text-xs font-black uppercase text-[#53685C]">Precio de la hora máquina de empuje</dt>
+            <dd className="mt-1 text-lg font-black text-[#0B1726]">{formatoMoneda(parametrosJardinerosYa.valorHoraMaquinaEmpuje)}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-[#DDE7E2] bg-white p-4">
+            <h3 className="text-sm font-black text-[#0B1726]">Comisión por manejo de personal</h3>
+            <p className="mt-1 text-xs font-bold text-[#53685C]">A mayor cantidad de personas coordinadas, mayor comisión por manejo de personal.</p>
+            <div className="mt-3 grid gap-2">
+              {(parametrosJardinerosYa.escalasComisionManejoPersonal || []).map((escala, index) => (
+                <div key={`comision-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#F8FAF7] px-3 py-2 text-sm font-bold">
+                  <span>{escala.desde} a {escala.hasta} ayudantes/personas</span>
+                  <strong>{escala.porcentaje}%</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[#DDE7E2] bg-white p-4">
+            <h3 className="text-sm font-black text-[#0B1726]">Traslado / bono de finalización</h3>
+            <p className="mt-1 text-xs font-bold text-[#53685C]">A mayor cantidad de casas atendidas, menor debería ser el costo de traslado por casa.</p>
+            <div className="mt-3 grid gap-2">
+              {(parametrosJardinerosYa.escalasTrasladoBonoFinalizacion || []).map((escala, index) => (
+                <div key={`traslado-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#F8FAF7] px-3 py-2 text-sm font-bold">
+                  <span>{escala.desde} a {escala.hasta} casas</span>
+                  <strong>{formatoMoneda(escala.valor)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>}
       <section className="mt-8 rounded-[2rem] border border-[#DDE7E2] bg-white p-6"><p className="text-xs font-black uppercase tracking-[0.22em] text-[#53685C]">Datos generales del hub</p><dl className="mt-5 grid gap-4 md:grid-cols-4">{[["Estado", estadoLegible(hub.estado)], ["Categoría", categoria.nombre], ["Responsable", responsable?.nombre || "Pendiente"], ["Última actividad", obtenerUltimaActividad(hub)]].map(([k, v]) => <div key={k} className="rounded-2xl border border-[#DDE7E2] bg-[#F8FAF7] p-4"><dt className="text-xs font-black uppercase text-[#53685C]">{k}</dt><dd className="mt-1 text-lg font-black text-[#0B1726]">{v}</dd></div>)}</dl></section>
       <HubServiciosList servicios={hub.servicios} />
     </section>
