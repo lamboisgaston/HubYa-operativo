@@ -60,7 +60,7 @@ export function CrearHubForm() {
         >
           Crear nuevo Hub
         </button>
-        <a href="/web-publica" target="_blank" rel="noreferrer" className="rounded-2xl border border-[#b7c3ad] bg-[#f8faf5] px-5 py-3 text-sm font-black text-[#1f2a1d] transition hover:bg-[#eef4ea]">Ver web pública</a>
+        <a href="/" target="_blank" rel="noreferrer" className="rounded-2xl border border-[#b7c3ad] bg-[#f8faf5] px-5 py-3 text-sm font-black text-[#1f2a1d] transition hover:bg-[#eef4ea]">Ver web pública</a>
         <a href="/operativo/contactos" className="rounded-2xl border border-[#b7c3ad] bg-[#f8faf5] px-5 py-3 text-sm font-black text-[#1f2a1d] transition hover:bg-[#eef4ea]">Importar contactos</a>
         <a href="#base-general" className="rounded-2xl border border-[#b7c3ad] bg-[#f8faf5] px-5 py-3 text-sm font-black text-[#1f2a1d] transition hover:bg-[#eef4ea]">Base de usuarios</a>
         <a href="/operativo/reportes" className="rounded-2xl border border-[#b7c3ad] bg-[#f8faf5] px-5 py-3 text-sm font-black text-[#1f2a1d] transition hover:bg-[#eef4ea]">Reportes generales</a>
