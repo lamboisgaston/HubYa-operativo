@@ -8,10 +8,10 @@ export default async function HubEntradaPage({ params }: { params: Promise<{ hub
 
   const acciones = hub.branchId === "ventas" ? [
     { label: "Propuestas comerciales", href: `/operativo/hubs/${hub.slug}/ventas`, helper: "Crear propuesta, compartir link, registrar respuestas y organizar entrega." },
-    { label: "Ver usuarios", href: `/operativo/hubs/${hub.slug}/usuarios`, helper: "Integrantes/clientes del Hub que reciben propuestas." },
+    { label: "Ver clientes", href: `/operativo/hubs/${hub.slug}/usuarios`, helper: "Integrantes/clientes del Hub que reciben propuestas." },
   ] : [
-    { label: "Ver usuarios", href: `/operativo/hubs/${hub.slug}/usuarios`, helper: "Personas, clientes o contactos del Hub." },
-    { label: "Agregar usuario", href: `/operativo/hubs/${hub.slug}/usuarios#agregar`, helper: "Cargar una persona nueva en este Hub." },
+    { label: "Ver clientes", href: `/operativo/hubs/${hub.slug}/usuarios`, helper: "Clientes, vecinos o integrantes asociados a este Hub." },
+    { label: "Agregar cliente", href: `/operativo/hubs/${hub.slug}/usuarios#agregar`, helper: "Cargar un cliente o vecino nuevo en este Hub." },
     { label: "Generar reporte", href: `/operativo/hubs/${hub.slug}/reporte`, helper: "Crear un reporte simple de trabajo." },
     { label: "Ver historial", href: `/operativo/hubs/${hub.slug}/reportes`, helper: "Revisar reportes guardados y enviados." },
     { label: "Configurar Hub", href: `/operativo/hubs/${hub.slug}/ficha`, helper: "Editar ficha, equipo y parámetros cuando haga falta." },

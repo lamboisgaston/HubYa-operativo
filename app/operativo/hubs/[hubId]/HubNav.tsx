@@ -14,7 +14,7 @@ export function HubNav({ hub }: { hub: HubPublico; active?: string }) {
         </div>
         <nav className="flex flex-wrap gap-2">
           <Link href="/operativo" className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Operativo</Link>
-          <Link href={`/operativo/hubs/${hub.slug}/usuarios`} className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Usuarios</Link>
+          <Link href={`/operativo/hubs/${hub.slug}/usuarios`} className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Clientes</Link>
           <Link href={`/operativo/hubs/${hub.slug}/comunicaciones`} className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Comunicaciones</Link>
           <Link href={`/operativo/hubs/${hub.slug}/respuestas`} className="rounded-2xl border border-[#cfd8c6] bg-[#f8faf5] px-4 py-3 text-center text-sm font-black text-[#1f2a1d]">Respuestas</Link>
           <Link href={`/operativo/hubs/${hub.slug}`} className="rounded-2xl bg-[#1f2a1d] px-4 py-3 text-center text-sm font-black text-white">Volver al Hub</Link>
